@@ -385,7 +385,12 @@ subroutine AD_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitOut
          
       
       ! set the rest of the parameters
-   p%Skew_Mod = InputFileData%Skew_Mod
+   ! NOTE: some parameters need to be set even if no rotors
+   p%Skew_Mod      = InputFileData%Skew_Mod
+   p%UA_Flag       = InputFileData%UA_Init%UAMod > UA_None
+   p%CompAeroMaps  = InitInp%CompAeroMaps
+   p%DT            = InputFileData%DTAero
+   p%Wake_Mod      = InputFileData%Wake_Mod
    do iR = 1, nRotors
       p%rotors(iR)%AeroProjMod = AeroProjMod(iR)
       call WrScr('   AeroDyn: projMod: '//trim(num2lstr(p%rotors(iR)%AeroProjMod)))
@@ -1444,9 +1449,8 @@ subroutine SetParameters( InitInp, InputFileData, RotData, p, p_AD, ErrStat, Err
 
    p%MHK              = InitInp%MHK
    
-   p_AD%DT            = InputFileData%DTAero
-   p_AD%Wake_Mod      = InputFileData%Wake_Mod
    p%DBEMT_Mod        = InputFileData%DBEMT_Mod
+
    p%TwrPotent        = InputFileData%TwrPotent
    p%TwrShadow        = InputFileData%TwrShadow
    p%TwrAero          = InputFileData%TwrAero
@@ -1736,9 +1740,11 @@ subroutine AD_End( u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg )
       if (p%Wake_Mod == WakeMod_FVW ) then
 
          if ( p%UA_Flag ) then
-            do iW=1,p%FVW%nWings
-               call UA_End(m%FVW%W(iW)%p_UA)
-            enddo
+            if (allocated(m%FVW%W)) then
+               do iW=1,p%FVW%nWings
+                  call UA_End(m%FVW%W(iW)%p_UA)
+               enddo
+            endif
          end if
 
          call FVW_End( m%FVW_u, p%FVW, x%FVW, xd%FVW, z%FVW, OtherState%FVW, m%FVW_y, m%FVW, ErrStat, ErrMsg )
@@ -5096,11 +5102,25 @@ SUBROUTINE Init_OLAF( InputFileData, u_AD, u, p, x, xd, z, OtherState, m, ErrSta
    allocate(InitInp%W(nWings)        , STAT = ErrStat2); ErrMsg2='Allocate W'; if(Failed()) return
    allocate(InitInp%WingsMesh(nWings), STAT = ErrStat2); ErrMsg2='Allocate Wings Mesh'; if(Failed()) return
 
+   ! --- Default inputs (not per retor) 
+   ! UA and inputs that are not per rotor
+   InitInp%UA_Flag    = p%UA_Flag
+   ! Important inputs if no rotors are present!
+   if (size(p%rotors)==0) then
+      InitInp%numBladeNodes = 0
+      InitInp%AirDens       = InputFileData%AirDens
+      InitInp%KinVisc       = InputFileData%KinVisc
+      InitInp%MHK           = 0                                    ! TODO this is an initinp of AeroDyn
+      InitInp%WtrDpth       = 0.0_ReKi                             ! TODO this is an initinp of AeroDyn
+      InitInp%RootName      = p%RootName(1:len_trim(p%RootName)-2) ! Removing "AD"
+   endif
+
    ! --- Inputs per wings/blades
    iW_incr=0
    do iR=1, size(p%rotors)
 
       InitInp%numBladeNodes  = p%rotors(iR)%numBlNds ! TODO TODO TODO per wing
+      InitInp%AirDens        = p%rotors(iR)%AirDens
       InitInp%KinVisc        = p%rotors(iR)%KinVisc
       InitInp%MHK            = p%rotors(iR)%MHK
       InitInp%WtrDpth        = p%rotors(iR)%WtrDpth
@@ -5163,9 +5183,6 @@ SUBROUTINE Init_OLAF( InputFileData, u_AD, u, p, x, xd, z, OtherState, m, ErrSta
          if(Failed()) return
    
       enddo ! iB, blades
-
-      ! Unsteady Aero Data
-      InitInp%UA_Flag    = p%UA_Flag
       call UA_CopyInitInput(InputFileData%UA_Init, InitInp%UA_Init, MESH_NEWCOPY, ErrStat2, ErrMsg2)
 
       iW_incr = iW_incr+p%rotors(iR)%numBlades

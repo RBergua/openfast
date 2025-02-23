@@ -540,7 +540,7 @@ subroutine Init_ADI_ForDriver(iCase, ADI, dvr, FED, dt, needInitIW, errStat, err
       InitInp%AD%defPvap     = dvr%Pvap
       InitInp%AD%WtrDpth     = dvr%WtrDpth
       InitInp%AD%MSL2SWL     = dvr%MSL2SWL
-      InitInp%AD%CompSeaSt   = dvr%SS_InitInp%CompSeaSt
+      InitInp%AD%CompSeaSt   = dvr%SS_InitInp%CompSeaSt /=0
       ! Init data per rotor
       allocate(InitInp%AD%rotors(dvr%numTurbines), stat=errStat) 
       if (errStat/=0) then
@@ -1037,7 +1037,7 @@ subroutine Dvr_ReadInputFile(fileName, dvr, errStat, errMsg )
    call ParseCom(FileInfo_In, CurLine, Line, errStat2, errMsg2, unEc); if (Failed()) return
    call ParseVar(FileInfo_In, CurLine, "compInflow", dvr%IW_InitInp%compInflow  , errStat2, errMsg2, unEc); if (Failed()) return
    call ParseVar(FileInfo_In, CurLine, "InflowFile", dvr%IW_InitInp%InputFile, errStat2, errMsg2, unEc, IsPath=.true.); if (Failed()) return
-   if (dvr%IW_InitInp%compInflow==0) then
+   if (dvr%IW_InitInp%compInflow/=1) then
       call ParseVar(FileInfo_In, CurLine, "HWindSpeed", dvr%IW_InitInp%HWindSpeed  , errStat2, errMsg2, unEc); if (Failed()) return
       call ParseVar(FileInfo_In, CurLine, "RefHt"     , dvr%IW_InitInp%RefHt       , errStat2, errMsg2, unEc); if (Failed()) return
       call ParseVar(FileInfo_In, CurLine, "PLExp"     , dvr%IW_InitInp%PLExp       , errStat2, errMsg2, unEc); if (Failed()) return
@@ -1543,6 +1543,9 @@ subroutine Dvr_InitializeOutputs(nWT, out, numSteps, errStat, errMsg)
             end do ! i
             write (out%unOutFile(iWT),'()')
          enddo
+         if (nWT==0) then
+            ! Special case, no turbine, TODO
+         endif
       endif
 
       ! --- Binary
@@ -1744,7 +1747,11 @@ subroutine Dvr_WriteOutputs(nt, t, dvr, out, yADI, SeaSt, errStat, errMsg)
    END IF
 
    ! Packing all outputs excpet time into one array
-   nAD = size(yADI%AD%rotors(1)%WriteOutput)
+   if (size(yADI%AD%rotors)>=1) then
+      nAD = size(yADI%AD%rotors(1)%WriteOutput)
+   else
+      nAD = 0
+   endif
    nIW = size(yADI%IW_WriteOutput)
    nSS = size(SeaSt%y%WriteOutput)
    nDV = out%nDvrOutputs
@@ -1872,11 +1879,15 @@ subroutine setVTKParameters(DVR_Outs, dvr, ADI, errStat, errMsg, dirname)
    ! Get radius for ground (blade length + hub radius):
    GroundRad = MaxBladeLength + MaxTwrLength+ DVR_Outs%VTKHubRad
    ! write the ground or seabed reference polygon:
-   RefPoint(1:2) = dvr%WT(1)%originInit(1:2)
-   do iWT=2,dvr%numTurbines
-      RefPoint(1:2) = RefPoint(1:2) + dvr%WT(iWT)%originInit(1:2)
-   end do
-   RefPoint(1:2) = RefPoint(1:2) / dvr%numTurbines
+   if (dvr%numTurbines>0) then
+      RefPoint(1:2) = dvr%WT(1)%originInit(1:2)
+      do iWT=2,dvr%numTurbines
+         RefPoint(1:2) = RefPoint(1:2) + dvr%WT(iWT)%originInit(1:2)
+      end do
+      RefPoint(1:2) = RefPoint(1:2) / dvr%numTurbines
+   else
+      RefPoint(1:3) = 0.0_ReKi
+   endif
    
    RefPoint(3) = 0.0_ReKi
    RefLengths  = GroundRad  + sqrt((WorldBoxMax(1)-WorldBoxMin(1))**2 + (WorldBoxMax(2)-WorldBoxMin(2))**2)
