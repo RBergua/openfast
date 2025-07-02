@@ -535,10 +535,9 @@ subroutine ModGlue_Init(p, m, y, p_FAST, m_FAST, Turbine, ErrStat, ErrMsg)
    ! Glue Module
    !----------------------------------------------------------------------------
 
-   LinFlags = VF_Linearize + VF_Mapping
-   ! LinFlags = VF_None
+   LinFlags = VF_Linearize + VF_Mapping + VF_Mesh
    call ModGlue_CombineModules(m%ModGlue, m%ModData, m%Mappings, p%Lin%iMod, LinFlags, &
-                            p_FAST%Linearize, ErrStat2, ErrMsg2, Name="Lin")
+                               p_FAST%Linearize, ErrStat2, ErrMsg2, Name="Lin")
    if (Failed()) return
 
    !----------------------------------------------------------------------------
@@ -829,8 +828,6 @@ contains
    function CalcOutputErrorAtAzimuth() result(eps_squared)
       real(R8Ki)  :: eps_squared_sum, eps_squared
       integer(IntKi) :: un, k
-
-
 
       ! Calculate difference between interpolated outputs for this rotation and
       ! interpolated outputs from previous rotation

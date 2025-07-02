@@ -397,11 +397,13 @@ subroutine FAST_InitMappings(Mappings, Mods, Turbine, ErrStat, ErrMsg)
       case (Module_ED)
 
          call MapCustom(MappingsTmp, Custom_ED_Tower_Damping, Mods(iModDst), Mods(iModDst), &
+                        DstDL=DatLoc(ED_u_TowerPtLoads), &
                         Active=Turbine%p_FAST%CalcSteady)
          
          do i = 1, Turbine%ED%p(Mods(iModDst)%Ins)%NumBl
             call MapCustom(MappingsTmp, Custom_ED_Blade_Damping, Mods(iModDst), Mods(iModDst), &
-                           i=i, Active=Turbine%p_FAST%CalcSteady .and. (Turbine%p_FAST%CompElast == Module_ED))
+                           i=i, DstDL=DatLoc(ED_u_BladePtLoads, i) ,&
+                           Active=Turbine%p_FAST%CalcSteady .and. (Turbine%p_FAST%CompElast == Module_ED))
          end do
 
          ! If FAST.Farm integration enabled and substructure is not modeled with SubDyn
@@ -421,6 +423,7 @@ subroutine FAST_InitMappings(Mappings, Mods, Turbine, ErrStat, ErrMsg)
       case (Module_BD)
 
          call MapCustom(MappingsTmp, Custom_BD_Blade_Damping, Mods(iModDst), Mods(iModDst), &
+                        DstDL=DatLoc(BD_u_PointLoad), &
                         Active=Turbine%p_FAST%CalcSteady)
 
       case (Module_SD)
@@ -578,7 +581,7 @@ subroutine FAST_InitMappings(Mappings, Mods, Turbine, ErrStat, ErrMsg)
 
             ! Create temporary motion mesh as cousin of load mesh, to compute get
             ! velocities at load locations for computing damping forces
-            call MeshCopy(SrcMesh=Turbine%BD%Input(INPUT_CURR, Mapping%DstIns)%DistrLoad, &
+            call MeshCopy(SrcMesh=Turbine%BD%Input(INPUT_CURR, Mapping%DstIns)%PointLoad, &
                           DestMesh=Mapping%TmpMotionMesh, &
                           CtrlCode=MESH_COUSIN, &
                           IOS=COMPONENT_OUTPUT, &
@@ -2357,11 +2360,12 @@ end subroutine
 
 !> MapCustom creates a custom mapping that is not included in linearization.
 !! Each custom mapping needs an entry in FAST_InputSolve to actually perform the transfer.
-subroutine MapCustom(Mappings, Desc, SrcMod, DstMod, i, Active)
+subroutine MapCustom(Mappings, Desc, SrcMod, DstMod, i, DstDL, Active)
    type(MappingType), allocatable, intent(inout)   :: Mappings(:)
    character(*), intent(in)                        :: Desc
    type(ModDataType), intent(inout)                :: SrcMod, DstMod
    integer(IntKi), optional, intent(in)            :: i
+   type(DatLoc), optional, intent(in)              :: DstDL
    logical, optional, intent(in)                   :: Active
    type(MappingType)                               :: Mapping
 
@@ -2379,6 +2383,7 @@ subroutine MapCustom(Mappings, Desc, SrcMod, DstMod, i, Active)
    Mapping%SrcIns = SrcMod%Ins
    Mapping%DstIns = DstMod%Ins
    if (present(i)) Mapping%i = i
+   if (present(DstDL)) Mapping%DstDL = DstDL
 
    ! Add mapping to array of mappings
    call AppendMapping(Mappings, Mapping)
@@ -2890,9 +2895,20 @@ subroutine FAST_InputSolve(iModDst, ModAry, MapAry, iInput, Turbine, ErrStat, Er
 
             ! Skip mappings that are not ready
             if (.not. Mapping%Ready) cycle
-            
+
+            ! Switch based on mapping type
+            select case (Mapping%MapType)
+
             ! If this is a load mesh mapping, clear the loads
-            if (Mapping%MapType == Map_LoadMesh) call ZeroDstLoadMesh(Mapping, ModAry(VarMapAry(i)%iModDst))
+            case (Map_LoadMesh)
+               call ZeroDstLoadMesh(Mapping, ModAry(Mapping%iModDst))
+            
+            ! If this is a custom mesh mapping and a destination mesh is specified, clear the loads
+            case (Map_Custom)
+               if (Mapping%DstDL%Num /= 0) call ZeroDstLoadMesh(Mapping, ModAry(Mapping%iModDst))
+
+            end select
+            
          end associate
       end do
 
@@ -2922,9 +2938,19 @@ subroutine FAST_InputSolve(iModDst, ModAry, MapAry, iInput, Turbine, ErrStat, Er
 
          ! Skip mappings where this isn't the destination module
          if (iModDst /= MapAry(i)%iModDst) cycle
-         
+
+         ! Switch based on mapping type
+         select case (MapAry(i)%MapType)
+
          ! If this is a load mesh mapping, clear the loads
-         if (MapAry(i)%MapType == Map_LoadMesh) call ZeroDstLoadMesh(MapAry(i), ModAry(MapAry(i)%iModDst))
+         case (Map_LoadMesh)
+            call ZeroDstLoadMesh(MapAry(i), ModAry(MapAry(i)%iModDst))
+         
+         ! If this is a custom mesh mapping and a destination mesh is specified, clear the loads
+         case (Map_Custom)
+            if (MapAry(i)%DstDL%Num /= 0) call ZeroDstLoadMesh(MapAry(i), ModAry(MapAry(i)%iModDst))
+
+         end select
       end do
 
       ! Loop through mappings and perform input solve
@@ -3107,7 +3133,8 @@ subroutine Custom_InputSolve(Mapping, ModSrc, ModDst, iInput, T, ErrStat, ErrMsg
    
    real(R8Ki)                             :: omega_c(3)
    real(R8Ki)                             :: r(3), r_hub(3)
-   real(R8Ki)                             :: Vrot(3)
+   real(R8Ki)                             :: Vrot(3), Vel(3)
+   real(R8Ki)                             :: DampingForce(3)
    
    ErrStat = ErrID_None
    ErrMsg = ''
@@ -3175,7 +3202,7 @@ subroutine Custom_InputSolve(Mapping, ModSrc, ModDst, iInput, T, ErrStat, ErrMsg
       end do
 
       ! Apply damping force as Bld_Kdmp*(node velocity)
-      T%BD%Input(iInput, Mapping%DstIns)%DistrLoad%Force = T%BD%Input(iInput, Mapping%DstIns)%DistrLoad%Force - T%p_FAST%Bld_Kdmp * Mapping%TmpMotionMesh%TranslationVel
+      T%BD%Input(iInput, Mapping%DstIns)%PointLoad%Force = T%BD%Input(iInput, Mapping%DstIns)%PointLoad%Force - T%p_FAST%Bld_Kdmp * Mapping%TmpMotionMesh%TranslationVel
 
 !-------------------------------------------------------------------------------
 ! ElastoDyn Inputs
@@ -3209,7 +3236,7 @@ subroutine Custom_InputSolve(Mapping, ModSrc, ModDst, iInput, T, ErrStat, ErrMsg
 
       ! Remove rotor rotational velocity from node velocity
       do i = 1, Mapping%TmpMotionMesh%Nnodes
-         r = Mapping%TmpMotionMesh%Position(:,i) +  Mapping%TmpMotionMesh%TranslationDisp(:,i) - r_hub
+         r = Mapping%TmpMotionMesh%Position(:,i) + Mapping%TmpMotionMesh%TranslationDisp(:,i) - r_hub
          Vrot = cross_product(omega_c, r)
          Mapping%TmpMotionMesh%TranslationVel(:,i) = Mapping%TmpMotionMesh%TranslationVel(:,i) - Vrot
       end do
