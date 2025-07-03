@@ -508,6 +508,13 @@ subroutine ModGlue_Init(p, m, y, p_FAST, m_FAST, Turbine, ErrStat, ErrMsg)
             end do
          end select
 
+         ! Remove linearize flag from input variables that have VF_NoLin flag
+         do j = 1, size(ModData%Vars%u)
+            if (MV_HasFlagsAll(ModData%Vars%u(j), VF_NoLin)) then
+               call MV_ClearFlags(ModData%Vars%u(j), VF_Linearize)
+            end if
+         end do
+
          ! Add or remove linearize flag based on requested output
          select case (p_FAST%LinOutputs)
          case (LIN_NONE)
@@ -527,6 +534,13 @@ subroutine ModGlue_Init(p, m, y, p_FAST, m_FAST, Turbine, ErrStat, ErrMsg)
                call MV_SetFlags(ModData%Vars%y(j), VF_Linearize)
             end do
          end select
+
+         ! Remove linearize flag from output variables that have VF_NoLin flag
+         do j = 1, size(ModData%Vars%y)
+            if (MV_HasFlagsAll(ModData%Vars%y(j), VF_NoLin)) then
+               call MV_ClearFlags(ModData%Vars%y(j), VF_Linearize)
+            end if
+         end do
 
       end associate
    end do
