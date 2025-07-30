@@ -5644,6 +5644,7 @@ SUBROUTINE BD_CalcForceAcc( u, p, OtherState, m, ErrStat, ErrMsg )
    INTEGER(IntKi)                               :: j
    REAL(BDKi)                                   :: RootAcc(6)
    REAL(BDKi)                                   :: NodeMassAcc(6)
+   INTEGER(IntKi)                               :: n_free
    INTEGER(IntKi)                               :: nelem ! number of elements
    INTEGER(IntKi)                               :: ErrStat2                     ! Temporary Error status
    CHARACTER(ErrMsgLen)                         :: ErrMsg2                      ! Temporary Error message
@@ -5651,73 +5652,54 @@ SUBROUTINE BD_CalcForceAcc( u, p, OtherState, m, ErrStat, ErrMsg )
 
    ErrStat = ErrID_None
    ErrMsg  = ""
-
-      ! must initialize these because BD_AssembleStiffK and BD_AssembleRHS are INOUT
+   ! must initialize these because BD_AssembleStiffK and BD_AssembleRHS are INOUT
    m%RHS    =  0.0_BDKi
    m%MassM  =  0.0_BDKi
 
-      ! Store the root accelerations as they will be used multiple times
+   ! Store the root accelerations as they will be used multiple times
    RootAcc(1:3) = u%RootMotion%TranslationAcc(1:3,1)
    RootAcc(4:6) = u%RootMotion%RotationAcc(1:3,1)
 
-
-      ! Calculate the global mass matrix and force vector for the beam
+   ! Calculate the global mass matrix and force vector for the beam
    DO nelem=1,p%elem_total
       CALL BD_ElementMatrixAcc( nelem, p, OtherState, m )            ! Calculate m%elm and m%elf
       CALL BD_AssembleStiffK(nelem,p,m%elm, m%MassM)     ! Assemble full mass matrix
       CALL BD_AssembleRHS(nelem,p,m%elf, m%RHS)          ! Assemble right hand side force terms
    ENDDO
 
-
-      ! Add point forces at GLL points to RHS of equation.
+   ! Add point forces at GLL points to RHS of equation.
    m%RHS = m%RHS + m%PointLoadLcl
 
+   ! Number of free degrees of freedom
+   n_free = p%dof_total - 6
 
-      ! Now set the root reaction force.
-      ! Note: m%RHS currently holds the force terms for the RHS of the equation.
-      !> The root reaction force is first node force minus  mass time acceleration terms:
-      !! \f$ F_\textrm{root} = F_1 - \sum_{i} m_{1,i} a_{i} \f$.
-   m%FirstNodeReactionLclForceMoment(1:6) =  m%RHS(1:6,1)
+   ! Full mass matrix (n_dof, n_dof)
+   m%LP_MassM = reshape(m%MassM, [p%dof_total, p%dof_total])
 
-      ! Setup the RHS of the m*a=F equation. Skip the first node as that is handled separately.
-   DO j=2,p%node_total
-      m%RHS(:,j)  =  m%RHS(:,j)  -  MATMUL( RESHAPE(m%MassM(:,j,:,1),(/6,6/)), RootAcc)
-   ENDDO
+   ! Mass matrix for free nodes
+   m%LP_MassM_LU = m%LP_MassM(7:p%dof_total, 7:p%dof_total)
 
+   ! Residual vector for free nodes
+   m%LP_RHS_LU = reshape(m%RHS(:,2:p%node_total), [n_free])
 
-      ! Solve for the accelerations!
-      !  Reshape for the use with the LAPACK solver.  Only solving for nodes 2:p%node_total (node 1 accelerations are known)
-   m%LP_RHS_LU =  RESHAPE(m%RHS(:,2:p%node_total),    (/p%dof_total-6/))
-   m%LP_MassM  =  RESHAPE(m%MassM,  (/p%dof_total,p%dof_total/))     ! Flatten out the dof dimensions of the matrix.
-   m%LP_MassM_LU  = m%LP_MassM(7:p%dof_total,7:p%dof_total)
+   ! Add force contributions from root acceleration
+   m%LP_RHS_LU = m%LP_RHS_LU - matmul(m%LP_MassM(7:,1:6), RootAcc)
 
-      ! Solve linear equations A * X = B for acceleration (F=ma) for nodes 2:p%node_total
-   CALL LAPACK_getrf( p%dof_total-6, p%dof_total-6, m%LP_MassM_LU, m%LP_indx, ErrStat2, ErrMsg2)
-      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-   CALL LAPACK_getrs( 'N',p%dof_total-6, m%LP_MassM_LU, m%LP_indx, m%LP_RHS_LU,ErrStat2, ErrMsg2)
-      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-
+   ! Solve linear equations A * X = B for acceleration (F=ma) for nodes 2:p%node_total
+   CALL LAPACK_getrf(n_free, n_free, m%LP_MassM_LU, m%LP_indx, ErrStat2, ErrMsg2)
+   CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   CALL LAPACK_getrs('N', n_free, m%LP_MassM_LU, m%LP_indx, m%LP_RHS_LU, ErrStat2, ErrMsg2)
+   CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (ErrStat >= AbortErrLev) return
 
-      ! Reshape for copy over to output overall accelerations of system
-   m%RHS(:,2:p%node_total) = RESHAPE( m%LP_RHS_LU, (/ p%dof_node, p%node_total-1 /) )
-   m%RHS(:,1) = RootAcc       ! This is known at the start.
+   ! Get reaction force at root node
+   m%FirstNodeReactionLclForceMoment = m%RHS(1:6,1) - &
+                                       matmul(m%LP_MassM(1:6,7:), m%LP_RHS_LU) - &
+                                       matmul(m%LP_MassM(1:6,1:6), RootAcc)   
 
-
-
-      !> Now that we have all the accelerations, complete the summation \f$ \sum_{i} m_{1,i} a_{i} \f$
-      ! First node:
-   NodeMassAcc = MATMUL( RESHAPE(m%MassM(:,1,:,1),(/6,6/)),m%RHS(:,1) )
-   m%FirstNodeReactionLclForceMoment(1:6)   =  m%FirstNodeReactionLclForceMoment(1:6)   - NodeMassAcc(1:6)
-
-      ! remaining nodes
-   DO j=2,p%Node_total
-      NodeMassAcc = MATMUL( RESHAPE(m%MassM(:,j,:,1),(/6,6/)),m%RHS(:,j) )
-      m%FirstNodeReactionLclForceMoment(1:6)   =  m%FirstNodeReactionLclForceMoment(1:6)   - NodeMassAcc(1:6)
-   ENDDO
-
-
-   RETURN
+   ! Populate RHS with prescribed root acceleration and solved accelerations
+   m%RHS(:,1) = RootAcc
+   m%RHS(:,2:p%node_total) = RESHAPE(m%LP_RHS_LU, [p%dof_node, p%node_total-1])
 
 END SUBROUTINE BD_CalcForceAcc
 
