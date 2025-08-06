@@ -3452,7 +3452,10 @@ class InputReader_OpenFAST(object):
                     if option_name.upper() == 'WATERKIN':
                         self.fst_vt['MoorDyn']['WaterKin'] = option_value.strip('"')
                         WaterKin_file = os.path.normpath(os.path.join(os.path.dirname(moordyn_file), self.fst_vt['MoorDyn']['WaterKin']))
-                        self.read_WaterKin(WaterKin_file)
+                        if not os.path.isfile(WaterKin_file):
+                            print(f'WaterKin file {WaterKin_file} does not exist.')
+                        else:
+                            self.read_WaterKin(WaterKin_file)
 
                     self.fst_vt['MoorDyn']['option_values'].append(float_read(option_value.strip('"'))) # some options values can be strings or floats
                     self.fst_vt['MoorDyn']['option_names'].append(option_name)
