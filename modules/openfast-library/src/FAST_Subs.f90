@@ -5695,7 +5695,7 @@ SUBROUTINE WrVTK_AllMeshes(p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInfw, HD, SD
       do iRot = 1, p_FAST%NRotors
          do iBld = 1, p_FAST%RotNumBld(iRot)
 
-            Suffix = '_R'//trim(Num2LStr(iRot)//"B"//Num2LStr(iBld))    ! Mesh suffix with rotor and blade number
+            Suffix = '_R'//trim(Num2LStr(iRot))//"B"//Num2LStr(iBld)    ! Mesh suffix with rotor and blade number
             k = k + 1                                                   ! BeamDyn instance number
          
             !call MeshWrVTK(p_FAST%TurbinePos, BD%Input(1,k)%RootMotion, trim(p_FAST%VTK_OutFileRoot)//'.BD_RootMotion'//trim(Num2LStr(k)), &
@@ -5729,7 +5729,7 @@ SUBROUTINE WrVTK_AllMeshes(p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInfw, HD, SD
       do iRot = 1, p_FAST%NRotors
          do iBld = 1, p_FAST%RotNumBld(iRot)
 
-            Suffix = '_R'//trim(Num2LStr(iRot)//"B"//Num2LStr(iBld))    ! Mesh suffix with rotor and blade number
+            Suffix = '_R'//trim(Num2LStr(iRot))//"B"//Num2LStr(iBld)    ! Mesh suffix with rotor and blade number
 
             call MeshWrVTK(p_FAST%TurbinePos, ED%y(iRot)%BladeLn2Mesh(iBld), &
                            trim(p_FAST%VTK_OutFileRoot)//'.ED_BladeLn2Mesh_motion'//Suffix, &
