@@ -1757,7 +1757,8 @@ class InputReader_OpenFAST(object):
         '''
         StC_vt = {}
 
-        with open(os.path.join(self.FAST_directory, filename)) as f:
+        sd_file = os.path.normpath(os.path.join(self.FAST_directory, self.fst_vt['Fst']['ServoFile']))
+        with open(os.path.join(os.path.dirname(sd_file), filename)) as f:
 
             f.readline()
             f.readline()
