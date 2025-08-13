@@ -34,7 +34,7 @@ jobs:
     # Tests compiling in debug mode with single precision.
     # This workspace is not used by any other subtests, it checks type errors of the type ReKi/R8Ki
     # Debug speeds up the build.
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -67,45 +67,8 @@ jobs:
         run: |
           cmake --build . --target all
 
-  build-all-debug-single:
-    # Tests compiling in debug mode with single precision.
-    # This workspace is not used by any other subtests, it checks type errors of the type ReKi/R8Ki
-    # Debug speeds up the build.
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Install dependencies
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y libopenblas-dev libopenblas-openmp-dev libhdf5-dev libnetcdf-dev libopenmpi-dev libyaml-cpp-dev
-      - name: Setup workspace
-        run: cmake -E make_directory ${{runner.workspace}}/openfast/build
-      - name: Configure build
-        working-directory: ${{runner.workspace}}/openfast/build
-        run: |
-          cmake \
-            -DCMAKE_INSTALL_PREFIX:PATH=${{runner.workspace}}/openfast/install \
-            -DCMAKE_Fortran_COMPILER:STRING=${{env.FORTRAN_COMPILER}} \
-            -DCMAKE_CXX_COMPILER:STRING=${{env.CXX_COMPILER}} \
-            -DCMAKE_C_COMPILER:STRING=${{env.C_COMPILER}} \
-            -DPython_ROOT_DIR:PATH=${{env.pythonLocation}} \
-            -DBLA_VENDOR:STRING=OpenBLAS \
-            -DCMAKE_BUILD_TYPE:STRING=DEBUG \
-            -DVARIABLE_TRACKING:BOOL=OFF \
-            -DDOUBLE_PRECISION:BOOL=OFF \
-            -DBUILD_OPENFAST_CPP_API:BOOL=ON \
-            -DBUILD_OPENFAST_LIB_DRIVER:BOOL=ON \
-            -DBUILD_OPENFAST_CPP_DRIVER:BOOL=ON \
-            -DBUILD_FASTFARM:BOOL=ON \
-            ${GITHUB_WORKSPACE}
-      - name: Build all
-        working-directory: ${{runner.workspace}}/openfast/build
-        run: |
-          cmake --build . --target all
-
   build-all-release:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -169,7 +132,7 @@ jobs:
     # Tests compiling in debug mode.
     # Also compiles the Registry and generates new types files.
     # Debug more speeds up the build.
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -246,7 +209,7 @@ jobs:
 
 
   build-test-OF-simulink:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -293,7 +256,7 @@ jobs:
   #-----------------------------------------------------------------------------
 
   rtest-module-drivers:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: build-all-release
     steps:
       - name: Restore workspace from artifact
@@ -356,7 +319,7 @@ jobs:
 
 
   rtest-interfaces:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: build-all-release
     steps:
       - name: Restore workspace from artifact
@@ -411,7 +374,7 @@ jobs:
 
 
   rtest-OF:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: build-all-release
     steps:
       - name: Restore workspace from artifact
@@ -467,7 +430,7 @@ jobs:
 
 
   rtest-OF-offshore:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: build-all-release
     steps:
       - name: Restore workspace from artifact
@@ -523,7 +486,7 @@ jobs:
 
  
   rtest-OF-linearization:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: build-all-release
     steps:
       - name: Restore workspace from artifact
@@ -575,7 +538,7 @@ jobs:
             !${{github.workspace}}/build/reg_tests/glue-codes/openfast/WP_Baseline
 
   rtest-OF-aeromap:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: build-all-release
     steps:
       - name: Restore workspace from artifact
@@ -628,7 +591,7 @@ jobs:
 
 
   rtest-openfast_io:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: build-all-release
     steps:
       - name: Restore workspace from artifact
@@ -680,7 +643,7 @@ jobs:
 
 
   rtest-FF:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     needs: build-all-release
     env:
       OMP_NUM_THREADS: 2
