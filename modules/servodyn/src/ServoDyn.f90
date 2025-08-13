@@ -726,6 +726,11 @@ subroutine SrvD_InitVars(InitInp, u, p, x, y, m, InitOut, Linearize, ErrStat, Er
                            Perturbs=uPerturbs)
    enddo
 
+   call MV_AddMeshVar(InitOut%Vars%u, 'PtfmMotionMesh ', MotionFields, &
+                              DatLoc(SrvD_u_PtfmMotionMesh), &
+                              Mesh=u%PtfmMotionMesh, &
+                              Perturbs=uPerturbs)
+
    !----------------------------------------------------------------------------
    ! Output variables
    !----------------------------------------------------------------------------
