@@ -345,7 +345,7 @@ SUBROUTINE WAT_init( p, WAT_IfW, AWAE_InitInput, ErrStat, ErrMsg )
    HAWC_InitInput%WindFileName(3) = trim(BoxFileRoot)//trim(FileEnding(3))
 
    ! HAWC spatial grid
-   if (p%WAT == Mod_WAT_PreDef) then       ! from libary of WAT files, set the NxNyNz and DxDyDz terms
+   if (p%WAT == Mod_WAT_PreDef) then       ! from library of WAT files, set the NxNyNz and DxDyDz terms
       call MannLibDims(BoxFileRoot, p%RotorDiamRef, p%WAT_NxNyNz, p%WAT_DxDyDz, ErrStat2, ErrMsg2);  if (Failed()) return
       write(sDummy, '(3(I8,1X))') p%WAT_NxNyNz
       call WrScr('  WAT: NxNyNz set to: '//trim(sDummy)//' (inferred from filename)')
@@ -608,12 +608,12 @@ contains
    ! check for failed where /= 0 is fatal
    logical function Failed0(txt)
       character(*), intent(in) :: txt
-      if (errStat /= 0) then
+      if (ErrStat2 /= 0) then
          ErrStat2 = ErrID_Fatal
          ErrMsg2  = "Could not allocate memory for "//trim(txt)
-         call SetErrStat(errStat2, errMsg2, errStat, errMsg, RoutineName)
+         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
       endif
-      Failed0 = errStat >= AbortErrLev
+      Failed0 = ErrStat >= AbortErrLev
       if(Failed0) call cleanUp()
    end function Failed0
 END SUBROUTINE Farm_InitWD
@@ -720,12 +720,12 @@ contains
    ! check for failed where /= 0 is fatal
    logical function Failed0(txt)
       character(*), intent(in) :: txt
-      if (errStat /= 0) then
+      if (ErrStat2 /= 0) then
          ErrStat2 = ErrID_Fatal
          ErrMsg2  = "Could not allocate memory for "//trim(txt)
-         call SetErrStat(errStat2, errMsg2, errStat, errMsg, RoutineName)
+         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
       endif
-      Failed0 = errStat >= AbortErrLev
+      Failed0 = ErrStat >= AbortErrLev
       if(Failed0) call cleanUp()
    end function Failed0
 END SUBROUTINE Farm_InitFAST
@@ -817,6 +817,9 @@ SUBROUTINE Farm_InitMD( farm, ErrStat, ErrMsg )
    ALLOCATE( farm%MD%Input( 2 ), farm%MD%InputTimes( 2 ), STAT = ErrStat2 )
    if (Failed0("MD%Input and MD%InputTimes.")) return;
 
+   ! Assign the SS pointer of the first SS instance (turbine 1) to MD. Because MD in FF mode will only pull frequency info, instance of SS doesn't matter (error will be thrown by MD if user asks for SS grid).
+   MD_InitInp%WaveField => farm%FWrap(1)%m%Turbine%SeaSt%p%WaveField ! this is the same wave field as Init%OutData_SeaSt%WaveField in FAST_subs.f90 (as set by line 278 in SeaSt_Init). Cant use Init%OutData_SeaSt%WaveField because Init is a local variable to FAST_InitializeAll
+   
    ! initialize MoorDyn
    CALL MD_Init( MD_InitInp, farm%MD%Input(1), farm%MD%p, farm%MD%x, farm%MD%xd, farm%MD%z, &
                  farm%MD%OtherSt, farm%MD%y, farm%MD%m, farm%p%DT_mooring, MD_InitOut, ErrStat2, ErrMsg2 )
@@ -877,12 +880,12 @@ contains
    ! check for failed where /= 0 is fatal
    logical function Failed0(txt)
       character(*), intent(in) :: txt
-      if (errStat /= 0) then
+      if (ErrStat2 /= 0) then
          ErrStat2 = ErrID_Fatal
          ErrMsg2  = "Could not allocate memory for "//trim(txt)
-         call SetErrStat(errStat2, errMsg2, errStat, errMsg, RoutineName)
+         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
       endif
-      Failed0 = errStat >= AbortErrLev
+      Failed0 = ErrStat >= AbortErrLev
       if(Failed0) call cleanUp()
    end function Failed0
 END SUBROUTINE Farm_InitMD
