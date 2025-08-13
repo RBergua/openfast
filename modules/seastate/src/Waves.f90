@@ -968,6 +968,9 @@ SUBROUTINE VariousWaves_Init ( InitInp, InitOut, WaveField, ErrStat, ErrMsg )
 
    call Get_1Spsd_and_WaveElevC0(InitInp, InitOut, WaveField, OmegaArr, WaveS1SddArr)
 
+   ! Scale wave spectrum and wave amplitudes to account for wave-current interaction
+   ! Valid for colinear waves and current in deepwater only
+   call WaveCurrentInteraction(CurrVw0, InitInp%Gravity, WaveField, OmegaArr, WaveS1SddArr)
 
    !> #  Multi Directional Waves
    call CalculateWaveDirection(InitInp, InitOut, WaveField, ErrStatTmp, ErrMsgTmp); if (Failed()) return;
@@ -2324,6 +2327,35 @@ SUBROUTINE Get_1Spsd_and_WaveElevC0(InitInp, InitOut, WaveField, OmegaArr, WaveS
       END DO   ! I - The positive frequency components (including zero) of the discrete Fourier transforms
       
 END SUBROUTINE Get_1Spsd_and_WaveElevC0
+!------------------------------------------------------------------------------------------------------------------------
+SUBROUTINE WaveCurrentInteraction(CurrVw0, Gravity, WaveField, OmegaArr, WaveS1SddArr)
+   REAL(ReKi),                      INTENT(IN   )  :: CurrVw0
+   REAL(ReKi),                      INTENT(IN   )  :: Gravity
+   TYPE(SeaSt_WaveFieldType),       INTENT(INOUT)  :: WaveField
+   REAL(SiKi),                      INTENT(IN   )  :: OmegaArr(0:WaveField%NStepWave2)                !< Array of all non-negative angular frequencies (rad/s)
+   REAL(SiKi),                      INTENT(INOUT)  :: WaveS1SddArr(0:WaveField%NStepWave2)            !< One-sided power spectral density of the wave spectrum at all non-negative frequencies (m^2/(rad/s))
+
+   INTEGER(IntKi)                                  :: I
+   REAL(SiKi)                                      :: c0, c1, c2, Sc
+
+   c0 = 4.0_SiKi * REAL( CurrVw0 / Gravity , SiKi )
+
+   DO I = 0,WaveField%NStepWave2
+
+      c1 = 1.0_SiKi + c0 * OmegaArr(I)
+      IF ( c1 <= 0.0_SiKi ) THEN
+         Sc = 0.0_SiKi
+      ELSE
+         c2 = SQRT( c1 )
+         Sc = 4.0_SiKi / ( (1+c2)**2 * c2 )
+      END IF
+
+      WaveField%WaveElevC0(:,I) = SQRT( Sc ) * WaveField%WaveElevC0(:,I)
+      WaveS1SddArr(I)           =       Sc   * WaveS1SddArr(I)
+
+   END DO
+
+END SUBROUTINE WaveCurrentInteraction
 !------------------------------------------------------------------------------------------------------------------------
 !> update WaveField%WaveElevC0; call InitFFT before calling this routine!
 SUBROUTINE ConstrainedNewWaves(InitInp, InitOut, WaveField, OmegaArr, WaveS1SddArr, CosWaveDir, SinWaveDir, CurrVw0, OmegaCrit, Omega_I_Crit, FFT_Data, ErrStat, ErrMsg)
