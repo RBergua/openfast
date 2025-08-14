@@ -2737,7 +2737,8 @@ class InputWriter_OpenFAST(object):
         
     def write_StC(self,StC_vt,StC_filename):
 
-        stc_file = os.path.join(self.FAST_runDirectory, StC_filename)
+        sd_file = os.path.normpath(os.path.join(self.FAST_runDirectory, self.fst_vt['Fst']['ServoFile']))
+        stc_file = os.path.join(os.path.dirname(sd_file), StC_filename)
         f = open(stc_file, 'w')
         
         f.write('------- STRUCTURAL CONTROL (StC) INPUT FILE ----------------------------\n')

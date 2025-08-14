@@ -2030,6 +2030,12 @@ subroutine InitMappings_SrvD(Mappings, SrcMod, DstMod, Turbine, ErrStat, ErrMsg)
                             ErrStat=ErrStat2, ErrMsg=ErrMsg2); if(Failed()) return
       end do
 
+      ! Map ED platform motion to SrvD
+      call MapMotionMesh(Turbine, Mappings, SrcMod=SrcMod, DstMod=DstMod, &
+                            SrcDL=DatLoc(ED_y_PlatformPtMesh), &                 ! ED%y%PlatformPtMesh
+                            DstDL=DatLoc(SrvD_u_PtfmMotionMesh), &               ! SrvD%u%PtfmMotionMesh
+                            ErrStat=ErrStat2, ErrMsg=ErrMsg2); if(Failed()) return
+
    case (Module_SED)
 
       call MapCustom(Mappings, Custom_SED_to_SrvD, SrcMod=SrcMod, DstMod=DstMod)
