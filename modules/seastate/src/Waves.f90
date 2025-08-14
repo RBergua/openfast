@@ -987,7 +987,7 @@ SUBROUTINE VariousWaves_Init ( InitInp, InitOut, WaveField, ErrStat, ErrMsg )
    
    ! make sure this is called before calling ConstrainedNewWaves
    CALL InitFFT ( WaveField%NStepWave, FFT_Data, .TRUE., ErrStatTmp )
-      CALL SetErrStat(ErrStatTmp,'Error occured while initializing the FFT.',ErrStat,ErrMsg,RoutineName)
+      CALL SetErrStat(ErrStatTmp,'Error occurred while initializing the FFT.',ErrStat,ErrMsg,RoutineName)
       IF ( ErrStat >= AbortErrLev ) THEN
          CALL CleanUp()
          RETURN
@@ -1204,7 +1204,7 @@ SUBROUTINE VariousWaves_Init ( InitInp, InitOut, WaveField, ErrStat, ErrMsg )
    END IF
 
    CALL  ExitFFT(FFT_Data, ErrStatTmp)
-   CALL  SetErrStat(ErrStatTmp,'Error occured while cleaning up after the FFTs.', ErrStat,ErrMsg,RoutineName)
+   CALL  SetErrStat(ErrStatTmp,'Error occurred while cleaning up after the FFTs.', ErrStat,ErrMsg,RoutineName)
    IF ( ErrStat >= AbortErrLev ) THEN
       CALL CleanUp()
       RETURN
@@ -1417,7 +1417,7 @@ CONTAINS
    end function
    logical function FailedFFT(TmpName)
       character(*), intent(in) :: TmpName
-      CALL SetErrStat( ErrStatTmp, 'Error occured while applying the FFT to '//trim(TmpName), ErrStat, ErrMsg, RoutineName )
+      CALL SetErrStat( ErrStatTmp, 'Error occurred while applying the FFT to '//trim(TmpName), ErrStat, ErrMsg, RoutineName )
       FailedFFT = ErrStat >= AbortErrLev
       if (FailedFFT) CALL Cleanup()
    end function
@@ -1459,7 +1459,7 @@ CONTAINS
       ENDDO
 
       CALL ApplyFFT_cx (   WaveElevAtXY(0:WaveField%NStepWave-1),   tmpComplexArr, FFT_Data,   ErrStatLcl2  )
-      CALL SetErrStat(ErrStatLcl2,'Error occured while applying the FFT.',ErrStatLcl,ErrMsgLcl,'WaveElevTimeSeriesAtXY')
+      CALL SetErrStat(ErrStatLcl2,'Error occurred while applying the FFT.',ErrStatLcl,ErrMsgLcl,'WaveElevTimeSeriesAtXY')
 
       WaveElevCAtXY( 1,: ) = REAL(tmpComplexArr(:))
       WaveElevCAtXY( 2,: ) = AIMAG(tmpComplexArr(:))
@@ -2441,7 +2441,7 @@ SUBROUTINE ConstrainedNewWaves(InitInp, InitOut, WaveField, OmegaArr, WaveS1SddA
             tmpComplexArr = CMPLX(  WaveField%WaveElevC0(1,:) + Crest * tmpArr, &
                                     WaveField%WaveElevC0(2,:))
             CALL ApplyFFT_cx (  WaveField%WaveElev0    (0:WaveField%NStepWave-1),  tmpComplexArr    (:  ), FFT_Data, ErrStatTmp )
-            CALL SetErrStat(ErrStatTmp,'Error occured while applying the FFT to WaveElev0.',ErrStat,ErrMsg,RoutineName)
+            CALL SetErrStat(ErrStatTmp,'Error occurred while applying the FFT to WaveElev0.',ErrStat,ErrMsg,RoutineName)
             IF ( ErrStat >= AbortErrLev ) RETURN
 
             ! Find the preceding or following trough, whichever is lower
@@ -2456,7 +2456,7 @@ SUBROUTINE ConstrainedNewWaves(InitInp, InitOut, WaveField, OmegaArr, WaveS1SddA
                tmpComplexArr = CMPLX(  WaveField%WaveElevC0(1,:) + (Crest+CrestHeightTol) * tmpArr, &
                                        WaveField%WaveElevC0(2,:))
                CALL ApplyFFT_cx (  WaveField%WaveElev0    (0:WaveField%NStepWave-1),  tmpComplexArr    (:  ), FFT_Data, ErrStatTmp )
-               CALL SetErrStat(ErrStatTmp,'Error occured while applying the FFT to WaveElev0.',ErrStat,ErrMsg,RoutineName)
+               CALL SetErrStat(ErrStatTmp,'Error occurred while applying the FFT to WaveElev0.',ErrStat,ErrMsg,RoutineName)
                IF ( ErrStat >= AbortErrLev ) RETURN
 
                
