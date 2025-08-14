@@ -313,7 +313,8 @@ subroutine ExtInfw_PackInitInput(RF, Indata)
    logical         :: PtrInIndex
    if (RF%ErrStat >= AbortErrLev) return
    if (c_associated(InData%C_obj%object)) then
-      call SetErrStat(ErrID_Severe,'C_obj%object cannot be packed.', RF%ErrStat, RF%ErrMsg, RoutineName)
+      RF%ErrStat = ErrID_Fatal
+      RF%ErrMsg = RoutineName//': C_obj%object cannot be packed.'
       return
    end if
    call RegPack(RF, InData%NumActForcePtsBlade)
@@ -523,7 +524,8 @@ subroutine ExtInfw_PackInitOutput(RF, Indata)
    logical         :: PtrInIndex
    if (RF%ErrStat >= AbortErrLev) return
    if (c_associated(InData%C_obj%object)) then
-      call SetErrStat(ErrID_Severe,'C_obj%object cannot be packed.', RF%ErrStat, RF%ErrMsg, RoutineName)
+      RF%ErrStat = ErrID_Fatal
+      RF%ErrMsg = RoutineName//': C_obj%object cannot be packed.'
       return
    end if
    call RegPackAlloc(RF, InData%WriteOutputHdr)
@@ -768,7 +770,8 @@ subroutine ExtInfw_PackMisc(RF, Indata)
    logical         :: PtrInIndex
    if (RF%ErrStat >= AbortErrLev) return
    if (c_associated(InData%C_obj%object)) then
-      call SetErrStat(ErrID_Severe,'C_obj%object cannot be packed.', RF%ErrStat, RF%ErrMsg, RoutineName)
+      RF%ErrStat = ErrID_Fatal
+      RF%ErrMsg = RoutineName//': C_obj%object cannot be packed.'
       return
    end if
    call NWTC_Library_PackModJacType(RF, InData%Jac) 
@@ -1029,7 +1032,8 @@ subroutine ExtInfw_PackParam(RF, Indata)
    logical         :: PtrInIndex
    if (RF%ErrStat >= AbortErrLev) return
    if (c_associated(InData%C_obj%object)) then
-      call SetErrStat(ErrID_Severe,'C_obj%object cannot be packed.', RF%ErrStat, RF%ErrMsg, RoutineName)
+      RF%ErrStat = ErrID_Fatal
+      RF%ErrMsg = RoutineName//': C_obj%object cannot be packed.'
       return
    end if
    call RegPack(RF, InData%AirDens)
@@ -1576,7 +1580,8 @@ subroutine ExtInfw_PackInput(RF, Indata)
    logical         :: PtrInIndex
    if (RF%ErrStat >= AbortErrLev) return
    if (c_associated(InData%C_obj%object)) then
-      call SetErrStat(ErrID_Severe,'C_obj%object cannot be packed.', RF%ErrStat, RF%ErrMsg, RoutineName)
+      RF%ErrStat = ErrID_Fatal
+      RF%ErrMsg = RoutineName//': C_obj%object cannot be packed.'
       return
    end if
    call RegPackPtr(RF, InData%pxVel)
@@ -2194,7 +2199,8 @@ subroutine ExtInfw_PackOutput(RF, Indata)
    logical         :: PtrInIndex
    if (RF%ErrStat >= AbortErrLev) return
    if (c_associated(InData%C_obj%object)) then
-      call SetErrStat(ErrID_Severe,'C_obj%object cannot be packed.', RF%ErrStat, RF%ErrMsg, RoutineName)
+      RF%ErrStat = ErrID_Fatal
+      RF%ErrMsg = RoutineName//': C_obj%object cannot be packed.'
       return
    end if
    call RegPackPtr(RF, InData%u)

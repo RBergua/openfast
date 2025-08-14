@@ -267,7 +267,6 @@ subroutine ADI_CalcOutput(t, u, p, x, xd, z, OtherState, y, m, errStat, errMsg)
 
    integer(IntKi)                :: errStat2
    character(errMsgLen)          :: errMsg2
-   integer(IntKi)                :: node
    character(*), parameter       :: RoutineName = 'ADI_CalcOutput'
    integer :: iWT
    errStat = ErrID_None
@@ -395,6 +394,12 @@ subroutine ADI_InitInflowWind(Root, i_IW, u_AD, o_AD, IW, dt, InitOutData, errSt
       ! the average values for the entire wind profile must be calculated and stored (we don't know if OLAF
       ! is used until after AD_Init below).
       InitInData%BoxExceedAllow = .true.
+      InitInData%OutputAccel = i_IW%OutputAccel
+
+      !FIXME: bjj: what about these initialization inputs?
+      !   InitInData%HubPosition
+      !   InitInData%RadAvg 
+      
       CALL InflowWind_Init( InitInData, IW%u, IW%p, &
                      IW%x, IW%xd, IW%z, IW%OtherSt, &
                      IW%y, IW%m, dt,  InitOutData, errStat2, errMsg2 )
