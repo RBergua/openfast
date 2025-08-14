@@ -202,9 +202,12 @@ end subroutine SetErr
 !===============================================================================================================
 !--------------------------------------------- HydroDyn Init----------------------------------------------------
 !===============================================================================================================
-SUBROUTINE HydroDyn_C_Init( OutRootName_C,                                             &
+SUBROUTINE HydroDyn_C_Init(                                                            &
+               SeaSt_InputFilePassed,                                                  &
                SeaSt_InputFileString_C,   SeaSt_InputFileStringLength_C,               &
+               HD_InputFilePassed,                                                     &
                HD_InputFileString_C,      HD_InputFileStringLength_C,                  &
+               OutRootName_C,                                                          &
                Gravity_C, defWtrDens_C, defWtrDpth_C, defMSL2SWL_C,                    &
                PtfmRefPtPositionX_C, PtfmRefPtPositionY_C,                             &
                NumNodePts_C,  InitNodePositions_C,                                     &
@@ -218,11 +221,13 @@ SUBROUTINE HydroDyn_C_Init( OutRootName_C,                                      
 !GCC$ ATTRIBUTES DLLEXPORT :: HydroDyn_C_Init
 #endif
 
-   character(kind=c_char),    intent(in   )  :: OutRootName_C(IntfStrLen)              !< Root name to use for echo files and other
+   integer(c_int),            intent(in   )  :: SeaSt_InputFilePassed                  !< 0: pass the input file name; 1: pass the input file content
    type(c_ptr),               intent(in   )  :: SeaSt_InputFileString_C                !< SeaSt input file as a single string with lines deliniated by C_NULL_CHAR
    integer(c_int),            intent(in   )  :: SeaSt_InputFileStringLength_C          !< SeaSt length of the input file string
+   integer(c_int),            intent(in   )  :: HD_InputFilePassed                     !< 0: pass the input file name; 1: pass the input file content
    type(c_ptr),               intent(in   )  :: HD_InputFileString_C                   !< HD input file as a single string with lines deliniated by C_NULL_CHAR
    integer(c_int),            intent(in   )  :: HD_InputFileStringLength_C             !< HD length of the input file string
+   character(kind=c_char),    intent(in   )  :: OutRootName_C(IntfStrLen)              !< Root name to use for echo files and other
    real(c_float),             intent(in   )  :: Gravity_C                              !< Gravitational constant (set by calling code)
    real(c_float),             intent(in   )  :: defWtrDens_C                           !< Default value for water density (may be overridden by input file)
    real(c_float),             intent(in   )  :: defWtrDpth_C                           !< Default value for water density (may be overridden by input file)
@@ -248,6 +253,7 @@ SUBROUTINE HydroDyn_C_Init( OutRootName_C,                                      
    character(IntfStrLen)                                                :: OutRootName       !< Root name to use for echo files and other
    character(kind=C_char, len=SeaSt_InputFileStringLength_C), pointer   :: SeaSt_InputFileString   !< Input file as a single string with NULL chracter separating lines
    character(kind=C_char, len=HD_InputFileStringLength_C), pointer      :: HD_InputFileString      !< Input file as a single string with NULL chracter separating lines
+   character(IntfStrLen)                                                :: TmpFileName             !< Temporary file name if not passing HD or SS input file contents directly
 
    real(DbKi)                                                           :: TimeInterval      !< timestep for HD
    integer(IntKi)                                                       :: ErrStat           !< aggregated error message
@@ -255,6 +261,7 @@ SUBROUTINE HydroDyn_C_Init( OutRootName_C,                                      
    integer(IntKi)                                                       :: ErrStat2          !< temporary error status  from a call
    character(ErrMsgLen)                                                 :: ErrMsg2           !< temporary error message from a call
    integer(IntKi)                                                       :: i,j,k             !< generic counters
+   integer(IntKi)                                                       :: NChanSS, NChanHD  !< number of output channels in SeaSt and HD
    character(*), parameter                                              :: RoutineName = 'HydroDyn_C_Init'  !< for error handling
 
    ! Initialize error handling
@@ -327,8 +334,21 @@ SUBROUTINE HydroDyn_C_Init( OutRootName_C,                                      
    ! Get fortran pointer to C_NULL_CHAR deliniated input file as a string
    call C_F_pointer(SeaSt_InputFileString_C, SeaSt_InputFileString)
 
-   ! Get the data to pass to SeaSt%Init
-   call InitFileInfo(SeaSt_InputFileString, SeaSt%InitInp%PassedFileData, ErrStat2, ErrMsg2);   if (Failed())  return
+   ! Format SeaSt input file contents
+   if (SeaSt_InputFilePassed==1_c_int) then
+      ! Get the data to pass to SeaSt%Init
+      SeaSt%InitInp%InputFile       = "passed_SeaSt_file"      ! dummy
+      SeaSt%InitInp%UseInputFile    = .FALSE.                  ! this probably should be passed in
+      call InitFileInfo(SeaSt_InputFileString, SeaSt%InitInp%PassedFileData, ErrStat2, ErrMsg2);   if (Failed())  return
+   else
+      i = min(IntfStrLen,SeaSt_InputFileStringLength_C)
+      TmpFileName = ''
+      TmpFileName(1:i) = SeaSt_InputFileString(1:i)
+      i = INDEX(TmpFileName,C_NULL_CHAR) - 1                ! if this has a c null character at the end...
+      if ( i > 0 ) TmpFileName = TmpFileName(1:I)           ! remove it
+      SeaSt%InitInp%InputFile  = TmpFileName
+      SeaSt%InitInp%UseInputFile    = .TRUE.
+   endif
 
    ! For diagnostic purposes, the following can be used to display the contents
    ! of the InFileInfo data structure.
@@ -337,8 +357,7 @@ SUBROUTINE HydroDyn_C_Init( OutRootName_C,                                      
 
    ! Set other inputs for calling SeaState_Init
    SeaSt%InitInp%hasIce          = .FALSE.                  ! Always keep at false unless interfacing to ice modules
-   SeaSt%InitInp%InputFile       = "passed_SeaSt_file"      ! dummy
-   SeaSt%InitInp%UseInputFile    = .FALSE.                  ! this probably should be passed in
+
    ! Linearization
    !     for now, set linearization to false. Pass this in later when interface supports it
    !     Note: we may want to linearize at T=0 for added mass effects, but that might be
@@ -384,8 +403,21 @@ SUBROUTINE HydroDyn_C_Init( OutRootName_C,                                      
    ! Get fortran pointer to C_NULL_CHAR deliniated input file as a string
    call C_F_pointer(HD_InputFileString_C, HD_InputFileString)
 
-   ! Get the data to pass to HD%Init
-   call InitFileInfo(HD_InputFileString, HD%InitInp%PassedFileData, ErrStat2, ErrMsg2);   if (Failed())  return
+   ! Format HD input file contents
+   if (HD_InputFilePassed==1_c_int) then
+      ! Get the data to pass to HD%InitInp
+      HD%InitInp%InputFile             = "passed_hd_file"         ! dummy
+      HD%InitInp%UseInputFile          = .FALSE.                  ! this probably should be passed in
+      call InitFileInfo(HD_InputFileString, HD%InitInp%PassedFileData, ErrStat2, ErrMsg2);   if (Failed())  return
+   else
+      i = min(IntfStrLen, HD_InputFileStringLength_C)
+      TmpFileName = ''
+      TmpFileName(1:i) = HD_InputFileString(1:i)
+      i = INDEX(TmpFileName,C_NULL_CHAR) - 1                ! if this has a c null character at the end...
+      if ( i > 0 ) TmpFileName = TmpFileName(1:I)           ! remove it
+      HD%InitInp%InputFile  = TmpFileName
+      HD%InitInp%UseInputFile    = .TRUE.
+   endif
 
    ! For diagnostic purposes, the following can be used to display the contents
    ! of the InFileInfo data structure.
@@ -393,8 +425,6 @@ SUBROUTINE HydroDyn_C_Init( OutRootName_C,                                      
    !call Print_FileInfo_Struct( CU, HD%InitInp%PassedFileData )
 
    ! Set other inputs for calling HydroDyn_Init
-   HD%InitInp%InputFile             = "passed_hd_file"         ! dummy
-   HD%InitInp%UseInputFile          = .FALSE.                  ! this probably should be passed in
    ! Linearization
    !     for now, set linearization to false. Pass this in later when interface supports it
    !     Note: we may want to linearize at T=0 for added mass effects, but that might be
@@ -477,26 +507,32 @@ SUBROUTINE HydroDyn_C_Init( OutRootName_C,                                      
    !-------------------------------------------------------------
    !  Set output channel information for driver code
    ! Number of channels
-   NumChannels_C = size(SeaSt%InitOutData%WriteOutputHdr) + size(HD%InitOutData%WriteOutputHdr)
+   if (allocated(SeaSt%InitOutData%WriteOutputHdr))   NChanSS = size(SeaSt%InitOutData%WriteOutputHdr)
+   if (allocated(HD%InitOutData%WriteOutputHdr))      NChanHD = size(HD%InitOutData%WriteOutputHdr)
+   NumChannels_C = NChanSS + NChanHD
 
    ! transfer the output channel names and units to c_char arrays for returning
    !     Upgrade idea:  use C_NULL_CHAR as delimiters.  Requires rework of Python
    !                    side of code.
    k=1
-   do i=1,size(SeaSt%InitOutData%WriteOutputHdr)
-      do j=1,ChanLen    ! max length of channel name.  Same for units
-         OutputChannelNames_C(k)=SeaSt%InitOutData%WriteOutputHdr(i)(j:j)
-         OutputChannelUnits_C(k)=SeaSt%InitOutData%WriteOutputUnt(i)(j:j)
-         k=k+1
+   if (allocated(SeaSt%InitOutData%WriteOutputHdr)) then
+      do i=1,size(SeaSt%InitOutData%WriteOutputHdr)
+         do j=1,ChanLen    ! max length of channel name.  Same for units
+            OutputChannelNames_C(k)=SeaSt%InitOutData%WriteOutputHdr(i)(j:j)
+            OutputChannelUnits_C(k)=SeaSt%InitOutData%WriteOutputUnt(i)(j:j)
+            k=k+1
+         enddo
       enddo
-   enddo
-   do i=1,size(HD%InitOutData%WriteOutputHdr)
-      do j=1,ChanLen    ! max length of channel name.  Same for units
-         OutputChannelNames_C(k)=HD%InitOutData%WriteOutputHdr(i)(j:j)
-         OutputChannelUnits_C(k)=HD%InitOutData%WriteOutputUnt(i)(j:j)
-         k=k+1
+   endif
+   if (allocated(HD%InitOutData%WriteOutputHdr)) then
+      do i=1,size(HD%InitOutData%WriteOutputHdr)
+         do j=1,ChanLen    ! max length of channel name.  Same for units
+            OutputChannelNames_C(k)=HD%InitOutData%WriteOutputHdr(i)(j:j)
+            OutputChannelUnits_C(k)=HD%InitOutData%WriteOutputUnt(i)(j:j)
+            k=k+1
+         enddo
       enddo
-   enddo
+   endif
 
    ! null terminate the string
    OutputChannelNames_C(k) = C_NULL_CHAR
@@ -782,14 +818,18 @@ SUBROUTINE HydroDyn_C_CalcOutput(Time_C, NumNodePts_C, NodePos_C, NodeVel_C, Nod
 
    ! Get the output channel info out of y
    k=1
-   do i=1,size(SeaSt%y%WriteOutput)
-      OutputChannelValues_C(k) = REAL(SeaSt%y%WriteOutput(i), C_FLOAT)
-      k=k+1
-   enddo
-   do i=1,size(HD%y%WriteOutput)
-      OutputChannelValues_C(k) = REAL(HD%y%WriteOutput(i), C_FLOAT)
-      k=k+1
-   enddo
+   if (allocated(SeaSt%y%WriteOutput)) then
+      do i=1,size(SeaSt%y%WriteOutput)
+         OutputChannelValues_C(k) = REAL(SeaSt%y%WriteOutput(i), C_FLOAT)
+         k=k+1
+      enddo
+   endif
+   if (allocated(HD%y%WriteOutput)) then
+      do i=1,size(HD%y%WriteOutput)
+         OutputChannelValues_C(k) = REAL(HD%y%WriteOutput(i), C_FLOAT)
+         k=k+1
+      enddo
+   endif
 
    ! Set error status
    call SetErr(ErrStat,ErrMsg,ErrStat_C,ErrMsg_C)
@@ -982,14 +1022,18 @@ SUBROUTINE HydroDyn_C_CalcOutput_and_AddedMass(Time_C, NumNodePts_C, NodePos_C, 
 
    ! Get the output channel info out of y
    k=1
-   do i=1,size(SeaSt%y%WriteOutput)
-      OutputChannelValues_C(k) = REAL(SeaSt%y%WriteOutput(i), C_FLOAT)
-      k=k+1
-   enddo
-   do i=1,size(HD%y%WriteOutput)
-      OutputChannelValues_C(k) = REAL(HD%y%WriteOutput(i), C_FLOAT)
-      k=k+1
-   enddo
+   if (allocated(SeaSt%y%WriteOutput)) then
+      do i=1,size(SeaSt%y%WriteOutput)
+         OutputChannelValues_C(k) = REAL(SeaSt%y%WriteOutput(i), C_FLOAT)
+         k=k+1
+      enddo
+   endif
+   if (allocated(HD%y%WriteOutput)) then
+      do i=1,size(HD%y%WriteOutput)
+         OutputChannelValues_C(k) = REAL(HD%y%WriteOutput(i), C_FLOAT)
+         k=k+1
+      enddo
+   endif
 
    ! Set error status
    call SetErr(ErrStat,ErrMsg,ErrStat_C,ErrMsg_C)

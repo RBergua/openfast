@@ -203,6 +203,9 @@ CONTAINS
       DepthValue = ""  ! Start off as empty string, to only be filled if MD setting is specified (otherwise InitInp%WtrDepth is used)
                        ! DepthValue and InitInp%WtrDepth are processed later by setupBathymetry.
       WaterKinValue = ""
+
+      ! Read in the SeaState wave field pointer for wave kinematics (regardless if kinematics are enabled in MD or not)
+      p%WaveField => InitInp%WaveField 
       
       m%PtfmInit = InitInp%PtfmInit(:,1)   ! is this copying necssary in case this is an individual instance in FAST.Farm?
 
@@ -692,6 +695,7 @@ CONTAINS
                    if (N > 3) then
                       CALL SetErrStat( ErrID_Fatal, 'A line type EA entry can have at most 3 (bar-separated) values.', ErrStat, ErrMsg, RoutineName )
                       CALL CleanUp()
+                      RETURN
                    else if (N==3) then                               ! visco-elastic case, load dependent dynamic stiffness!
                       m%LineTypeList(l)%ElasticMod = 3
                       read(tempStrings(2), *) m%LineTypeList(l)%alphaMBL
@@ -714,6 +718,7 @@ CONTAINS
                    if (N > m%LineTypeList(l)%ElasticMod) then
                       CALL SetErrStat( ErrID_Fatal, 'A line type BA entry cannot have more (bar-separated) values than its EA entry.', ErrStat, ErrMsg, RoutineName )
                       CALL CleanUp()
+                      RETURN
                    else if (N==2) then                               ! visco-elastic case when two BA values provided
                       read(tempStrings(2), *) m%LineTypeList(l)%BA_D 
                    else if (m%LineTypeList(l)%ElasticMod > 1) then  ! case where there is no dynamic damping for viscoelastic model (will it work)?
@@ -924,7 +929,7 @@ CONTAINS
                   IF ( ErrStat2 /= 0 ) THEN
                      CALL WrScr('   Unable to parse Body '//trim(Num2LStr(l))//' on row '//trim(Num2LStr(i))//' in input file.')  ! Specific screen output because errors likely
                      CALL WrScr('   Ensure row has all 13 columns needed in MDv2 input file (13th Dec 2021).')  
-                        CALL SetErrStat( ErrID_Fatal, 'Failed to read bodies.' , ErrStat, ErrMsg, RoutineName )
+                     CALL SetErrStat( ErrID_Fatal, 'Failed to read bodies.' , ErrStat, ErrMsg, RoutineName )
                      if (p%writeLog > 0) then
                         write(p%UnLog,'(A)') '   Unable to parse Body '//trim(Num2LStr(l))//' on row '//trim(Num2LStr(i))//' in input file.'
                         write(p%UnLog,'(A)') '   Ensure row has all 13 columns needed in MDv2 input file (13th Dec 2021).'
@@ -982,11 +987,13 @@ CONTAINS
                            
                         else
                            CALL SetErrStat( ErrID_Fatal,  "Turbine ID out of bounds for Body "//trim(Num2LStr(l))//".", ErrStat, ErrMsg, RoutineName )  
+                           CALL CleanUp()  
                            return
                         end if   
                      else
                         CALL SetErrStat( ErrID_Fatal,  "No number provided for Body "//trim(Num2LStr(l))//" Turbine attachment.", ErrStat, ErrMsg, RoutineName )   
-                            return
+                        CALL CleanUp()
+                        return
                      end if
                      
                   else if (let1 == "FREE") then    ! if a free body
@@ -1004,6 +1011,7 @@ CONTAINS
                      
                   else 
                      CALL SetErrStat( ErrID_Fatal,  "Unidentified Body type string for Body "//trim(Num2LStr(l))//": "//trim(tempString1), ErrStat, ErrMsg, RoutineName )
+                     CALL CleanUp()
                      return
                   end if
                   
@@ -1074,6 +1082,13 @@ CONTAINS
                          m%RodList(l)%N, LineOutString
                   END IF
 
+                  ! check p%numRodTypes is greater than 0, if not users are missing Rod Types section of input file
+                  IF (p%nRodTypes == 0) THEN
+                     CALL SetErrStat( ErrID_Fatal, 'No rod types defined in input file. Please define rod types before defining rods.', ErrStat, ErrMsg, RoutineName )
+                     CALL CleanUp()
+                     RETURN
+                  END IF
+
                   ! find Rod properties index
                   DO J = 1,p%nRodTypes
                      IF (trim(tempString1) == trim(m%RodTypeList(J)%name)) THEN
@@ -1082,6 +1097,7 @@ CONTAINS
                      END IF
                      IF (J == p%nRodTypes) THEN   ! call an error if there is no match
                          CALL SetErrStat( ErrID_Fatal, 'Unable to find matching rod type name for Rod '//trim(Num2LStr(l))//": "//trim(tempString1), ErrStat, ErrMsg, RoutineName )
+                         CALL CleanUp()
                          RETURN
                      END IF
                   END DO
@@ -1135,17 +1151,20 @@ CONTAINS
                      
                            else
                                CALL SetErrStat( ErrID_Fatal,  "Unidentified Type/BodyID for Rod "//trim(Num2LStr(l))//": "//trim(tempString2), ErrStat, ErrMsg, RoutineName )
+                               CALL CleanUp()
                                return
                            end if
                         
                         else
                            CALL SetErrStat( ErrID_Fatal,  "Body ID out of bounds for Rod "//trim(Num2LStr(l))//".", ErrStat, ErrMsg, RoutineName )  
+                           CALL CleanUp()
                            return
                         end if
                      
                   else
                      CALL SetErrStat( ErrID_Fatal,  "No number provided for Rod "//trim(Num2LStr(l))//" Body attachment.", ErrStat, ErrMsg, RoutineName )   
-                         return
+                     CALL CleanUp()   
+                     return
                   end if
                   
                   else if ((let1 == "VESSEL") .or. (let1 == "VES") .or. (let1 == "COUPLED") .or. (let1 == "CPLD")) then    ! if a rigidly coupled rod, add to list and add 
@@ -1184,11 +1203,13 @@ CONTAINS
                            
                         else
                            CALL SetErrStat( ErrID_Fatal,  "Turbine ID out of bounds for Rod "//trim(Num2LStr(l))//".", ErrStat, ErrMsg, RoutineName )  
+                           CALL CleanUp() 
                            return
                         end if   
                      else
                         CALL SetErrStat( ErrID_Fatal,  "No number provided for Rod "//trim(Num2LStr(l))//" Turbine attachment.", ErrStat, ErrMsg, RoutineName )   
-                            return
+                        CALL CleanUp()   
+                        return
                      end if
                    
                   else if ((let1 == "ROD") .or. (let1 == "R") .or. (let1 == "FREE")) then
@@ -1205,6 +1226,7 @@ CONTAINS
                   else 
                   
                      CALL SetErrStat( ErrID_Fatal,  "Unidentified Type/BodyID for Rod "//trim(Num2LStr(l))//": "//trim(tempString2), ErrStat, ErrMsg, RoutineName )   
+                     CALL CleanUp() 
                      return
                   end if
                   
@@ -1212,22 +1234,21 @@ CONTAINS
                   ! process output flag characters (LineOutString) and set line output flag array (OutFlagList)
                   m%RodList(l)%OutFlagList = 0  ! first set array all to zero
                   ! per node, 3 component
-                  IF ( scan( LineOutString, 'p') > 0 )  m%RodList(l)%OutFlagList(2 ) = 1   ! node position
-                  IF ( scan( LineOutString, 'v') > 0 )  m%RodList(l)%OutFlagList(3 ) = 1   ! node velocity
-                  IF ( scan( LineOutString, 'U') > 0 )  m%RodList(l)%OutFlagList(4 ) = 1   ! water velocity
-                  IF ( scan( LineOutString, 'B') > 0 )  m%RodList(l)%OutFlagList(5 ) = 1   ! node buoyancy force
-                  IF ( scan( LineOutString, 'D') > 0 )  m%RodList(l)%OutFlagList(6 ) = 1   ! drag force
-                  IF ( scan( LineOutString, 'I') > 0 )  m%RodList(l)%OutFlagList(7 ) = 1   ! inertia force
-                  IF ( scan( LineOutString, 'P') > 0 )  m%RodList(l)%OutFlagList(8 ) = 1   ! dynamic pressure force
-                  IF ( scan( LineOutString, 'b') > 0 )  m%RodList(l)%OutFlagList(9 ) = 1   ! seabed contact forces
+                  IF ( scan( LineOutString, 'p') > 0 )  m%RodList(l)%OutFlagList(2 ) = 1   ! node position (p)
+                  IF ( scan( LineOutString, 'v') > 0 )  m%RodList(l)%OutFlagList(3 ) = 1   ! node velocity (v)
+                  IF ( scan( LineOutString, 'U') > 0 )  m%RodList(l)%OutFlagList(4 ) = 1   ! water velocity (U)
+                  IF ( scan( LineOutString, 'B') > 0 )  m%RodList(l)%OutFlagList(5 ) = 1   ! node buoyancy force (Bo)
+                  IF ( scan( LineOutString, 'D') > 0 )  m%RodList(l)%OutFlagList(6 ) = 1   ! drag force (D)
+                  IF ( scan( LineOutString, 'I') > 0 )  m%RodList(l)%OutFlagList(7 ) = 1   ! inertia force (I)
+                  IF ( scan( LineOutString, 'P') > 0 )  m%RodList(l)%OutFlagList(8 ) = 1   ! dynamic pressure force (Pd)
+                  IF ( scan( LineOutString, 'b') > 0 )  m%RodList(l)%OutFlagList(9 ) = 1   ! seabed contact forces (B)
                   ! per node, 1 component
                   IF ( scan( LineOutString, 'W') > 0 )  m%RodList(l)%OutFlagList(10) = 1   ! node weight/buoyancy (positive up)
-                  IF ( scan( LineOutString, 'K') > 0 )  m%RodList(l)%OutFlagList(11) = 1   ! curvature at node
-                  ! per element, 1 component >>> these don't apply to a rod!! <<<
-                  IF ( scan( LineOutString, 't') > 0 )  m%RodList(l)%OutFlagList(12) = 1  ! segment tension force (just EA)
-                  IF ( scan( LineOutString, 'c') > 0 )  m%RodList(l)%OutFlagList(13) = 1  ! segment internal damping force
-                  IF ( scan( LineOutString, 's') > 0 )  m%RodList(l)%OutFlagList(14) = 1  ! Segment strain
-                  IF ( scan( LineOutString, 'd') > 0 )  m%RodList(l)%OutFlagList(15) = 1  ! Segment strain rate
+                  ! Extended flags outputs
+                  IF ( scan( LineOutString, 'A') > 0 )  m%RodList(l)%OutFlagList(16) = 1   ! Transverse fluid inertia force (Ap)
+                  IF ( scan( LineOutString, 'a') > 0 )  m%RodList(l)%OutFlagList(17) = 1   ! Axial fluid inertia force (Aq)
+                  IF ( scan( LineOutString, 'X') > 0 )  m%RodList(l)%OutFlagList(18) = 1   ! Transverse drag forces (Dp)
+                  IF ( scan( LineOutString, 'Y') > 0 )  m%RodList(l)%OutFlagList(19) = 1   ! Tangential drag forces (Dq)
 
                   IF (SUM(m%RodList(l)%OutFlagList) > 0)   m%RodList(l)%OutFlagList(1) = 1  ! this first entry signals whether to create any output file at all
                   ! the above letter-index combinations define which OutFlagList entry corresponds to which output type
@@ -1320,11 +1341,11 @@ CONTAINS
                   IF ( ErrStat2 /= 0 ) THEN
                      CALL WrScr('   Unable to parse Point '//trim(Num2LStr(l))//' row in input file.')  ! Specific screen output because errors likely
                      CALL WrScr('   Ensure row has all 9 columns, including CdA and Ca.')           ! to be caused by non-updated input file formats.
-                        CALL SetErrStat( ErrID_Fatal, 'Failed to read points.' , ErrStat, ErrMsg, RoutineName ) ! would be nice to specify which line <<<<<<<<<
-                        if (p%writeLog > 0) then
-                           write(p%UnLog,'(A)') '   Unable to parse Point '//trim(Num2LStr(l))//' row in input file.'
-                           write(p%UnLog,'(A)') '   Ensure row has all 9 columns, including CdA and Ca.'
-                        end if
+                     CALL SetErrStat( ErrID_Fatal, 'Failed to read points.' , ErrStat, ErrMsg, RoutineName ) ! would be nice to specify which line <<<<<<<<<
+                     if (p%writeLog > 0) then
+                        write(p%UnLog,'(A)') '   Unable to parse Point '//trim(Num2LStr(l))//' row in input file.'
+                        write(p%UnLog,'(A)') '   Ensure row has all 9 columns, including CdA and Ca.'
+                     end if
                      CALL CleanUp()
                      RETURN
                   END IF
@@ -1353,11 +1374,13 @@ CONTAINS
                            
                         else
                            CALL SetErrStat( ErrID_Fatal,  "Body ID out of bounds for Point "//trim(Num2LStr(l))//".", ErrStat, ErrMsg, RoutineName )  
+                           CALL CleanUp()
                            return
                         end if                     
                      else
                         CALL SetErrStat( ErrID_Fatal,  "No number provided for Point "//trim(Num2LStr(l))//" Body attachment.", ErrStat, ErrMsg, RoutineName )   
-                            return
+                        CALL CleanUp() 
+                        return
                      end if
                   
                   else if ((let1 == "VESSEL") .or. (let1 == "VES") .or. (let1 == "COUPLED") .or. (let1 == "CPLD")) then    ! if a fairlead, add to list and add 
@@ -1396,15 +1419,18 @@ CONTAINS
                            
                         else
                            CALL SetErrStat( ErrID_Fatal,  "Turbine ID out of bounds for Point "//trim(Num2LStr(l))//".", ErrStat, ErrMsg, RoutineName )  
+                           CALL CleanUp()
                            return
                         end if   
                      else
                         CALL SetErrStat( ErrID_Fatal,  "No number provided for Point "//trim(Num2LStr(l))//" Turbine attachment.", ErrStat, ErrMsg, RoutineName )   
+                        CALL CleanUp()  
                             return
                      end if
                   
                   else 
                      CALL SetErrStat( ErrID_Fatal,  "Unidentified Type/BodyID for Point "//trim(Num2LStr(l))//": "//trim(tempString1), ErrStat, ErrMsg, RoutineName )
+                     CALL CleanUp()
                      return
                   end if
                   
@@ -1481,6 +1507,7 @@ CONTAINS
                        END IF
                        IF (J == p%nLineTypes) THEN   ! call an error if there is no match
                            CALL SetErrStat( ErrID_Fatal, 'Unable to find matching line type name for Line '//trim(Num2LStr(l)), ErrStat, ErrMsg, RoutineName )
+                           CALL CleanUp()
                            RETURN
                        END IF
                   END DO
@@ -1509,6 +1536,7 @@ CONTAINS
                   
                   if (len_trim(num1)<1) then
                      CALL SetErrStat( ErrID_Fatal,  "Error: no number provided for line "//trim(Num2LStr(l))//" end A attachment.", ErrStat, ErrMsg, RoutineName )  
+                     CALL CleanUp()
                      return
                   end if 
 
@@ -1524,10 +1552,12 @@ CONTAINS
                            CALL Rod_AddLine(m%RodList(J), l, 0, 1)   ! add line l (end A, denoted by 0) to rod J (end B, denoted by 1)
                         else
                            CALL SetErrStat( ErrID_Fatal,  "Error: rod end (A or B) must be specified for line "//trim(Num2LStr(l))//" end A attachment. Instead seeing "//let2, ErrStat, ErrMsg, RoutineName )  
-                            return
+                           CALL CleanUp()  
+                           return
                         end if
                      else
                         CALL SetErrStat( ErrID_Fatal,  " Rod ID out of bounds for line "//trim(Num2LStr(l))//" end A attachment.", ErrStat, ErrMsg, RoutineName )  
+                        CALL CleanUp()
                         return
                      end if
                   
@@ -1538,6 +1568,7 @@ CONTAINS
                         CALL Point_AddLine(m%PointList(J), l, 0)   ! add line l (end A, denoted by 0) to point J
                      else
                         CALL SetErrStat( ErrID_Fatal,  "Error: point out of bounds for line "//trim(Num2LStr(l))//" end A attachment.", ErrStat, ErrMsg, RoutineName )  
+                        CALL CleanUp() 
                         return
                      end if
                         
@@ -1550,6 +1581,7 @@ CONTAINS
 
                   if (len_trim(num1)<1) then
                      CALL SetErrStat( ErrID_Fatal,  "Error: no number provided for line "//trim(Num2LStr(l))//" end B attachment.", ErrStat, ErrMsg, RoutineName )  
+                     CALL CleanUp()
                      return
                   end if 
 
@@ -1565,10 +1597,12 @@ CONTAINS
                            CALL Rod_AddLine(m%RodList(J), l, 1, 1)   ! add line l (end B, denoted by 1) to rod J (end B, denoted by 1)
                         else
                            CALL SetErrStat( ErrID_Fatal,  "Error: rod end (A or B) must be specified for line "//trim(Num2LStr(l))//" end B attachment. Instead seeing "//let2, ErrStat, ErrMsg, RoutineName )  
-                            return
+                           CALL CleanUp()
+                           return
                         end if
                      else
                         CALL SetErrStat( ErrID_Fatal,  " Rod ID out of bounds for line "//trim(Num2LStr(l))//" end B attachment.", ErrStat, ErrMsg, RoutineName )  
+                        CALL CleanUp()
                         return
                      end if
 
@@ -1579,6 +1613,7 @@ CONTAINS
                         CALL Point_AddLine(m%PointList(J), l, 1)   ! add line l (end B, denoted by 1) to point J
                      else
                         CALL SetErrStat( ErrID_Fatal,  "Error: point out of bounds for line "//trim(Num2LStr(l))//" end B attachment.", ErrStat, ErrMsg, RoutineName )  
+                        CALL CleanUp()
                         return
                      end if
                         
@@ -1588,11 +1623,11 @@ CONTAINS
                   ! process output flag characters (LineOutString) and set line output flag array (OutFlagList)
                   m%LineList(l)%OutFlagList = 0  ! first set array all to zero
                   ! per node 3 component
-                  IF ( scan( LineOutString, 'p') > 0 )  m%LineList(l)%OutFlagList(2) = 1 
-                  IF ( scan( LineOutString, 'v') > 0 )  m%LineList(l)%OutFlagList(3) = 1
-                  IF ( scan( LineOutString, 'U') > 0 )  m%LineList(l)%OutFlagList(4) = 1
-                  IF ( scan( LineOutString, 'D') > 0 )  m%LineList(l)%OutFlagList(5) = 1
-                  IF ( scan( LineOutString, 'b') > 0 )  m%LineList(l)%OutFlagList(6) = 1   ! seabed contact forces
+                  IF ( scan( LineOutString, 'p') > 0 )  m%LineList(l)%OutFlagList(2) = 1  ! node position (p)
+                  IF ( scan( LineOutString, 'v') > 0 )  m%LineList(l)%OutFlagList(3) = 1  ! node velocity (v)
+                  IF ( scan( LineOutString, 'U') > 0 )  m%LineList(l)%OutFlagList(4) = 1  ! node displacement (U)
+                  IF ( scan( LineOutString, 'D') > 0 )  m%LineList(l)%OutFlagList(5) = 1  ! node rotation (D)
+                  IF ( scan( LineOutString, 'b') > 0 )  m%LineList(l)%OutFlagList(6) = 1  ! seabed contact forces (B)
                   IF ( scan( LineOutString, 'V') > 0 )  m%LineList(l)%OutFlagList(7) = 1   ! VIV forces
                   ! per node 1 component
                   IF ( scan( LineOutString, 'W') > 0 )  m%LineList(l)%OutFlagList(8) = 1  ! node weight/buoyancy (positive up)
@@ -1792,11 +1827,13 @@ CONTAINS
                                END IF
                             ELSE
                                CALL SetErrStat( ErrID_Fatal,  "Body ID out of bounds for External Load "//trim(Num2LStr(l))//".", ErrStat, ErrMsg, RoutineName )
+                               CALL CleanUp()
                                return
                             END IF
                          ELSE
                             CALL SetErrStat( ErrID_Fatal,  "No number provided for External Load "//trim(Num2LStr(l))//" BODY attachment.", ErrStat, ErrMsg, RoutineName )
-                               return
+                            CALL CleanUp()
+                            return
                          END IF
                      ELSEIF (let1 == "POINT" .OR. let1 == "P") THEN
                         IF (len_trim(num1) > 0) THEN
@@ -1807,11 +1844,13 @@ CONTAINS
                               m%PointList(J)%Bquad = m%PointList(J)%Bquad + m%ExtLdList(l)%Bquad
                            ELSE
                               CALL SetErrStat( ErrID_Fatal,  "Point ID out of bounds for External Load "//trim(Num2LStr(l))//".", ErrStat, ErrMsg, RoutineName )
+                              CALL CleanUp()
                               return
                            END IF
                         ELSE
                            CALL SetErrStat( ErrID_Fatal,  "No number provided for External Load "//trim(Num2LStr(l))//" POINT attachment.", ErrStat, ErrMsg, RoutineName )
-                              return
+                           CALL CleanUp()
+                           return
                         END IF
                      ELSEIF (let1 == "ROD" .OR. let1 == "R") THEN
                         IF (len_trim(num1) > 0) THEN
@@ -1822,11 +1861,13 @@ CONTAINS
                               m%RodList(J)%Bquad = m%RodList(J)%Bquad(1:2) + m%ExtLdList(l)%Bquad(1:2) ! rods only have axial and transverse
                            ELSE
                               CALL SetErrStat( ErrID_Fatal,  "Rod ID out of bounds for External Load "//trim(Num2LStr(l))//".", ErrStat, ErrMsg, RoutineName )
+                              CALL CleanUp()
                               return
                            END IF
                         ELSE
                            CALL SetErrStat( ErrID_Fatal,  "No number provided for External Load "//trim(Num2LStr(l))//" ROD attachment.", ErrStat, ErrMsg, RoutineName )
-                              return
+                           CALL CleanUp()
+                           return
                         END IF
                      END IF
                      
@@ -2375,7 +2416,7 @@ CONTAINS
          ! rRef and OrMatRef or the position and orientation matrix of the
          ! coupled object relative to the platform, based on the input file.
          ! They are used to set the "reference" pose of each coupled mesh
-         ! entry before the intial offsets from PtfmInit are applied.
+         ! entry before the initial offsets from PtfmInit are applied.
          
          J = 0 ! this is the counter through the mesh points for each turbine
          
@@ -2482,7 +2523,7 @@ CONTAINS
 
       end do  ! iTurb
    
-      ! >>>>>> ensure the output mesh includes all elements from u%(Farm)CoupledKinematics, OR make a seperate array of output meshes for each turbine <<<<<<<<<
+      ! >>>>>> ensure the output mesh includes all elements from u%(Farm)CoupledKinematics, OR make a separate array of output meshes for each turbine <<<<<<<<<
       
 
       CALL CheckError( ErrStat2, ErrMsg2 )
@@ -2651,7 +2692,7 @@ CONTAINS
       !        if log file, compute and write some object properties
       ! -------------------------------------------------------------------
       if (p%writeLog > 1) then
-         write(p%UnLog, '(A)'  ) "Values after intialization before dynamic relaxation"
+         write(p%UnLog, '(A)'  ) "Values after initialization before dynamic relaxation"
          write(p%UnLog, '(A)'  ) "  Bodies:"         
          DO l = 1,p%nBodies
             write(p%UnLog, '(A)'  )         "    Body"//trim(num2lstr(l))//":"            
@@ -2692,8 +2733,8 @@ CONTAINS
          end if
 
          ! boost drag coefficient of each line type  <<<<<<<< does this actually do anything or do lines hold these coefficients???
+         m%IC_gen = .True. ! turn on IC_gen flag
          DO I = 1, p%nLines
-            m%LineList(I)%IC_gen = .True. ! turn on IC_gen flag for Line VIV model
             m%LineList(I)%Cdn = m%LineList(I)%Cdn * InputFileDat%CdScaleIC
             m%LineList(I)%Cdt = m%LineList(I)%Cdt * InputFileDat%CdScaleIC 
          END DO
@@ -2851,9 +2892,9 @@ CONTAINS
 
          CALL MD_DestroyInput( u_array(1), ErrStat2, ErrMsg2 )
 
-         ! UNboost drag coefficient of each line type   <<<
+         ! Unboost drag coefficient of each line type   <<<
+         m%IC_gen = .False. ! turn off IC_gen flag
          DO I = 1, p%nLines
-            m%LineList(I)%IC_gen = .False. ! turn off IC_gen flag for Line VIV model
             m%LineList(I)%Cdn = m%LineList(I)%Cdn / InputFileDat%CdScaleIC
             m%LineList(I)%Cdt = m%LineList(I)%Cdt / InputFileDat%CdScaleIC 
          END DO
@@ -2944,7 +2985,7 @@ CONTAINS
          CHARACTER(*),   INTENT(INOUT) :: Msg         ! The error message (ErrMsg)
 
          INTEGER(IntKi)             :: ErrStat3    ! The error identifier (ErrStat)
-         CHARACTER(1024)            :: ErrMsg3     ! The error message (ErrMsg)
+         CHARACTER(ErrMsgLen)       :: ErrMsg3     ! The error message (ErrMsg)
 
          ! Set error status/message;
          IF ( ErrID /= ErrID_None ) THEN
@@ -4066,7 +4107,7 @@ CONTAINS
       
       ! give Lines latest state variable values for internal nodes
       DO l = 1,p%nLines
-         CALL Line_SetState(m%LineList(l), x%states(m%LineStateIs1(l):m%LineStateIsN(l)), t)
+         CALL Line_SetState(m%LineList(l), x%states(m%LineStateIs1(l):m%LineStateIsN(l)), t, m)
       END DO
 
       ! calculate dynamics of free objects (will also calculate forces (doRHS()) from any child/dependent objects)...
@@ -4267,7 +4308,7 @@ CONTAINS
    !--------------------------------------------------------------
    SUBROUTINE MD_RK2 ( t, dtM, u_interp, u, t_array, p, x, xd, z, other, m, ErrStat, ErrMsg )
    
-      REAL(DbKi)                     , INTENT(INOUT)      :: t          ! intial time (s) for this integration step
+      REAL(DbKi)                     , INTENT(INOUT)      :: t          ! initial time (s) for this integration step
       REAL(DbKi)                     , INTENT(IN   )      :: dtM        ! single time step  size (s) for this integration step
       TYPE( MD_InputType )           , INTENT(INOUT)      :: u_interp   ! interpolated instantaneous input values to be calculated for each mooring time step
       TYPE( MD_InputType )           , INTENT(INOUT)      :: u(:)       ! INTENT(IN   )

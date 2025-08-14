@@ -79,19 +79,23 @@ MODULE MoorDyn_IO
   INTEGER, PARAMETER             :: MZ        =   25
   INTEGER, PARAMETER             :: Sub       =   26
   INTEGER, PARAMETER             :: TenA      =   27 
-  INTEGER, PARAMETER             :: TenB      =   28 
-
+  INTEGER, PARAMETER             :: TenB      =   28
+ 
 
   ! List of units corresponding to the quantities parameters for QTypes
-  CHARACTER(ChanLen), PARAMETER :: UnitList(0:26) =  (/ &
-                               "(s)       ","(m)       ","(m)       ","(m)       ", &
-                               "(deg)     ","(deg)     ","(deg)     ", &
-                               "(m/s)     ","(m/s)     ","(m/s)     ", &
-                               "(deg/s)   ","(deg/s)   ","(deg/s)   ", &
-                               "(m/s2)    ","(m/s2)    ","(m/s2)    ", &
-                               "(deg/s2)  ","(deg/s2)  ","(deg/s2)  ", &
-                               "(N)       ","(N)       ","(N)       ","(N)       ", &
-                               "(Nm)      ","(Nm)      ","(Nm)      ","(frac)    "/)
+  CHARACTER(ChanLen), PARAMETER :: UnitList(0:26) = (/ &
+                                 "(s)       ",                             & !  0: Time
+                                 "(m)       ", "(m)       ", "(m)       ", & !  1–3:  PosX, PosY, PosZ
+                                 "(deg)     ", "(deg)     ", "(deg)     ", & !  4–6:  RotX, RotY, RotZ
+                                 "(m/s)     ", "(m/s)     ", "(m/s)     ", & !  7–9:  VelX, VelY, VelZ
+                                 "(deg/s)   ", "(deg/s)   ", "(deg/s)   ", & ! 10–12: RVelX, RVelY, RVelZ
+                                 "(m/s2)    ", "(m/s2)    ", "(m/s2)    ", & ! 13–15: AccX, AccY, AccZ
+                                 "(deg/s2)  ", "(deg/s2)  ", "(deg/s2)  ", & ! 16–18: RAccX, RAccY, RAccZ
+                                 "(N)       ",                             & ! 19: Ten
+                                 "(N)       ", "(N)       ", "(N)       ", & ! 20–22: FX, FY, FZ
+                                 "(Nm)      ", "(Nm)      ", "(Nm)      ", & ! 23–25: MX, MY, MZ
+                                 "(frac)    "                             & ! 26: Sub
+/)                     
 
   CHARACTER(28), PARAMETER  :: OutPFmt = "( I4, 3X,A 10,1 X, A10 )"   ! Output format parameter output list.
   CHARACTER(28), PARAMETER  :: OutSFmt = "ES10.3E2"
@@ -801,9 +805,9 @@ CONTAINS
       DO I=1,p%NRods
       
          ! calculate number of output entries (excluding time) to write for this Rod
-         RodNumOuts = 3*(m%RodList(I)%N + 1)*SUM(m%RodList(I)%OutFlagList(2:9)) &
-                       + (m%RodList(I)%N + 1)*SUM(m%RodList(I)%OutFlagList(10:11)) &
-                             + m%RodList(I)%N*SUM(m%RodList(I)%OutFlagList(12:18))
+         RodNumOuts = 3*(m%RodList(I)%N + 1)*SUM(m%RodList(I)%OutFlagList(2:24)) &
+                          + (m%RodList(I)%N + 1)*SUM(m%RodList(I)%OutFlagList(25:26)) &
+                                + m%RodList(I)%N*SUM(m%RodList(I)%OutFlagList(27:51))
       
          ALLOCATE(m%RodList(I)%RodWrOutput( 1 + RodNumOuts), STAT = ErrStat)  
          IF ( ErrStat /= ErrID_None ) THEN
@@ -860,7 +864,7 @@ CONTAINS
 !      INTEGER                                        :: L                    ! counter for index in LineWrOutput
       INTEGER                                        :: LineNumOuts          ! number of entries in LineWrOutput for each line
       INTEGER                                        :: RodNumOuts           ! for Rods ... redundant <<<
-      CHARACTER(200)                                 :: Frmt                 ! a string to hold a format statement
+      CHARACTER(4000)                                 :: Frmt                 ! a string to hold a format statement
       INTEGER                                        :: ErrStat2
 
 
@@ -1097,9 +1101,9 @@ CONTAINS
 
                         
             ! calculate number of output entries (excluding time) to write for this Rod
-            RodNumOuts = 3*(m%RodList(I)%N + 1)*SUM(m%RodList(I)%OutFlagList(2:9)) &
-                          + (m%RodList(I)%N + 1)*SUM(m%RodList(I)%OutFlagList(10:11)) &
-                                + m%RodList(I)%N*SUM(m%RodList(I)%OutFlagList(12:18))
+            RodNumOuts = 3*(m%RodList(I)%N + 1)*SUM(m%RodList(I)%OutFlagList(2:24)) &
+                          + (m%RodList(I)%N + 1)*SUM(m%RodList(I)%OutFlagList(25:26)) &
+                                + m%RodList(I)%N*SUM(m%RodList(I)%OutFlagList(27:51))
                                   
             if (wordy > 2) PRINT *, RodNumOuts, " output channels"
 
@@ -1170,6 +1174,22 @@ CONTAINS
                WRITE(m%RodList(I)%RodUnOut,'('//TRIM(Int2LStr((m%RodList(I)%N)))//'(A1,A15))', advance='no', IOSTAT=ErrStat2) &
                   ( p%Delim, 'Seg'//TRIM(Int2Lstr(J))//'SRt', J=1,(m%RodList(I)%N) )
             END IF
+            IF (m%RodList(I)%OutFlagList(16) == 1) THEN
+               WRITE(m%RodList(I)%RodUnOut,'('//TRIM(Int2LStr(3+3*m%RodList(I)%N))//'(A1,A15))', advance='no') &
+                  ( p%Delim, 'Node'//TRIM(Int2Lstr(J))//'ApX', p%Delim, 'Node'//TRIM(Int2Lstr(J))//'ApY', p%Delim, 'Node'//TRIM(Int2Lstr(J))//'ApZ', J=0,m%RodList(I)%N )
+            END IF
+            IF (m%RodList(I)%OutFlagList(17) == 1) THEN
+               WRITE(m%RodList(I)%RodUnOut,'('//TRIM(Int2LStr(3+3*m%RodList(I)%N))//'(A1,A15))', advance='no') &
+                  ( p%Delim, 'Node'//TRIM(Int2Lstr(J))//'AqX', p%Delim, 'Node'//TRIM(Int2Lstr(J))//'AqY', p%Delim, 'Node'//TRIM(Int2Lstr(J))//'AqZ', J=0,m%RodList(I)%N )
+            END IF
+            IF (m%RodList(I)%OutFlagList(18) == 1) THEN
+               WRITE(m%RodList(I)%RodUnOut,'('//TRIM(Int2LStr(3+3*m%RodList(I)%N))//'(A1,A15))', advance='no') &
+                  ( p%Delim, 'Node'//TRIM(Int2Lstr(J))//'DpX', p%Delim, 'Node'//TRIM(Int2Lstr(J))//'DpY', p%Delim, 'Node'//TRIM(Int2Lstr(J))//'DpZ', J=0,m%RodList(I)%N )
+            END IF
+            IF (m%RodList(I)%OutFlagList(19) == 1) THEN
+               WRITE(m%RodList(I)%RodUnOut,'('//TRIM(Int2LStr(3+3*m%RodList(I)%N))//'(A1,A15))', advance='no') &
+                  ( p%Delim, 'Node'//TRIM(Int2Lstr(J))//'DqX', p%Delim, 'Node'//TRIM(Int2Lstr(J))//'DqY', p%Delim, 'Node'//TRIM(Int2Lstr(J))//'DqZ', J=0,m%RodList(I)%N )
+            END IF
             
             WRITE(m%RodList(I)%RodUnOut,'(A1)', IOSTAT=ErrStat2) ' '  ! make line break at the end
             
@@ -1235,6 +1255,24 @@ CONTAINS
                WRITE(m%RodList(I)%RodUnOut,'('//TRIM(Int2LStr((m%RodList(I)%N)))//'(A1,A15))', advance='no', IOSTAT=ErrStat2) &
                   ( p%Delim, '(1/s)', J=1,(m%RodList(I)%N) )
             END IF
+            IF (m%RodList(I)%OutFlagList(16) == 1) THEN
+                WRITE(m%RodList(I)%RodUnOut,'('//TRIM(Int2LStr(3+3*m%RodList(I)%N))//'(A1,A15))', advance='no') &
+                  ( p%Delim, '(N)', p%Delim, '(N)', p%Delim, '(N)', J=0,m%RodList(I)%N )
+            END IF
+            IF (m%RodList(I)%OutFlagList(17) == 1) THEN
+                WRITE(m%RodList(I)%RodUnOut,'('//TRIM(Int2LStr(3+3*m%RodList(I)%N))//'(A1,A15))', advance='no') &
+                 ( p%Delim, '(N)', p%Delim, '(N)', p%Delim, '(N)', J=0,m%RodList(I)%N )
+            END IF
+            IF (m%RodList(I)%OutFlagList(18) == 1) THEN
+                WRITE(m%RodList(I)%RodUnOut,'('//TRIM(Int2LStr(3+3*m%RodList(I)%N))//'(A1,A15))', advance='no') &
+                 ( p%Delim, '(N)', p%Delim, '(N)', p%Delim, '(N)', J=0,m%RodList(I)%N )
+            END IF
+            IF (m%RodList(I)%OutFlagList(19) == 1) THEN
+                WRITE(m%RodList(I)%RodUnOut,'('//TRIM(Int2LStr(3+3*m%RodList(I)%N))//'(A1,A15))', advance='no') &
+                 ( p%Delim, '(N)', p%Delim, '(N)', p%Delim, '(N)', J=0,m%RodList(I)%N )
+            END IF
+
+               
             
             WRITE(m%RodList(I)%RodUnOut,'(A1)', IOSTAT=ErrStat2) ' '  ! make Rod break at the end
             
@@ -1305,11 +1343,6 @@ CONTAINS
       IF (ALLOCATED(m%MDWrOutput)) THEN
          DEALLOCATE(m%MDWrOutput)
       ENDIF
-      DO I=1,p%NLines
-         IF (ALLOCATED(m%LineList(I)%LineWrOutput)) THEN
-            DEALLOCATE(m%LineList(I)%LineWrOutput)       ! this may be unnecessary and handled by Line destructor
-         ENDIF
-      END DO
 
    END SUBROUTINE MDIO_CloseOutput
    !----------------------------------------------------------------------------------------============
@@ -1333,7 +1366,8 @@ CONTAINS
       INTEGER                                :: L                           ! counter for index in LineWrOutput
       INTEGER                                :: LineNumOuts                 ! number of entries in LineWrOutput for each line
       INTEGER                                :: RodNumOuts                  !   same for Rods
-      CHARACTER(200)                         :: Frmt                        ! a string to hold a format statement
+      CHARACTER(4000)                        :: Frmt                        ! a string to hold a format statement
+      REAL(DbKi)                             :: VOFsum
 
 
       IF ( .NOT. ALLOCATED( p%OutParam ) .OR. p%MDUnOut < 0 )  THEN
@@ -1467,7 +1501,11 @@ CONTAINS
                      CASE (MZ)
                         y%WriteOutput(I) = m%RodList(p%OutParam(I)%ObjID)%F6net(6)  ! total force in z
                      CASE (Sub)
-                        y%WriteOutput(I) = m%RodList(p%OutParam(I)%ObjID)%h0 / m%RodList(p%OutParam(I)%ObjID)%UnstrLen ! rod submergence
+                        VOFsum = 0.0_DbKi
+                        do j = 0, m%RodList(p%OutParam(I)%ObjID)%N
+                           VOFsum = VOFsum + m%RodList(p%OutParam(I)%ObjID)%VOF(j)
+                        end do
+                        y%WriteOutput(I) = VOFsum / size(m%RodList(p%OutParam(I)%ObjID)%VOF) ! rod submergence
                      CASE (TenA)
                         y%WriteOutput(I) = sqrt(m%RodList(p%OutParam(I)%ObjID)%FextA(1)**2 + m%RodList(p%OutParam(I)%ObjID)%FextA(2)**2 + m%RodList(p%OutParam(I)%ObjID)%FextA(3)**2)! external forces on end A
                      CASE (TenB)
@@ -1768,9 +1806,9 @@ CONTAINS
         IF (m%RodList(I)%OutFlagList(1) == 1) THEN    ! only proceed if the line is flagged to output a file
            
            ! calculate number of output entries to write for this Rod
-           RodNumOuts = 3*(m%RodList(I)%N + 1)*SUM(m%RodList(I)%OutFlagList(2:9)) &
-                         + (m%RodList(I)%N + 1)*SUM(m%RodList(I)%OutFlagList(10:11)) &
-                               + m%RodList(I)%N*SUM(m%RodList(I)%OutFlagList(12:18))
+           RodNumOuts = 3*(m%RodList(I)%N + 1)*SUM(m%RodList(I)%OutFlagList(2:24)) &
+                         + (m%RodList(I)%N + 1)*SUM(m%RodList(I)%OutFlagList(25:26)) &
+                               + m%RodList(I)%N*SUM(m%RodList(I)%OutFlagList(27:51))
            
            
            Frmt = '(F10.4,'//TRIM(Int2LStr(RodNumOuts))//'(A1,ES15.7))'   ! should evenutally use user specified format?
@@ -1870,6 +1908,46 @@ CONTAINS
                   L = L+1
               END DO
            END IF
+
+           ! Node tangential fluid inertial force
+           IF (m%RodList(I)%OutFlagList(16) == 1) THEN
+             DO J = 0,m%RodList(I)%N  
+                DO K = 1,3
+                  m%RodList(I)%RodWrOutput(L) = m%RodList(I)%Ap(K,J)
+                  L = L+1
+                 END DO
+              END DO
+           END IF
+
+           ! Node transverse fluid inertia forc
+           IF (m%RodList(I)%OutFlagList(17) == 1) THEN
+             DO J = 0,m%RodList(I)%N  
+                DO K = 1,3
+                  m%RodList(I)%RodWrOutput(L) = m%RodList(I)%Aq(K,J)
+                  L = L+1
+                END DO
+              END DO
+           END IF
+
+           ! Node transverse drag forces
+           IF (m%RodList(I)%OutFlagList(18) == 1) THEN
+             DO J = 0,m%RodList(I)%N  
+                DO K = 1,3
+                  m%RodList(I)%RodWrOutput(L) = m%RodList(I)%Dp(K,J)
+                  L = L+1
+                END DO
+              END DO
+           END IF
+
+           ! Node Tangential drag forces
+           IF (m%RodList(I)%OutFlagList(19) == 1) THEN
+             DO J = 0,m%RodList(I)%N  
+                DO K = 1,3
+                  m%RodList(I)%RodWrOutput(L) = m%RodList(I)%Dq(K,J)
+                  L = L+1
+              END DO
+           END DO
+         END IF
            
         !   ! Node curvatures
         !   IF (m%RodList(I)%OutFlagList(8) == 1) THEN

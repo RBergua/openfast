@@ -534,7 +534,6 @@ IMPLICIT NONE
     REAL(ReKi) , DIMENSION(1:3)  :: BlPitchCom = 0.0_ReKi      !< blade pitch commands from Simulink/Labview [rad]
     REAL(ReKi) , DIMENSION(1:3)  :: BlAirfoilCom = 0.0_ReKi      !< blade airfoil commands from Simulink/Labview [-]
     REAL(ReKi)  :: HSSBrFrac = 0.0_ReKi      !< Fraction of full braking torque: 0 (off) <= HSSBrFrac <= 1 (full) from Simulink or LabVIEW [-]
-    REAL(ReKi) , DIMENSION(1:3)  :: LidarFocus = 0.0_ReKi      !< lidar focus (relative to lidar location) [m]
     REAL(ReKi) , DIMENSION(1:20)  :: CableDeltaL = 0.0_ReKi      !< Cable control DeltaL [m]
     REAL(ReKi) , DIMENSION(1:20)  :: CableDeltaLdot = 0.0_ReKi      !< Cable control DeltaLdot [m/s]
   END TYPE FAST_ExternInputType
@@ -545,8 +544,8 @@ IMPLICIT NONE
     REAL(DbKi)  :: t_global = 0.0_R8Ki      !< Current simulation time (for global/FAST simulation) [(s)]
     REAL(ReKi)  :: PrevClockTime = 0.0_ReKi      !< Clock time at start of simulation in seconds [(s)]
     REAL(ReKi)  :: UsrTime1 = 0.0_ReKi      !< User CPU time for simulation initialization [(s)]
-    REAL(ReKi)  :: UsrTime2 = 0.0_ReKi      !< User CPU time for simulation (without intialization) [(s)]
-    INTEGER(IntKi) , DIMENSION(1:8)  :: StrtTime = 0_IntKi      !< Start time of simulation (including intialization) [-]
+    REAL(ReKi)  :: UsrTime2 = 0.0_ReKi      !< User CPU time for simulation (without initialization) [(s)]
+    INTEGER(IntKi) , DIMENSION(1:8)  :: StrtTime = 0_IntKi      !< Start time of simulation (including initialization) [-]
     INTEGER(IntKi) , DIMENSION(1:8)  :: SimStrtTime = 0_IntKi      !< Start time of simulation (after initialization) [-]
     TYPE(FAST_ExternInputType)  :: ExternInput      !< external input values [-]
     TYPE(FAST_MiscLinType)  :: Lin      !< misc data for linearization analysis [-]
@@ -8332,7 +8331,6 @@ subroutine FAST_CopyExternInputType(SrcExternInputTypeData, DstExternInputTypeDa
    DstExternInputTypeData%BlPitchCom = SrcExternInputTypeData%BlPitchCom
    DstExternInputTypeData%BlAirfoilCom = SrcExternInputTypeData%BlAirfoilCom
    DstExternInputTypeData%HSSBrFrac = SrcExternInputTypeData%HSSBrFrac
-   DstExternInputTypeData%LidarFocus = SrcExternInputTypeData%LidarFocus
    DstExternInputTypeData%CableDeltaL = SrcExternInputTypeData%CableDeltaL
    DstExternInputTypeData%CableDeltaLdot = SrcExternInputTypeData%CableDeltaLdot
 end subroutine
@@ -8358,7 +8356,6 @@ subroutine FAST_PackExternInputType(RF, Indata)
    call RegPack(RF, InData%BlPitchCom)
    call RegPack(RF, InData%BlAirfoilCom)
    call RegPack(RF, InData%HSSBrFrac)
-   call RegPack(RF, InData%LidarFocus)
    call RegPack(RF, InData%CableDeltaL)
    call RegPack(RF, InData%CableDeltaLdot)
    if (RegCheckErr(RF, RoutineName)) return
@@ -8376,7 +8373,6 @@ subroutine FAST_UnPackExternInputType(RF, OutData)
    call RegUnpack(RF, OutData%BlPitchCom); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%BlAirfoilCom); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%HSSBrFrac); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%LidarFocus); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%CableDeltaL); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%CableDeltaLdot); if (RegCheckErr(RF, RoutineName)) return
 end subroutine
