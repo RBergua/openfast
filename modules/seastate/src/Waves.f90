@@ -778,6 +778,7 @@ SUBROUTINE VariousWaves_Init ( InitInp, InitOut, WaveField, ErrStat, ErrMsg )
    REAL(ReKi)                   :: CurrVw0                  ! Projection of MSL current velocity on to the mean wave direction
    REAL(SiKi)                   :: OmegaCrit                ! Critial absolute wave angular frequency at which wave energy cannot propagate
    REAL(SiKi)                   :: Omega_i_Crit             ! Critial intrinsic wave angular frequency at which wave energy cannot propagate
+   LOGICAL                      :: bFirstNonzeroWaveComponent
 
    ! Variables for error handling
    INTEGER(IntKi)               :: ErrStatTmp               !< Temporary error status
@@ -851,7 +852,43 @@ SUBROUTINE VariousWaves_Init ( InitInp, InitOut, WaveField, ErrStat, ErrMsg )
 
    ! Determine the critical wave frequencies at which wave energy can no longer propogate against an opposing current
    ! Note that OmegaCrit and Omega_i_Crit will be -1 if no current or aligned waves and current
-   CurrVw0   = InitInp%CurrVxi0 * COS( D2R*WaveField%WaveDir ) + InitInp%CurrVyi0 * SIN( D2R*WaveField%WaveDir )
+   IF ( WaveField%WvCrntMod /= WvCrntMod_Superpose ) THEN
+      IF ( WaveField%WaveMod == WaveMod_UserFreq .or. WaveField%WaveMod == WaveMod_UserSpctrm) THEN ! Need to determine wave heading and check for multidirectional waves based on components
+         bFirstNonzeroWaveComponent = .true.
+         DO I = 0,WaveField%NStepWave2
+            IF ( .not. EqualRealNos(WaveField%WaveElevC0(1,I),0.0_SiKi) .or. .not. EqualRealNos(WaveField%WaveElevC0(2,I),0.0_SiKi) ) THEN
+               IF ( bFirstNonzeroWaveComponent ) THEN
+                  WaveField%WaveDir = WaveField%WaveDirArr(I)
+                  bFirstNonzeroWaveComponent = .false.
+               ELSE
+                  IF ( .not. EqualRealNos( WaveField%WaveDir, WaveField%WaveDirArr(I) ) ) then ! Multidirectional waves
+                     CALL SetErrStat(ErrID_Fatal,' Multidirectional waves are not supported with WvCrntMod = 1 or 2. Set WvCrntMod to 0. ',ErrStat,ErrMsg,RoutineName)
+                     CALL CleanUp()
+                     RETURN
+                  END IF
+               END IF
+            END IF
+         END DO
+      ELSE  ! Can check for multidirectional waves based on input settings
+         IF ( WaveField%WaveMultiDir == .true. ) THEN
+            CALL SetErrStat( ErrID_Fatal,'Multidirectional waves are not supported with WvCrntMod = 1 or 2. Set WvCrntMod to 0.',ErrStat,ErrMsg,RoutineName)
+            CALL CleanUp()
+            RETURN
+         END IF
+      END IF
+      CurrVw0   = InitInp%CurrVxi0 * COS( D2R*WaveField%WaveDir ) + InitInp%CurrVyi0 * SIN( D2R*WaveField%WaveDir )
+   ELSE
+      CurrVw0   = 0.0_ReKi
+   ENDIF
+
+   IF ( WaveField%WvCrntMod == WvCrntMod_Full ) THEN  ! Check if waves and current are colinear
+      IF ( .not. EqualRealNos( REAL(ABS(CurrVw0),SiKi), SQRT( InitInp%CurrVxi0**2 + InitInp%CurrVyi0**2 ) ) ) THEN
+         CALL SetErrStat(ErrID_Fatal,' Waves and current must be colinear (aligned or opposing) when WvCrntMod = 2. Set WvCrntMod to 0 or 1. ',ErrStat,ErrMsg,RoutineName)
+         CALL CleanUp()
+         RETURN
+      END IF
+   END IF
+
    CALL GetOmegaCritical( CurrVw0, InitInp%Gravity, WaveField%EffWtrDpth, OmegaCrit, Omega_i_Crit, ErrStatTmp, ErrMsgTmp )
      CALL SetErrStat(ErrStatTmp,ErrMsgTmp,ErrStat,ErrMsg,RoutineName)
        IF ( ErrStat >= AbortErrLev ) THEN
@@ -968,9 +1005,11 @@ SUBROUTINE VariousWaves_Init ( InitInp, InitOut, WaveField, ErrStat, ErrMsg )
 
    call Get_1Spsd_and_WaveElevC0(InitInp, InitOut, WaveField, OmegaArr, WaveS1SddArr)
 
-   ! Scale wave spectrum and wave amplitudes to account for wave-current interaction
-   ! Valid for colinear waves and current in deepwater only
-   call WaveCurrentInteraction(CurrVw0, InitInp%Gravity, WaveField, OmegaArr, WaveS1SddArr)
+   IF ( WaveField%WvCrntMod == WvCrntMod_Full ) THEN
+      ! Scale wave spectrum and wave amplitudes to account for wave-current interaction
+      ! Valid for colinear waves and current in deepwater only
+      call WaveCurrentInteraction(CurrVw0, InitInp%Gravity, WaveField, OmegaArr, WaveS1SddArr)
+   END IF
 
    !> #  Multi Directional Waves
    call CalculateWaveDirection(InitInp, InitOut, WaveField, ErrStatTmp, ErrMsgTmp); if (Failed()) return;

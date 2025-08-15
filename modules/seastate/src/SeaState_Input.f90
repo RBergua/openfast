@@ -174,6 +174,10 @@ subroutine SeaSt_ParseInput( InputFileName, OutRootName, defWtrDens, defWtrDpth,
    call ParseVar( FileInfo_In, CurLine, 'WaveStMod', InputFileData%WaveStMod, ErrStat2, ErrMsg2, UnEc )
       if (Failed())  return;
 
+      ! WvCrntMod - Model switch for wave-current modeling.
+   call ParseVar( FileInfo_In, CurLine, 'WvCrntMod', InputFileData%WvCrntMod, ErrStat2, ErrMsg2, UnEc )
+      if (Failed())  return;
+
       ! WaveTMax - Analysis time for incident wave calculations.
    call ParseVar( FileInfo_In, CurLine, 'WaveTMax', InputFileData%Waves%WaveTMax, ErrStat2, ErrMsg2, UnEc )
       if (Failed())  return;
@@ -618,7 +622,20 @@ subroutine SeaStateInput_ProcessInitData( InitInp, p, InputFileData, ErrStat, Er
          RETURN
       END IF
    END IF
-   
+
+   ! WvCrntMod - Model switch for wave-current modeling
+   SELECT CASE(InputFileData%WvCrntMod)
+      CASE(WvCrntMod_Superpose)
+      CASE(WvCrntMod_Doppler)
+      CASE(WvCrntMod_Full)
+      CASE DEFAULT
+         call SetErrStat( ErrID_Fatal,'WvCrntMod must be 0, 1, or 2',ErrStat,ErrMsg,RoutineName)
+         return
+   END SELECT
+
+   IF ( InputFileData%WaveMod == WaveMod_None .or. InputFileData%WaveMod == WaveMod_ExtFull ) THEN    ! WvCrntMod is not used
+      InputFileData%WvCrntMod = 0_IntKi
+   END IF
 
       ! WaveTMax - Analysis time for incident wave calculations.
 
@@ -803,6 +820,10 @@ subroutine SeaStateInput_ProcessInitData( InitInp, p, InputFileData, ErrStat, Er
       if ( InputFileData%Waves%WaveDirRange > 360.0_ReKi ) then
          call SetErrStat( ErrID_Fatal,' WaveDirRange should be less than a full circle.',ErrStat,ErrMsg,RoutineName)
       ENDIF
+
+      if ( InputFileData%Waves%WaveNDir == 1_IntKi) then
+         InputFileData%WaveMultiDir = .false.
+      endif
 
    else  ! Set everything to zero if we aren't going to use it
 
@@ -1045,6 +1066,17 @@ subroutine SeaStateInput_ProcessInitData( InitInp, p, InputFileData, ErrStat, Er
 
    end if
 
+   if ( InputFileData%Current%CurrMod == 0 .and. .not. InitInp%hasCurrField ) then  ! No current
+      InputFileData%WvCrntMod = 0_IntKi
+   end if
+
+   if ( InputFileData%Waves2%WvDiffQTFF .OR. InputFileData%Waves2%WvSumQTFF ) then
+      if (InputFileData%WvCrntMod /= WvCrntMod_Superpose) then
+         call SetErrStat( ErrID_Fatal,' 2nd-order waves are not supported with WvCrntMod = 1 or 2. Set WvCrntMod = 0 or set both WvDiffQTF and WvSumQTF to false. ',ErrStat,ErrMsg,RoutineName)
+         return
+      end if
+   end if
+
    !-------------------------------------------------------------------------------------------------
    ! Data section for MacCamy-Fuchs diffraction model
    !-------------------------------------------------------------------------------------------------
@@ -1178,6 +1210,7 @@ subroutine SeaStateInput_ProcessInitData( InitInp, p, InputFileData, ErrStat, Er
    
    p%WaveField%WaveMod      = InputFileData%WaveMod
    p%WaveField%WaveStMod    = InputFileData%WaveStMod
+   p%WaveField%WvCrntMod    = InputFileData%WvCrntMod
    p%WaveField%WtrDens      = InputFileData%WtrDens     ! may have overwritten default InitInp
    p%WaveField%RhoXg        = p%WaveField%WtrDens*InitInp%Gravity               ! For WAMIT and WAMIT2
    p%WaveField%WaveDir      = InputFileData%WaveDir
