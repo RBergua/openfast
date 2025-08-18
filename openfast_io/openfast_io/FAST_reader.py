@@ -2426,6 +2426,7 @@ class InputReader_OpenFAST(object):
         f.readline()
         self.fst_vt['SeaState']['WaveMod']       = int_read(f.readline().split()[0])
         self.fst_vt['SeaState']['WaveStMod']     = int_read(f.readline().split()[0])
+        self.fst_vt['SeaState']['WvCrntMod']     = int_read(f.readline().split()[0])
         self.fst_vt['SeaState']['WaveTMax']      = float_read(f.readline().split()[0])
         self.fst_vt['SeaState']['WaveDT']        = float_read(f.readline().split()[0])
         self.fst_vt['SeaState']['WaveHs']        = float_read(f.readline().split()[0])
