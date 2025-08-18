@@ -176,9 +176,9 @@ jobs:
 
       - name: Test version output
         run: |
-          build/bin/openfast_x64.exe -h
-          build/bin/TurbSim_x64.exe -h
-          build/bin/FAST.Farm_x64.exe -h
+          build/bin/openfast.exe -h
+          build/bin/TurbSim.exe -h
+          build/bin/FAST.Farm.exe -h
 
       - name: Build MATLAB Mex File
         uses: matlab-actions/run-command@v2
