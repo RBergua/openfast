@@ -20,7 +20,7 @@ set "OverallErrorLevel=0"
 @REM Build all solutions (release 64)
 devenv vs-build/OpenFAST.sln /Build "Release|x64"
 if %ERRORLEVEL% NEQ 0 (
-    set "FailedSolutions=!FailedSolutions!OpenFAST Release|x64 "
+    set "FailedSolutions=!FailedSolutions!OpenFAST Release "
     set "OverallErrorLevel=1"
     echo Build of OpenFAST.sln Release failed!
 )
@@ -29,7 +29,7 @@ if %ERRORLEVEL% NEQ 0 (
 @REM Build all OpenMP solutions (release 64 OpenMP)
 devenv vs-build/OpenFAST.sln /Build "Release_OpenMP|x64"
 if %ERRORLEVEL% NEQ 0 (
-    set "FailedSolutions=!FailedSolutions!OpenFAST Release_OpenMP|x64 "
+    set "FailedSolutions=!FailedSolutions!OpenFAST Release_OpenMP "
     set "OverallErrorLevel=1"
     echo Build of OpenFAST.sln Release_OpenMP failed!
 )
@@ -38,7 +38,7 @@ if %ERRORLEVEL% NEQ 0 (
 @REM Build MATLAB solution last
 devenv vs-build/OpenFAST.sln /Build "Release_Matlab|x64"
 if %ERRORLEVEL% NEQ 0 (
-    set "FailedSolutions=!FailedSolutions!OpenFAST Release_Matlab|x64 "
+    set "FailedSolutions=!FailedSolutions!OpenFAST Release_Matlab "
     set "OverallErrorLevel=1"
     echo Build of OpenFAST.sln Release_Matlab failed!
 )
