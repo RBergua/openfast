@@ -870,7 +870,7 @@ SUBROUTINE VariousWaves_Init ( InitInp, InitOut, WaveField, ErrStat, ErrMsg )
             END IF
          END DO
       ELSE  ! Can check for multidirectional waves based on input settings
-         IF ( WaveField%WaveMultiDir == .true. ) THEN
+         IF ( WaveField%WaveMultiDir ) THEN
             CALL SetErrStat( ErrID_Fatal,'Multidirectional waves are not supported with WvCrntMod = 1 or 2. Set WvCrntMod to 0.',ErrStat,ErrMsg,RoutineName)
             CALL CleanUp()
             RETURN
