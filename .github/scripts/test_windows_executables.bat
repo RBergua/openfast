@@ -6,12 +6,12 @@ set "FailedExecs="
 set "OverallErrorLevel=0"
 
 echo "Directory listing of executables"
-dir build/bin
+dir build\bin
 echo.
 
 :: test OpenFAST
 echo on
-build/bin/OpenFAST.exe -h
+build\bin\OpenFAST.exe -h
 echo off
 if %ERRORLEVEL% NEQ 0 (
     set "FailedExecs=!FailedExecs!OpenFAST  "
@@ -23,7 +23,7 @@ echo on
 
 :: test TurbSim
 echo on
-build/bin/TurbSim.exe -h
+build\bin\TurbSim.exe -h
 echo off
 if %ERRORLEVEL% NEQ 0 (
     set "FailedExecs=!FailedExecs!TurbSim  "
@@ -35,7 +35,7 @@ echo on
 
 :: test FAST.Farm
 echo on
-build/bin/FAST.Farm.exe -h
+build\bin\FAST.Farm.exe -h
 echo off
 if %ERRORLEVEL% NEQ 0 (
     set "FailedExecs=!FailedExecs!FAST.Farm  "
