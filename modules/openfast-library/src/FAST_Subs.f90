@@ -1108,6 +1108,9 @@ SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SE
       Init%InData_MD%Linearize = p_FAST%Linearize
       if (p_FAST%WrVTK /= VTK_None) Init%InData_MD%VisMeshes = .true.
 
+      ! Assign the seastate pointer here
+      Init%InData_MD%WaveField => Init%OutData_SeaSt%WaveField
+
       ! Call module initialization routine
       dt_module = p_FAST%DT
       CALL MD_Init(Init%InData_MD, MD%Input(INPUT_CURR), MD%p, &
