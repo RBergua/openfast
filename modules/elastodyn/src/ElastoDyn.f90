@@ -892,12 +892,12 @@ SUBROUTINE ED_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg )
 
       ! Blade Pitch Motions:
 
-   m%AllOuts(PtchPMzc1) = u%BlPitchCom(1)*R2D
+   m%AllOuts(PtchPMzc1) = x%QT(DOF_BP(1))*R2D ! u%BlPitchCom(1)*R2D
 IF ( p%NumBl > 1 ) THEN
-   m%AllOuts(PtchPMzc2) = u%BlPitchCom(2)*R2D
+   m%AllOuts(PtchPMzc2) = x%QT(DOF_BP(2))*R2D ! u%BlPitchCom(2)*R2D
    IF ( p%NumBl > 2 )  THEN ! 3-blader
 
-      m%AllOuts(PtchPMzc3) = u%BlPitchCom(3)*R2D
+      m%AllOuts(PtchPMzc3) = x%QT(DOF_BP(3))*R2D ! u%BlPitchCom(3)*R2D
 
    ELSE  ! 2-blader
 
@@ -1821,7 +1821,7 @@ END IF
    y%Yaw      = x%QT( DOF_Yaw)
    y%YawRate  = x%QDT(DOF_Yaw)
    y%YawAngle = x%QT( DOF_Yaw) + x%QT(DOF_Y)  !crude approximation for yaw error... (without subtracting it from the wind direction)   
-   y%BlPitch  = u%BlPitchCom !OtherState%BlPitch
+   y%BlPitch  = x%QT( DOF_BP ) ! u%BlPitchCom !OtherState%BlPitch
    y%LSS_Spd  = x%QDT(DOF_GeAz)
    y%HSS_Spd  = ABS(p%GBRatio)*x%QDT(DOF_GeAz)
    y%RotSpeed = x%QDT(DOF_GeAz) + x%QDT(DOF_DrTr)
@@ -1911,7 +1911,7 @@ SUBROUTINE ED_CalcContStateDeriv( t, u, p, x, xd, z, OtherState, m, dxdt, ErrSta
        !OtherState%BlPitch = u%BlPitchCom
        
          ! set the coordinate system variables:
-      CALL SetCoordSy( t, m%CoordSys, m%RtHS, u%BlPitchCom, p, x, ErrStat2, ErrMsg2 )
+      CALL SetCoordSy( t, m%CoordSys, m%RtHS, p, x, ErrStat2, ErrMsg2 )
          call setErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
          IF (ErrStat >= AbortErrLev) RETURN
    
@@ -2180,9 +2180,9 @@ SUBROUTINE Init_DOFparameters( InputFileData, p, ErrStat, ErrMsg )
    ErrMsg  = ''
 
    IF ( p%NumBl == 1 )  THEN
-      p%NDOF = 18 
+      p%NDOF = 19
    ELSEIF ( p%NumBl == 2 )  THEN
-      p%NDOF = 22
+      p%NDOF = 24
    ELSE
       p%NDOF = ED_MaxDOFs
    ENDIF
@@ -2207,6 +2207,10 @@ SUBROUTINE Init_DOFparameters( InputFileData, p, ErrStat, ErrMsg )
 
 
    DO K = 1,p%NumBl
+      p%DOF_Flag( DOF_BP(K  ) ) = InputFileData%PitchDOF
+      p%DOF_Desc( DOF_BP(K  ) ) = 'Blade pitch DOF of blade '//TRIM(Num2LStr( K ))// &
+                                  ' (internal DOF index = DOF_BP('         //TRIM(Num2LStr( K ))//'  )), rad'
+
       p%DOF_Flag( DOF_BF(K,1) ) = InputFileData%FlapDOF1
       p%DOF_Desc( DOF_BF(K,1) ) = '1st flapwise bending-mode DOF of blade '//TRIM(Num2LStr( K ))// &
                                   ' (internal DOF index = DOF_BF('         //TRIM(Num2LStr( K ))//',1)), m'
@@ -2286,7 +2290,7 @@ SUBROUTINE Init_DOFparameters( InputFileData, p, ErrStat, ErrMsg )
 
 
 !bjj was   ALLOCATE ( p%DOFs%PSBE(p%NumBl,3), p%DOFs%PSE(p%NumBl,p%NDOF),  STAT=ErrStat )
-   ALLOCATE ( p%DOFs%PSBE(p%NumBl,(NumBE+NumBF)), p%DOFs%PSE(p%NumBl,p%NDOF),  STAT=ErrStat )
+   ALLOCATE ( p%DOFs%PSBE(p%NumBl,(1+NumBE+NumBF)), p%DOFs%PSE(p%NumBl,p%NDOF),  STAT=ErrStat )
    IF ( ErrStat /= 0 )  THEN
       CALL ExitThisRoutine( ErrID_Fatal, ' Could not allocate memory for the ActiveAOFs PSBE and PSE arrays.' )
       RETURN
@@ -2315,10 +2319,10 @@ SUBROUTINE Init_DOFparameters( InputFileData, p, ErrStat, ErrMsg )
 
    IF ( p%NumBl == 2 )  THEN ! 2-blader
       p%NPH = 12                         ! Number of DOFs that contribute to the angular velocity of the hub            (body H) in the inertia frame.
-      p%NPM = 15                         ! Number of DOFs that contribute to the angular velocity of the blade elements (body M) in the inertia frame.
+      p%NPM = 16                         ! Number of DOFs that contribute to the angular velocity of the blade elements (body M) in the inertia frame.
    ELSE                    ! 3-blader
       p%NPH = 11                         ! Number of DOFs that contribute to the angular velocity of the hub            (body H) in the inertia frame.
-      p%NPM = 14                         ! Number of DOFs that contribute to the angular velocity of the blade elements (body M) in the inertia frame.
+      p%NPM = 15                         ! Number of DOFs that contribute to the angular velocity of the blade elements (body M) in the inertia frame.
    ENDIF
 
 
@@ -2338,7 +2342,7 @@ SUBROUTINE Init_DOFparameters( InputFileData, p, ErrStat, ErrMsg )
          ! Array of DOF indices (pointers) that contribute to the angular velocity of the blade elements (body M) in the inertia frame:
       DO K = 1,p%NumBl ! Loop through all blades
          p%PM(K,:) = (/ DOF_R, DOF_P, DOF_Y, DOF_TFA1, DOF_TSS1, DOF_TFA2, DOF_TSS2, DOF_Yaw, DOF_RFrl, DOF_GeAz, DOF_DrTr, &
-                        DOF_Teet,  DOF_BF(K,1) , DOF_BE(K,1)    , DOF_BF(K,2)          /)
+                        DOF_Teet,  DOF_BP(K) , DOF_BF(K,1) , DOF_BE(K,1)    , DOF_BF(K,2)          /)
       ENDDO          ! K - All blades
 
    ELSE  ! 3-blader
@@ -2346,7 +2350,7 @@ SUBROUTINE Init_DOFparameters( InputFileData, p, ErrStat, ErrMsg )
          ! Array of DOF indices (pointers) that contribute to the angular velocity of the blade elements (body M) in the inertia frame:
       DO K = 1,p%NumBl ! Loop through all blades
          p%PM(K,:) = (/ DOF_R, DOF_P, DOF_Y, DOF_TFA1, DOF_TSS1, DOF_TFA2, DOF_TSS2, DOF_Yaw, DOF_RFrl, DOF_GeAz, DOF_DrTr, &
-                                   DOF_BF(K,1) , DOF_BE(K,1)    , DOF_BF(K,2)         /)
+                                   DOF_BP(K) , DOF_BF(K,1) , DOF_BE(K,1)    , DOF_BF(K,2)         /)
       ENDDO          ! K - All blades
 
    ENDIF
@@ -3387,7 +3391,11 @@ SUBROUTINE SetPrimaryParameters( InitInp, p, InputFileData, ErrStat, ErrMsg  )
    
    CALL AllocAry( p%TipMass, p%NumBl, 'TipMass', ErrStat, ErrMsg )
    IF ( ErrStat >= AbortErrLev ) RETURN
-   p%TipMass   = InputFileData%TipMass
+   p%TipMass   = InputFileData%TipMass(1:p%NumBl)
+
+   CALL AllocAry( p%PitchIner, p%NumBl, 'PitchIner', ErrStat, ErrMsg )
+   IF ( ErrStat >= AbortErrLev ) RETURN
+   p%PitchIner = InputFileData%PitchIner(1:p%NumBl)
 
       ! initialize all of the DOF parameters:
    CALL Init_DOFparameters( InputFileData, p, ErrStat, ErrMsg ) !sets p%NDOF and p%NAug
@@ -3539,10 +3547,11 @@ SUBROUTINE Init_ContStates( x, p, InputFileData, OtherState, ErrStat, ErrMsg  )
       InitQE1 = 0.0_ReKi
    END IF
    
-      
+   x%QT ( DOF_BP(1:p%NumBl  ) ) = InputFileData%BlPitch(1:p%NumBl)
    x%QT ( DOF_BF(1:p%NumBl,1) ) = InitQF1   ! These come from InitBlDefl().
    x%QT ( DOF_BF(1:p%NumBl,2) ) = InitQF2   ! These come from InitBlDefl().
    x%QT ( DOF_BE(1:p%NumBl,1) ) = InitQE1   ! These come from InitBlDefl().
+   x%QDT( DOF_BP(1:p%NumBl  ) ) = 0.0
    x%QDT( DOF_BF(1:p%NumBl,1) ) = 0.0
    x%QDT( DOF_BF(1:p%NumBl,2) ) = 0.0
    x%QDT( DOF_BE(1:p%NumBl,1) ) = 0.0
@@ -5879,6 +5888,21 @@ SUBROUTINE SetEnabledDOFIndexArrays( p )
 
 
    DO K = 1,p%NumBl ! Loop through all blades
+      IF ( p%DOF_Flag(DOF_BP(K  )) )  THEN  ! Blade pitch.
+
+         p%DOFs%NActvDOF = p%DOFs%NActvDOF + 1
+         p%DOFs%NPSBE(K) = p%DOFs%NPSBE(K) + 1
+         p%DOFs%NPSE (K) = p%DOFs%NPSE (K) + 1
+
+         p%DOFs%PS      (  p%DOFs%NActvDOF) = DOF_BP(K  )
+         p%DOFs%PSBE    (K,p%DOFs%NPSBE(K)) = DOF_BP(K  )
+         p%DOFs%PSE     (K,p%DOFs%NPSE (K)) = DOF_BP(K  )
+
+      ENDIF
+   ENDDO          ! K - Blades
+
+
+   DO K = 1,p%NumBl ! Loop through all blades
       IF ( p%DOF_Flag(DOF_BF(K,1)) )  THEN  ! 1st blade flap.
 
          p%DOFs%NActvDOF = p%DOFs%NActvDOF + 1
@@ -5952,12 +5976,12 @@ END SUBROUTINE SetEnabledDOFIndexArrays
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine is used to define the internal coordinate systems for this particular time step.
 !! It also sets the TeeterAng and TeetAngVel for this time step.
-SUBROUTINE SetCoordSy( t, CoordSys, RtHSdat, BlPitch, p, x, ErrStat, ErrMsg )
+SUBROUTINE SetCoordSy( t, CoordSys, RtHSdat, p, x, ErrStat, ErrMsg )
 
       ! Subroutine arguments (passed variables)
 
    REAL(DbKi),                   INTENT(IN)    :: t                             !< Current simulation time, in seconds (used only for SmllRotTrans error messages)
-   REAL(ReKi),                   INTENT(IN)    :: BlPitch (:)                   !< The current blade pitch
+ ! REAL(ReKi),                   INTENT(IN)    :: BlPitch (:)                   !< The current blade pitch
    TYPE(ED_CoordSys),            INTENT(INOUT) :: CoordSys                      !< The coordinate systems to be set
    TYPE(ED_RtHndSide),           INTENT(INOUT) :: RtHSdat                       !< data from the RtHndSid module
    TYPE(ED_ParameterType),       INTENT(IN)    :: p                             !< The module's parameters
@@ -6175,8 +6199,10 @@ SUBROUTINE SetCoordSy( t, CoordSys, RtHSdat, BlPitch, p, x, ErrStat, ErrMsg )
 
       ! Blade / pitched coordinate system:
 
-      CosPitch = COS( REAL(BlPitch(K),R8Ki) )
-      SinPitch = SIN( REAL(BlPitch(K),R8Ki) )
+      ! CosPitch = COS( REAL(BlPitch(K),R8Ki) )
+      ! SinPitch = SIN( REAL(BlPitch(K),R8Ki) )
+      CosPitch = COS( x%QT(DOF_BP(K)) )
+      SinPitch = SIN( x%QT(DOF_BP(K)) )
 
       CoordSys%j1(K,:) = CosPitch*CoordSys%i1(K,:) - SinPitch*CoordSys%i2(K,:)      ! j1(K,:) = vector / direction j1 for blade K (=  xbK from the IEC coord. system).
       CoordSys%j2(K,:) = SinPitch*CoordSys%i1(K,:) + CosPitch*CoordSys%i2(K,:)      ! j2(K,:) = vector / direction j2 for blade K (=  ybK from the IEC coord. system).
@@ -6750,7 +6776,8 @@ SUBROUTINE CalculateAngularPosVelPAcc( p, x, CoordSys, RtHSdat, ErrStat, ErrMsg 
    CHARACTER(*),                 INTENT(OUT)    :: ErrMsg                       !< Error message
 
       !Local variables
-   
+
+   REAL(ReKi)                   :: EwM0  (3)                                       ! Angular velocity of at blade root (body M(0)).
    REAL(ReKi)                   :: AngVelHM  (3)                                   ! Angular velocity of eleMent J of blade K (body M) in the hub (body H).
 !   REAL(ReKi)                   :: AngVelEN  (3)                                   ! Angular velocity of the nacelle (body N) in the inertia frame (body E for earth).
    REAL(ReKi)                   :: AngAccELt (3)                                   ! Portion of the angular acceleration of the low-speed shaft (body L) in the inertia frame (body E for earth) associated with everything but the QD2T()'s.
@@ -6887,28 +6914,29 @@ ENDIF
 
    DO K = 1,p%NumBl ! Loop through all blades
 
+      ! EwM0 = RtHSdat%AngVelEH-CoordSys%j3(K,:)*x%QDT(DOF_BP(K))
+
       DO J = 0,p%TipNode ! Loop through the blade nodes / elements
       ! Define the partial angular velocities of the current node (body M(RNodes(J))) in the inertia frame:
       ! NOTE: PAngVelEM(K,J,I,D,:) = the Dth-derivative of the partial angular velocity
       !   of DOF I for body M of blade K, element J in body E.
 
          RtHSdat%PAngVelEM(K,J,          :,0,:) = RtHSdat%PAngVelEH(:,0,:)
+         RtHSdat%PAngVelEM(K,J,DOF_BP(K  ),0,:) =                         -CoordSys%j3(K,:)
          RtHSdat%PAngVelEM(K,J,DOF_BF(K,1),0,:) = - p%TwistedSF(K,2,1,J,1)*CoordSys%j1(K,:) &
                                                   + p%TwistedSF(K,1,1,J,1)*CoordSys%j2(K,:)
          RtHSdat%PAngVelEM(K,J,DOF_BF(K,2),0,:) = - p%TwistedSF(K,2,2,J,1)*CoordSys%j1(K,:) &
                                                   + p%TwistedSF(K,1,2,J,1)*CoordSys%j2(K,:)
          RtHSdat%PAngVelEM(K,J,DOF_BE(K,1),0,:) = - p%TwistedSF(K,2,3,J,1)*CoordSys%j1(K,:) &
                                                   + p%TwistedSF(K,1,3,J,1)*CoordSys%j2(K,:)
-                                      AngVelHM  =     x%QDT(DOF_BF(K,1))*RtHSdat%PAngVelEM(K,J,DOF_BF(K,1),0,:) &
+                                      AngVelHM  =     x%QDT(DOF_BP(K  ))*RtHSdat%PAngVelEM(K,J,DOF_BP(K  ),0,:) &
+                                                    + x%QDT(DOF_BF(K,1))*RtHSdat%PAngVelEM(K,J,DOF_BF(K,1),0,:) &
                                                     + x%QDT(DOF_BF(K,2))*RtHSdat%PAngVelEM(K,J,DOF_BF(K,2),0,:) &
                                                     + x%QDT(DOF_BE(K,1))*RtHSdat%PAngVelEM(K,J,DOF_BE(K,1),0,:)
           RtHSdat%AngVelEM(:,J,K              ) =  RtHSdat%AngVelEH + AngVelHM
-          RtHSdat%AngPosHM(:,K,J              ) =     x%QT (DOF_BF(K,1))*RtHSdat%PAngVelEM(K,J,DOF_BF(K,1),0,:) &
+          RtHSdat%AngPosHM(:,K,J              ) =     x%QT (DOF_BF(K,1))*RtHSdat%PAngVelEM(K,J,DOF_BF(K,1),0,:) & ! Used for local blade rotational deflection output only; no need to introduce pitch here.
                                                     + x%QT (DOF_BF(K,2))*RtHSdat%PAngVelEM(K,J,DOF_BF(K,2),0,:) &
                                                     + x%QT (DOF_BE(K,1))*RtHSdat%PAngVelEM(K,J,DOF_BE(K,1),0,:)
-         RtHSdat%AngAccEKt(:,J              ,K) =  RtHSdat%AngAccEHt + x%QDT(DOF_BF(K,1))*RtHSdat%PAngVelEM(K,J,DOF_BF(K,1),1,:) & 
-                                                                     + x%QDT(DOF_BF(K,2))*RtHSdat%PAngVelEM(K,J,DOF_BF(K,2),1,:) & 
-                                                                     + x%QDT(DOF_BE(K,1))*RtHSdat%PAngVelEM(K,J,DOF_BE(K,1),1,:)   
  
       ! Define the 1st derivatives of the partial angular velocities of the current node (body M(RNodes(J))) in the inertia frame:
 
@@ -6916,11 +6944,18 @@ ENDIF
    !       be calculated.  Thus, they are currently commented out.  If it
    !       turns out that they are ever needed (i.e., if inertias of the
    !       blade elements are ever added, etc...) simply uncomment out these computations:
-   !      RtHSdat%PAngVelEM(K,J,          :,1,:) = RtHSdat%PAngVelEH(:,1,:)
-   !      RtHSdat%PAngVelEM(K,J,DOF_BF(K,1),1,:) = CROSS_PRODUCT(   RtHSdat%AngVelEH, PAngVelEM(K,J,DOF_BF(K,1),0,:) )
-   !      RtHSdat%PAngVelEM(K,J,DOF_BF(K,2),1,:) = CROSS_PRODUCT(   RtHSdat%AngVelEH, PAngVelEM(K,J,DOF_BF(K,2),0,:) )
-   !      RtHSdat%PAngVelEM(K,J,DOF_BE(K,1),1,:) = CROSS_PRODUCT(   RtHSdat%AngVelEH, PAngVelEM(K,J,DOF_BE(K,1),0,:) )
 
+          EwM0 = RtHSdat%AngVelEM(:,0,K)
+
+          RtHSdat%PAngVelEM(K,J,          :,1,:) = RtHSdat%PAngVelEH(:,1,:)
+          RtHSdat%PAngVelEM(K,J,DOF_BP(K  ),1,:) = CROSS_PRODUCT(   RtHSdat%AngVelEH , RtHSdat%PAngVelEM(K,J,DOF_BP(K  ),0,:) )
+          RtHSdat%PAngVelEM(K,J,DOF_BF(K,1),1,:) = CROSS_PRODUCT(   EwM0             , RtHSdat%PAngVelEM(K,J,DOF_BF(K,1),0,:) )
+          RtHSdat%PAngVelEM(K,J,DOF_BF(K,2),1,:) = CROSS_PRODUCT(   EwM0             , RtHSdat%PAngVelEM(K,J,DOF_BF(K,2),0,:) )
+          RtHSdat%PAngVelEM(K,J,DOF_BE(K,1),1,:) = CROSS_PRODUCT(   EwM0             , RtHSdat%PAngVelEM(K,J,DOF_BE(K,1),0,:) )
+          RtHSdat%AngAccEKt(:,J              ,K) =  RtHSdat%AngAccEHt + x%QDT(DOF_BP(K  ))*RtHSdat%PAngVelEM(K,J,DOF_BP(K  ),1,:) &
+                                                                      + x%QDT(DOF_BF(K,1))*RtHSdat%PAngVelEM(K,J,DOF_BF(K,1),1,:) &
+                                                                      + x%QDT(DOF_BF(K,2))*RtHSdat%PAngVelEM(K,J,DOF_BF(K,2),1,:) &
+                                                                      + x%QDT(DOF_BE(K,1))*RtHSdat%PAngVelEM(K,J,DOF_BE(K,1),1,:)
 
       END DO !J = 1,p%BldNodes ! Loop through the blade nodes / elements
 
@@ -7009,7 +7044,8 @@ SUBROUTINE CalculateLinearVelPAcc( p, x, CoordSys, RtHSdat )
    REAL(ReKi)                   :: EwAXrWJ   (3)                                   ! = AngVelEA X rWJ
    REAL(ReKi)                   :: EwHXrPQ   (3)                                   ! = AngVelEH X rPQ
    REAL(ReKi)                   :: EwHXrQC   (3)                                   ! = AngVelEH X rQC
-   REAL(ReKi)                   :: EwHXrQS   (3)                                   ! = AngVelEH X rQS of the current blade point S.
+   REAL(ReKi)                   :: EwM0      (3)                                   ! = AngVelEM(0)
+   REAL(ReKi)                   :: EwM0XrQS  (3)                                   ! = AngVelEM(0) X rQS of the current blade point S.
    REAL(ReKi)                   :: EwNXrOU   (3)                                   ! = AngVelEN X rOU
    REAL(ReKi)                   :: EwNXrOV   (3)                                   ! = AngVelEN X rOV
    REAL(ReKi)                   :: EwNXrOW   (3)                                   ! = AngVelEN X rOW
@@ -7263,6 +7299,9 @@ SUBROUTINE CalculateLinearVelPAcc( p, x, CoordSys, RtHSdat )
 
    DO K = 1,p%NumBl ! Loop through all blades
 
+      ! EwM0 = RtHSdat%AngVelEH-CoordSys%j3(K,:)*x%QDT(DOF_BP(K))
+      EwM0 = RtHSdat%AngVelEM(:,0,K)
+
       DO J = 0,p%TipNode ! Loop through the blade nodes / elements
 
       ! Define the partial linear velocities (and their 1st derivatives) of the
@@ -7271,7 +7310,7 @@ SUBROUTINE CalculateLinearVelPAcc( p, x, CoordSys, RtHSdat )
       !   Also, define the portion of the linear acceleration of the current node
       !   in the inertia frame associated with everything but the QD2T()'s:
 
-         EwHXrQS = CROSS_PRODUCT(  RtHSdat%AngVelEH, RtHSdat%rQS(:,K,J) )
+         EwM0XrQS = CROSS_PRODUCT( EwM0 , RtHSdat%rQS(:,K,J) )
 
          RtHSdat%PLinVelES(K,J,          :,:,:) = RtHSdat%PLinVelEQ(:,:,:)
          RtHSdat%PLinVelES(K,J,DOF_BF(K,1),0,:) = p%TwistedSF(K,1,1,J,0)                          *CoordSys%j1(K,:) &  !bjj: this line can be optimized
@@ -7290,9 +7329,9 @@ SUBROUTINE CalculateLinearVelPAcc( p, x, CoordSys, RtHSdat )
                                                     + p%AxRedBld(K,1,2,J)*x%QT ( DOF_BF(K,1) ) &
                                                     + p%AxRedBld(K,2,3,J)*x%QT ( DOF_BE(K,1) )   )*CoordSys%j3(K,:)
 
-         TmpVec1 = CROSS_PRODUCT( RtHSdat%AngVelEH, RtHSdat%PLinVelES(K,J,DOF_BF(K,1),0,:) )
-         TmpVec2 = CROSS_PRODUCT( RtHSdat%AngVelEH, RtHSdat%PLinVelES(K,J,DOF_BE(K,1),0,:) )
-         TmpVec3 = CROSS_PRODUCT( RtHSdat%AngVelEH, RtHSdat%PLinVelES(K,J,DOF_BF(K,2),0,:) )
+         TmpVec1 = CROSS_PRODUCT( EwM0, RtHSdat%PLinVelES(K,J,DOF_BF(K,1),0,:) )
+         TmpVec2 = CROSS_PRODUCT( EwM0, RtHSdat%PLinVelES(K,J,DOF_BE(K,1),0,:) )
+         TmpVec3 = CROSS_PRODUCT( EwM0, RtHSdat%PLinVelES(K,J,DOF_BF(K,2),0,:) )
 
          RtHSdat%PLinVelES(K,J,DOF_BF(K,1),1,:) = TmpVec1 &
                                                 - (   p%AxRedBld(K,1,1,J)*x%QDT( DOF_BF(K,1) ) &
@@ -7318,7 +7357,7 @@ SUBROUTINE CalculateLinearVelPAcc( p, x, CoordSys, RtHSdat )
          DO I = 1,p%NPH   ! Loop through all DOFs associated with the angular motion of the hub (body H)
 
             TmpVec0 = CROSS_PRODUCT(   RtHSdat%PAngVelEH(p%PH(I),0,:), RtHSdat%rQS(:,K,J)            )  !bjj: this line can be optimized
-            TmpVec1 = CROSS_PRODUCT(   RtHSdat%PAngVelEH(p%PH(I),0,:),     EwHXrQS        + LinVelHS )  !bjj: this line can be optimized
+            TmpVec1 = CROSS_PRODUCT(   RtHSdat%PAngVelEH(p%PH(I),0,:),     EwM0XrQS       + LinVelHS )  !bjj: this line can be optimized
             TmpVec2 = CROSS_PRODUCT(   RtHSdat%PAngVelEH(p%PH(I),1,:), RtHSdat%rQS(:,K,J)            )  !bjj: this line can be optimized
 
             RtHSdat%PLinVelES(K,J,p%PH(I),0,:) = RtHSdat%PLinVelES(K,J,p%PH(I),0,:) + TmpVec0            !bjj: this line can be optimized
@@ -7328,6 +7367,17 @@ SUBROUTINE CalculateLinearVelPAcc( p, x, CoordSys, RtHSdat )
             RtHSdat%LinAccESt(:,K,J)         = RtHSdat%LinAccESt(:,K,J)  + x%QDT(p%PH(I))*RtHSdat%PLinVelES(K,J,p%PH(I),1,:)  !bjj: this line can be optimized
 
          END DO ! I - all DOFs associated with the angular motion of the hub (body H)
+
+         ! Add contribution from blade pitch DoF
+         TmpVec0 = CROSS_PRODUCT(                                    -CoordSys%j3(K,:) , RtHSdat%rQS(:,K,J)  )  !bjj: this line can be optimized
+         TmpVec1 = CROSS_PRODUCT(                                    -CoordSys%j3(K,:) , EwM0XrQS + LinVelHS )  !bjj: this line can be optimized
+         TmpVec2 = CROSS_PRODUCT(-CROSS_PRODUCT( RtHSdat%AngVelEH(:), CoordSys%j3(K,:)), RtHSdat%rQS(:,K,J)  )  !bjj: this line can be optimized
+
+         RtHSdat%PLinVelES(K,J,DOF_BP(K),0,:) = RtHSdat%PLinVelES(K,J,DOF_BP(K),0,:) + TmpVec0             !bjj: this line can be optimized
+         RtHSdat%PLinVelES(K,J,DOF_BP(K),1,:) = RtHSdat%PLinVelES(K,J,DOF_BP(K),1,:) + TmpVec1 + TmpVec2   !bjj: this line can be optimized
+
+         RtHSdat%LinVelES(:,J,K)          = RtHSdat%LinVelES(:,J,K)   + x%QDT(DOF_BP(K))*RtHSdat%PLinVelES(K,J,DOF_BP(K),0,:)  !bjj: this line can be optimized
+         RtHSdat%LinAccESt(:,K,J)         = RtHSdat%LinAccESt(:,K,J)  + x%QDT(DOF_BP(K))*RtHSdat%PLinVelES(K,J,DOF_BP(K),1,:)  !bjj: this line can be optimized
 
       END DO !J = 0,p%TipNodes ! Loop through the blade nodes / elements
       
@@ -7472,6 +7522,7 @@ SUBROUTINE CalculateForcesMoments( p, x, CoordSys, u, RtHSdat )
    REAL(ReKi)                   :: TmpVec3   (3)                                   ! A temporary vector used in various computations.
    REAL(ReKi)                   :: TmpVec4   (3)                                   ! A temporary vector used in various computations.
    REAL(ReKi)                   :: TmpVec5   (3)                                   ! A temporary vector used in various computations.
+   REAL(ReKi)                   :: EwM0      (3)
    REAL(ReKi)                   :: Force(3)  ! External force  (e.g. from AeroDyn)
    REAL(ReKi)                   :: Moment(3) ! External moment (e.g. from AeroDyn)
    INTEGER(IntKi)               :: I                                               ! Loops through some or all of the DOFs
@@ -7529,24 +7580,28 @@ SUBROUTINE CalculateForcesMoments( p, x, CoordSys, u, RtHSdat )
 !.....................................
 ! PFrcS0B and PMomH0B  
 !.....................................
-DO K = 1,p%NumBl ! Loop through all blades
+   DO K = 1,p%NumBl ! Loop through all blades
 
       ! Initialize the partial forces and moments (including those associated
       !   with the QD2T()'s and those that are not) at the blade root (point S(0))
       !   using the tip brake effects:
 
+      ! EwM0 = RtHSdat%AngVelEH-CoordSys%j3(K,:)*x%QDT(DOF_BP(K))
+      EwM0 = RtHSdat%AngVelEM(:,0,K)
+
       RtHSdat%PFrcS0B(:,K,:) = 0.0 ! Initialize these partial
       RtHSdat%PMomH0B(:,K,:) = 0.0 ! forces and moments to zero
       DO I = 1,p%DOFs%NPSE(K)  ! Loop through all active (enabled) DOFs that contribute to the QD2T-related linear accelerations of blade K
 
-         TmpVec1 = -p%TipMass(K)*RtHSdat%PLinVelES(K,p%TipNode,p%DOFs%PSE(K,I),0,:)                            ! The portion of PFrcS0B associated with the tip brake
+         TmpVec1 = -p%TipMass(K)*RtHSdat%PLinVelES(K,p%TipNode,p%DOFs%PSE(K,I),0,:)                             ! The portion of PFrcS0B associated with the tip brake
+         TmpVec2 = -p%PitchIner(K) * CoordSys%j3(K,:) * DOT_PRODUCT( CoordSys%j3(K,:), EwM0 )
 
          RtHSdat%PFrcS0B(:,K,p%DOFs%PSE(K,I)) = TmpVec1
-         RtHSdat%PMomH0B(:,K,p%DOFs%PSE(K,I)) = CROSS_PRODUCT( RtHSdat%rS0S(:,K,p%TipNode), TmpVec1 )          ! The portion of PMomH0B associated with the tip brake
+         RtHSdat%PMomH0B(:,K,p%DOFs%PSE(K,I)) = CROSS_PRODUCT( RtHSdat%rS0S(:,K,p%TipNode), TmpVec1 ) + TmpVec2 ! The portion of PMomH0B associated with the tip brake
 
       ENDDO             ! I - All active (enabled) DOFs that contribute to the QD2T-related linear accelerations of blade K  
-   
-   
+
+
       DO J = 1,p%BldNodes ! Loop through the blade nodes / elements
 
       ! Integrate to find the partial forces and moments (including those associated
@@ -7563,7 +7618,6 @@ DO K = 1,p%NumBl ! Loop through all blades
          ENDDO             ! I - All active (enabled) DOFs that contribute to the QD2T-related linear accelerations of blade K
       END DO
       
-      
    END DO     
    
  
@@ -7572,9 +7626,15 @@ DO K = 1,p%NumBl ! Loop through all blades
 !.....................................
    DO K = 1,p%NumBl ! Loop through all blades
    
+      ! EwM0 = RtHSdat%AngVelEH-CoordSys%j3(K,:)*x%QDT(DOF_BP(K))
+      EwM0 = RtHSdat%AngVelEM(:,0,K)
+
       TmpVec1 = RtHSdat%FSTipDrag(:,K) - p%TipMass(K)*( p%Gravity*CoordSys%z2 + RtHSdat%LinAccESt(:,K,p%TipNode) ) ! The portion of FrcS0Bt associated with the tip brake
+      TmpVec2 = - p%PitchIner(K)*CoordSys%j3(K,:)*DOT_PRODUCT(CoordSys%j3(K,:), RtHSdat%AngAccEHt+x%QDT(DOF_BP(K))*CROSS_PRODUCT( RtHSdat%AngVelEH , -CoordSys%j3(K,:) ))
+      TmpVec3 = - CROSS_PRODUCT( EwM0, p%PitchIner(K)*CoordSys%j3(K,:)*DOT_PRODUCT(CoordSys%j3(K,:), EwM0) )
+
       RtHSdat%FrcS0Bt(:,K) = TmpVec1
-      RtHSdat%MomH0Bt(:,K) = CROSS_PRODUCT(  RtHSdat%rS0S(:,K,p%TipNode), TmpVec1 )                                 ! The portion of MomH0Bt associated with the tip brake
+      RtHSdat%MomH0Bt(:,K) = CROSS_PRODUCT(  RtHSdat%rS0S(:,K,p%TipNode), TmpVec1 ) + TmpVec2 + TmpVec3            ! The portion of MomH0Bt associated with the tip brake
 
       DO J = 1,p%BldNodes ! Loop through the blade nodes / elements      
       
@@ -7646,14 +7706,14 @@ DO K = 1,p%NumBl ! Loop through all blades
    RtHSdat%FrcPRott(1)  = TmpVec1(1) + u%HubPtLoad%Force(1,1)
    RtHSdat%FrcPRott(2)  = TmpVec1(2) + u%HubPtLoad%Force(3,1)
    RtHSdat%FrcPRott(3)  = TmpVec1(3) - u%HubPtLoad%Force(2,1)
-   
+
    RtHSdat%MomLPRott    = TmpVec2 + TmpVec3 - p%Hubg1Iner*CoordSys%g1*DOT_PRODUCT( CoordSys%g1, RtHSdat%AngAccEHt ) &
                                             - p%Hubg2Iner*CoordSys%g2*DOT_PRODUCT( CoordSys%g2, RtHSdat%AngAccEHt )                                          
-      
+
    RtHSdat%MomLPRott(1) = RtHSdat%MomLPRott(1) + u%HubPtLoad%Moment(1,1)
    RtHSdat%MomLPRott(2) = RtHSdat%MomLPRott(2) + u%HubPtLoad%Moment(3,1)
    RtHSdat%MomLPRott(3) = RtHSdat%MomLPRott(3) - u%HubPtLoad%Moment(2,1)
-   
+
    DO K = 1,p%NumBl ! Loop through all blades
    
          ! Calculate the position vector from the teeter pin to the blade root:
@@ -8128,6 +8188,7 @@ SUBROUTINE FillAugMat( p, x, CoordSys, u, HSSBrTrq, RtHSdat, AugMat )
       ! Local variables
    REAL(ReKi)                   :: TmpVec    (3)                                   ! A temporary vector used in various computations.
    REAL(ReKi)                   :: TmpVec1   (3)                                   ! A temporary vector used in various computations.
+   REAL(ReKi)                   :: TmpVec2   (3)                                   ! A temporary vector used in various computations.
    REAL(ReKi)                   :: TmpVec3   (3)                                   ! A temporary vector used in various computations.
    REAL(ReKi)                   :: GBoxTrq                                         ! Gearbox torque on the LSS side in N-m (calculated from inputs and parameters).
    REAL(ReKi)                   :: GBoxEffFac2                                     ! A second gearbox efficiency factor = ( 1 / GBoxEff^SgnPrvLSTQ - 1 )
@@ -8156,16 +8217,23 @@ SUBROUTINE FillAugMat( p, x, CoordSys, u, HSSBrTrq, RtHSdat, AugMat )
    
       DO L = 1,p%DOFs%NPSBE(K)    ! Loop through all active (enabled) blade DOFs that contribute to the QD2T-related linear accelerations of the tip of blade K (point S(p%BldFlexL))
          DO I = L,p%DOFs%NPSBE(K) ! Loop through all active (enabled) blade DOFs greater than or equal to L
-            AugMat(p%DOFs%PSBE(K,I),p%DOFs%PSBE(K,L)) = p%TipMass(K)*&
-                                        DOT_PRODUCT( RtHSdat%PLinVelES(K, p%TipNode, p%DOFs%PSBE(K,I),0,:), &   ! [C(q,t)]B
-                                                     RtHSdat%PLinVelES(K, p%TipNode, p%DOFs%PSBE(K,L),0,:)    )
+            AugMat(p%DOFs%PSBE(K,I),p%DOFs%PSBE(K,L)) = p%TipMass(K) *                                         &
+                                        DOT_PRODUCT( RtHSdat%PLinVelES(K, p%TipNode, p%DOFs%PSBE(K,I),0,:),    &   ! [C(q,t)]B
+                                                     RtHSdat%PLinVelES(K, p%TipNode, p%DOFs%PSBE(K,L),0,:)   ) &
+                                      + DOT_PRODUCT( RtHSdat%PAngVelEM(K,0,p%DOFs%PSBE(K,I),0,:),              &
+                                                     p%PitchIner(K)*CoordSys%j3(K,:)*DOT_PRODUCT(CoordSys%j3(K,:),RtHSdat%PAngVelEM(K,0,p%DOFs%PSBE(K,L),0,:)) )
+
          ENDDO             ! I - All active (enabled) blade DOFs greater than or equal to L
       ENDDO                ! L - All active (enabled) blade DOFs that contribute to the QD2T-related linear accelerations of the tip of blade K (point S(p%BldFlexL))
 
       TmpVec1 = RtHSdat%FSTipDrag(:,K) - p%TipMass(K)*( p%Gravity*CoordSys%z2 + RtHSdat%LinAccESt(:,K,p%TipNode) ) ! The portion of FrcS0Bt associated with the tip brake
+      TmpVec2 = -p%PitchIner(K)*CoordSys%j3(K,:)*DOT_PRODUCT(CoordSys%j3(K,:),RtHSdat%AngAccEKt(:,0,K))
+      TmpVec3 = -CROSS_PRODUCT( RtHSdat%AngVelEM(:,0,K) , p%PitchIner(K)*CoordSys%j3(K,:)*DOT_PRODUCT(CoordSys%j3(K,:),RtHSdat%AngVelEM(:,0,K)) )
       DO I = 1,p%DOFs%NPSBE(K)    ! Loop through all active (enabled) blade DOFs that contribute to the QD2T-related linear accelerations of the tip of blade K (point S(p%BldFlexL))
             AugMat(p%DOFs%PSBE(K,I), p%NAug) = DOT_PRODUCT( RtHSdat%PLinVelES(K,p%TipNode,p%DOFs%PSBE(K,I),0,:), &   ! {-f(qd,q,t)}B + {-f(qd,q,t)}GravB + {-f(qd,q,t)}AeroB
-                                                              TmpVec1                               ) ! NOTE: TmpVec1 is still the portion of FrcS0Bt associated with the tip brake
+                                                              TmpVec1                               )            &   ! NOTE: TmpVec1 is still the portion of FrcS0Bt associated with the tip brake
+                                             + DOT_PRODUCT( RtHSdat%PAngVelEM(K,0,p%DOFs%PSBE(K,I),0,:),         &
+                                                              TmpVec2 + TmpVec3 )
       ENDDO                ! I - All active (enabled) blade DOFs that contribute to the QD2T-related linear accelerations of the tip of blade K (point S(p%BldFlexL))
    
       
@@ -8990,7 +9058,7 @@ SUBROUTINE Init_u( u, p, x, InputFileData, m, ErrStat, ErrMsg )
       u%BlPitchCom = 0.0_ReKi
       
       ! set the coordinate system variables:
-   CALL SetCoordSy( -p%DT, m%CoordSys, m%RtHS, u%BlPitchCom, p, x_tmp, ErrStat2, ErrMsg2 )
+   CALL SetCoordSy( -p%DT, m%CoordSys, m%RtHS, p, x_tmp, ErrStat2, ErrMsg2 )
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
    
    CALL CalculatePositions( p, x_tmp, m%CoordSys, m%RtHS ) ! calculate positions
@@ -10972,6 +11040,15 @@ subroutine ED_InitVars(u, p, x, y, m, Vars, InputFileData, Linearize, ErrStat, E
                   Perturb=2.0_R8Ki * D2R_D, &
                   LinNames=['Hub teetering DOF (internal DOF index = DOF_Teet), rad'], &
                   Active=InputFileData%TeetDOF)
+
+   do i = 1, p%NumBl
+      call MV_AddVar(Vars%x, 'Blade'//trim(Num2LStr(i))//'Pitch', FieldAngularDisp, &
+                  DL=DatLoc(ED_x_QT), iAry=DOF_BP(i), &
+                  Flags=VF_DerivOrder2, &
+                  Perturb=2.0_R8Ki * D2R_D, &
+                  LinNames=['Blade pitch DOF (internal DOF index = DOF_BP(trim(Num2LStr(i)))), rad'], &
+                  Active=InputFileData%PitchDOF)
+   end do
 
    do i = 1, p%NumBl
       Flags = ior(VF_RotFrame, VF_DerivOrder2)

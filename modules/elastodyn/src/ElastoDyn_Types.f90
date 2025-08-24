@@ -105,6 +105,7 @@ IMPLICIT NONE
     LOGICAL  :: FlapDOF1 = .false.      !< First flapwise blade mode DOF [-]
     LOGICAL  :: FlapDOF2 = .false.      !< Second flapwise blade mode DOF [-]
     LOGICAL  :: EdgeDOF = .false.      !< Edgewise blade mode DOF [-]
+    LOGICAL  :: PitchDOF = .false.      !< Blade pitch DOF [-]
     LOGICAL  :: TeetDOF = .false.      !< Rotor-teeter DOF [-]
     LOGICAL  :: DrTrDOF = .false.      !< Drivetrain rotational-flexibility DOF [-]
     LOGICAL  :: GenDOF = .false.      !< Generator DOF [-]
@@ -161,6 +162,7 @@ IMPLICIT NONE
     REAL(ReKi)  :: PtfmRefyt = 0.0_ReKi      !< Lateral distance from the ground level [onshore], MSL [offshore wind or floating MHK], or seabed [fixed MHK] to the platform reference point [meters]
     REAL(ReKi)  :: PtfmRefzt = 0.0_ReKi      !< Vertical distance from the ground level [onshore], MSL [offshore wind or floating MHK], or seabed [fixed MHK] to the platform reference point [meters]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: TipMass      !< Tip-brake masses [kg]
+    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: PitchIner      !< Blade inertia about the pitch axis [kg]
     REAL(ReKi)  :: HubMass = 0.0_ReKi      !< Hub mass [kg]
     REAL(ReKi)  :: HubIner = 0.0_ReKi      !< Hub inertia about teeter axis (2-blader) or rotor axis (3-blader) [kg m^2]
     REAL(ReKi)  :: GenIner = 0.0_ReKi      !< Generator inertia about HSS [kg m^2]
@@ -678,6 +680,7 @@ IMPLICIT NONE
     REAL(ReKi)  :: TFinMass = 0.0_ReKi      !< Tail fin mass [-]
     REAL(ReKi)  :: TFrlIner = 0.0_ReKi      !< Tail boom inertia about tail-furl axis [-]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: TipMass      !< Tip-brake masses [-]
+    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: PitchIner      !< Blade inertia about the pitch axis [-]
     REAL(ReKi)  :: TurbMass = 0.0_ReKi      !< Mass of turbine (tower + rotor + nacelle) [-]
     REAL(ReKi)  :: TwrMass = 0.0_ReKi      !< Mass of tower [-]
     REAL(ReKi)  :: TwrTpMass = 0.0_ReKi      !< Tower-top mass (rotor + nacelle) [-]
@@ -1484,6 +1487,7 @@ subroutine ED_CopyInputFile(SrcInputFileData, DstInputFileData, CtrlCode, ErrSta
    DstInputFileData%FlapDOF1 = SrcInputFileData%FlapDOF1
    DstInputFileData%FlapDOF2 = SrcInputFileData%FlapDOF2
    DstInputFileData%EdgeDOF = SrcInputFileData%EdgeDOF
+   DstInputFileData%PitchDOF = SrcInputFileData%PitchDOF
    DstInputFileData%TeetDOF = SrcInputFileData%TeetDOF
    DstInputFileData%DrTrDOF = SrcInputFileData%DrTrDOF
    DstInputFileData%GenDOF = SrcInputFileData%GenDOF
@@ -1572,6 +1576,18 @@ subroutine ED_CopyInputFile(SrcInputFileData, DstInputFileData, CtrlCode, ErrSta
          end if
       end if
       DstInputFileData%TipMass = SrcInputFileData%TipMass
+   end if
+   if (allocated(SrcInputFileData%PitchIner)) then
+      LB(1:1) = lbound(SrcInputFileData%PitchIner)
+      UB(1:1) = ubound(SrcInputFileData%PitchIner)
+      if (.not. allocated(DstInputFileData%PitchIner)) then
+         allocate(DstInputFileData%PitchIner(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstInputFileData%PitchIner.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstInputFileData%PitchIner = SrcInputFileData%PitchIner
    end if
    DstInputFileData%HubMass = SrcInputFileData%HubMass
    DstInputFileData%HubIner = SrcInputFileData%HubIner
@@ -1872,6 +1888,9 @@ subroutine ED_DestroyInputFile(InputFileData, ErrStat, ErrMsg)
    if (allocated(InputFileData%TipMass)) then
       deallocate(InputFileData%TipMass)
    end if
+   if (allocated(InputFileData%PitchIner)) then
+      deallocate(InputFileData%PitchIner)
+   end if
    if (allocated(InputFileData%InpBlMesh)) then
       LB(1:1) = lbound(InputFileData%InpBlMesh)
       UB(1:1) = ubound(InputFileData%InpBlMesh)
@@ -1939,6 +1958,7 @@ subroutine ED_PackInputFile(RF, Indata)
    call RegPack(RF, InData%FlapDOF1)
    call RegPack(RF, InData%FlapDOF2)
    call RegPack(RF, InData%EdgeDOF)
+   call RegPack(RF, InData%PitchDOF)
    call RegPack(RF, InData%TeetDOF)
    call RegPack(RF, InData%DrTrDOF)
    call RegPack(RF, InData%GenDOF)
@@ -1995,6 +2015,7 @@ subroutine ED_PackInputFile(RF, Indata)
    call RegPack(RF, InData%PtfmRefyt)
    call RegPack(RF, InData%PtfmRefzt)
    call RegPackAlloc(RF, InData%TipMass)
+   call RegPackAlloc(RF, InData%PitchIner)
    call RegPack(RF, InData%HubMass)
    call RegPack(RF, InData%HubIner)
    call RegPack(RF, InData%GenIner)
@@ -2142,6 +2163,7 @@ subroutine ED_UnPackInputFile(RF, OutData)
    call RegUnpack(RF, OutData%FlapDOF1); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%FlapDOF2); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%EdgeDOF); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%PitchDOF); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%TeetDOF); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%DrTrDOF); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%GenDOF); if (RegCheckErr(RF, RoutineName)) return
@@ -2198,6 +2220,7 @@ subroutine ED_UnPackInputFile(RF, OutData)
    call RegUnpack(RF, OutData%PtfmRefyt); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%PtfmRefzt); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%TipMass); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%PitchIner); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%HubMass); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%HubIner); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%GenIner); if (RegCheckErr(RF, RoutineName)) return
@@ -5215,6 +5238,18 @@ subroutine ED_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg)
       end if
       DstParamData%TipMass = SrcParamData%TipMass
    end if
+   if (allocated(SrcParamData%PitchIner)) then
+      LB(1:1) = lbound(SrcParamData%PitchIner)
+      UB(1:1) = ubound(SrcParamData%PitchIner)
+      if (.not. allocated(DstParamData%PitchIner)) then
+         allocate(DstParamData%PitchIner(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstParamData%PitchIner.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstParamData%PitchIner = SrcParamData%PitchIner
+   end if
    DstParamData%TurbMass = SrcParamData%TurbMass
    DstParamData%TwrMass = SrcParamData%TwrMass
    DstParamData%TwrTpMass = SrcParamData%TwrTpMass
@@ -5811,6 +5846,9 @@ subroutine ED_DestroyParam(ParamData, ErrStat, ErrMsg)
    if (allocated(ParamData%TipMass)) then
       deallocate(ParamData%TipMass)
    end if
+   if (allocated(ParamData%PitchIner)) then
+      deallocate(ParamData%PitchIner)
+   end if
    if (allocated(ParamData%PitchAxis)) then
       deallocate(ParamData%PitchAxis)
    end if
@@ -6074,6 +6112,7 @@ subroutine ED_PackParam(RF, Indata)
    call RegPack(RF, InData%TFinMass)
    call RegPack(RF, InData%TFrlIner)
    call RegPackAlloc(RF, InData%TipMass)
+   call RegPackAlloc(RF, InData%PitchIner)
    call RegPack(RF, InData%TurbMass)
    call RegPack(RF, InData%TwrMass)
    call RegPack(RF, InData%TwrTpMass)
@@ -6347,6 +6386,7 @@ subroutine ED_UnPackParam(RF, OutData)
    call RegUnpack(RF, OutData%TFinMass); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%TFrlIner); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%TipMass); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%PitchIner); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%TurbMass); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%TwrMass); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%TwrTpMass); if (RegCheckErr(RF, RoutineName)) return

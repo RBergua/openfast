@@ -82,6 +82,7 @@ typedef	ElastoDyn/ED	ED_InputFile	DbKi	DT	-	-	-	"Requested integration time for 
 typedef	^	ED_InputFile	LOGICAL	FlapDOF1	-	-	-	"First flapwise blade mode DOF"	-
 typedef	^	ED_InputFile	LOGICAL	FlapDOF2	-	-	-	"Second flapwise blade mode DOF"	-
 typedef	^	ED_InputFile	LOGICAL	EdgeDOF	-	-	-	"Edgewise blade mode DOF"	-
+typedef	^	ED_InputFile	LOGICAL	PitchDOF	-	-	-	"Blade pitch DOF"	-
 typedef	^	ED_InputFile	LOGICAL	TeetDOF	-	-	-	"Rotor-teeter DOF"	-
 typedef	^	ED_InputFile	LOGICAL	DrTrDOF	-	-	-	"Drivetrain rotational-flexibility DOF"	-
 typedef	^	ED_InputFile	LOGICAL	GenDOF	-	-	-	"Generator DOF"	-
@@ -138,6 +139,7 @@ typedef	^	ED_InputFile	ReKi	PtfmRefxt	-	-	-	"Downwind distance from the ground l
 typedef	^	ED_InputFile	ReKi	PtfmRefyt	-	-	-	"Lateral distance from the ground level [onshore], MSL [offshore wind or floating MHK], or seabed [fixed MHK] to the platform reference point"	meters
 typedef	^	ED_InputFile	ReKi	PtfmRefzt	-	-	-	"Vertical distance from the ground level [onshore], MSL [offshore wind or floating MHK], or seabed [fixed MHK] to the platform reference point"	meters
 typedef	^	ED_InputFile	ReKi	TipMass	{:}	-	-	"Tip-brake masses"	kg
+typedef	^	ED_InputFile	ReKi	PitchIner	{:}	-	-	"Blade inertia about the pitch axis"	kg m^2
 typedef	^	ED_InputFile	ReKi	HubMass	-	-	-	"Hub mass"	kg
 typedef	^	ED_InputFile	ReKi	HubIner	-	-	-	"Hub inertia about teeter axis (2-blader) or rotor axis (3-blader)"	"kg m^2"
 typedef	^	ED_InputFile	ReKi	GenIner	-	-	-	"Generator inertia about HSS"	"kg m^2"
@@ -671,6 +673,7 @@ typedef	^	ParameterType	ReKi	SecondMom	{:}	-	-	"Second mass moment of inertia of
 typedef	^	ParameterType	ReKi	TFinMass	-	-	-	"Tail fin mass"
 typedef	^	ParameterType	ReKi	TFrlIner	-	-	-	"Tail boom inertia about tail-furl axis"
 typedef	^	ParameterType	ReKi	TipMass	{:}	-	-	"Tip-brake masses"
+typedef	^	ParameterType	ReKi	PitchIner	{:}	-	-	"Blade inertia about the pitch axis"
 typedef	^	ParameterType	ReKi	TurbMass	-	-	-	"Mass of turbine (tower + rotor + nacelle)"
 typedef	^	ParameterType	ReKi	TwrMass	-	-	-	"Mass of tower"
 typedef	^	ParameterType	ReKi	TwrTpMass	-	-	-	"Tower-top mass (rotor + nacelle)"

@@ -55,15 +55,17 @@ MODULE ElastoDyn_Parameters
    INTEGER(IntKi), PARAMETER        :: DOF_DrTr = 14                                   ! DOF index for drivetrain rotational-flexibility
    INTEGER(IntKi), PARAMETER        :: DOF_TFrl = 15                                   ! DOF index for tail-furl
 
+   INTEGER(IntKi), PARAMETER        :: DOF_BP (MaxBl) = (/ 16, 20, 24 /)               ! DOF indices for blade pitch
+
    INTEGER(IntKi), PARAMETER        :: DOF_BE (MaxBl,NumBE) = RESHAPE(  &              ! DOF indices for blade edge:
-                                               (/ 17, 20, 23 /),   (/MaxBl,NumBE/) )   !    1st blade edge mode for blades 1,2, and 3, respectively 17 + 3*(K-1)
+                                               (/ 18, 22, 26 /),   (/MaxBl,NumBE/) )   !    1st blade edge mode for blades 1,2, and 3, respectively 17 + 3*(K-1)
    INTEGER(IntKi), PARAMETER        :: DOF_BF (MaxBl,NumBF) = RESHAPE(  &              ! DOF indices for blade flap:
-                                               (/ 16, 19, 22,           &              !    1st blade flap mode for blades 1,2, and 3, respectively 16 + 3*(K-1)
-                                                  18, 21, 24 /),   (/MaxBl,NumBF/) )   !    2nd blade flap mode for blades 1,2, and 3, respectively 18 + 3*(K-1)
+                                               (/ 17, 21, 25,           &              !    1st blade flap mode for blades 1,2, and 3, respectively 16 + 3*(K-1)
+                                                  19, 23, 27 /),   (/MaxBl,NumBF/) )   !    2nd blade flap mode for blades 1,2, and 3, respectively 18 + 3*(K-1)
 
 
-   INTEGER(IntKi), PARAMETER        :: DOF_Teet = 22 !DOF_TFrl + 2*(NumBE+NumBF)+ 1    ! DOF index for rotor-teeter
-   INTEGER(IntKi), PARAMETER        :: ED_MaxDOFs  = 24
+   INTEGER(IntKi), PARAMETER        :: DOF_Teet = 24 !DOF_TFrl + 2*(NumBE+NumBF)+ 1    ! DOF index for rotor-teeter
+   INTEGER(IntKi), PARAMETER        :: ED_MaxDOFs  = 27
 
 
    INTEGER(IntKi), PARAMETER        :: NPA      =  9                                   ! Number of DOFs that contribute to the angular velocity of the tail (body A) in the inertia frame.
@@ -2507,6 +2509,13 @@ SUBROUTINE ReadPrimaryFile( InputFile, InputFileData, BldFile, FurlFile, TwrFile
          RETURN
       END IF
 
+   CALL AllocAry( InputFileData%PitchIner, MaxBl, 'PitchIner input array', ErrStat2, ErrMsg2 )
+      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+      IF ( ErrStat >= AbortErrLev ) THEN
+         CALL Cleanup()
+         RETURN
+      END IF
+
    CALL AllocAry( InputFileData%OutList, MaxOutPts, "ElastoDyn Input File's Outlist", ErrStat2, ErrMsg2 )
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       IF ( ErrStat >= AbortErrLev ) THEN
@@ -2642,6 +2651,14 @@ SUBROUTINE ReadPrimaryFile( InputFile, InputFileData, BldFile, FurlFile, TwrFile
 
       ! EdgeDOF - Edgewise blade mode DOF (flag):
    CALL ReadVar( UnIn, InputFile, InputFileData%EdgeDOF, "EdgeDOF", "Edgewise blade mode DOF (flag)", ErrStat2, ErrMsg2, UnEc)
+      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+      IF ( ErrStat >= AbortErrLev ) THEN
+         CALL Cleanup()
+         RETURN
+      END IF
+
+      ! PitchDOF - Blade pitch DOF (flag):
+   CALL ReadVar( UnIn, InputFile, InputFileData%PitchDOF, "PitchDOF", "Blade pitch DOF (flag)", ErrStat2, ErrMsg2, UnEc)
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       IF ( ErrStat >= AbortErrLev ) THEN
          CALL Cleanup()
@@ -3126,6 +3143,14 @@ SUBROUTINE ReadPrimaryFile( InputFile, InputFileData, BldFile, FurlFile, TwrFile
 
       ! TipMass - Tip-brake masses (kg):
    CALL ReadAryLines( UnIn, InputFile, InputFileData%TipMass, MaxBl, "TipMass", "Tip-brake masses (kg)", ErrStat2, ErrMsg2, UnEc)
+      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+      IF ( ErrStat >= AbortErrLev ) THEN
+         CALL Cleanup()
+         RETURN
+      END IF
+
+      ! PitchIner - Blade inertia about the pitch axis (kg):
+   CALL ReadAryLines( UnIn, InputFile, InputFileData%PitchIner, MaxBl, "PitchIner", "Blade inertia about the pitch axis (kg m^2)", ErrStat2, ErrMsg2, UnEc)
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       IF ( ErrStat >= AbortErrLev ) THEN
          CALL Cleanup()
@@ -4308,6 +4333,10 @@ SUBROUTINE ValidatePrimaryData( InputFileData, BD4Blades, Linearize, MHK, ErrSta
       
    DO K=1,InputFileData%NumBl
       IF ( InputFileData%TipMass(K) < 0.0_ReKi) call SetErrStat(ErrID_Fatal,'TipMass('//TRIM( Num2LStr( K ) )//') must not be negative.',ErrStat,ErrMsg,RoutineName)
+   ENDDO ! K
+
+   DO K=1,InputFileData%NumBl
+      IF ( InputFileData%PitchIner(K) <= 0.0_ReKi) call SetErrStat(ErrID_Fatal,'PitchIner('//TRIM( Num2LStr( K ) )//') must not be less than or equal to zero.',ErrStat,ErrMsg,RoutineName)
    ENDDO ! K
 
    IF ( InputFileData%NacYIner < 0.0_ReKi) call SetErrStat(ErrID_Fatal,'NacYIner must not be negative.',ErrStat,ErrMsg,RoutineName)
