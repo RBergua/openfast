@@ -344,7 +344,7 @@ CONTAINS
          end if
          k = WaveNumber ( omega_i, g, h )
          F = omega - omega_i - CurrVw0 * k
-         IF ( F < tol ) THEN
+         IF ( ABS(F) < tol ) THEN
             tolMet = .TRUE.
             EXIT
          ELSE
