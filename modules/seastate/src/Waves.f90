@@ -358,6 +358,7 @@ CONTAINS
       IF ( .NOT. tolMet ) THEN
          k = WaveNumber ( omega_i, g, h )
          CALL SetErrStat(ErrID_Warn,' Failed to converge. ',ErrStat,ErrMsg,RoutineName)
+         CALL WrScr('[WARNING] SeaState dispersion relation solver did not reach the predefined tolerance within the maximum allowed number of iterations. The problematic wave (absolute) frequency is '//TRIM(Num2LStr(omega))//' rad/s.')
       END IF
 
       END SUBROUTINE WaveDispRel
@@ -1491,6 +1492,7 @@ CONTAINS
              CALL CleanUp()
              RETURN
            END IF
+         IF (OmegaI < 0.0_SiKi) EXIT
 
          tmpComplexArr(I)  =  CMPLX(  WaveField%WaveElevC0(1,I),   WaveField%WaveElevC0(2,I))   *          &
                                       EXP( -ImagNmbr*WaveNmbr*(  Xcoord*CosWaveDir(I)+    &
