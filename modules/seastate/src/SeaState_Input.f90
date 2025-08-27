@@ -917,7 +917,6 @@ subroutine SeaStateInput_ProcessInitData( InitInp, p, InputFileData, ErrStat, Er
       InputFileData%Current%CurrMod = 0
    end if
 
-
    if ( ( InputFileData%Current%CurrMod /= 0 ) .AND. ( InputFileData%Current%CurrMod /= 1 ) .AND. ( InputFileData%Current%CurrMod /= 2 ) )  then
       call SetErrStat( ErrID_Fatal,'CurrMod must be 0, 1, or 2.',ErrStat,ErrMsg,RoutineName)
       return
@@ -934,27 +933,17 @@ subroutine SeaStateInput_ProcessInitData( InitInp, p, InputFileData, ErrStat, Er
    end if
 
 
-      ! CurrSSV0 - Sub-surface current velocity at still water level
-
    if ( InputFileData%Current%CurrMod == 1 )  then  ! .TRUE if we have standard current.
 
+      !------------------------- Sub-surface current -------------------------
+
+      ! CurrSSV0 - Sub-surface current velocity at still water level
       if ( InputFileData%Current%CurrSSV0 < 0.0 )  then
          call SetErrStat( ErrID_Fatal,'CurrSSV0 must not be less than zero.',ErrStat,ErrMsg,RoutineName)
          return
       end if
 
-   else
-
-      InputFileData%Current%CurrSSV0 = 0.0
-
-   end if
-
-
       ! CurrSSDirChr - Sub-surface current heading direction
-
-   if ( InputFileData%Current%CurrMod == 1 )  then  ! .TRUE if we have standard current.
-
-
       if ( TRIM(InputFileData%Current%CurrSSDirChr) == 'DEFAULT' )  then   ! .TRUE. when one wants to use the default value of codirectionality between sub-surface current and incident wave propogation heading directions.
 
          if ( InputFileData%WaveMod == WaveMod_None ) then
@@ -978,90 +967,48 @@ subroutine SeaStateInput_ProcessInitData( InitInp, p, InputFileData, ErrStat, Er
 
       end if
 
-
-   else
-
-      InputFileData%Current%CurrSSDir = 0.0
-
-   end if
-
+      !------------------------- Near-surface current ------------------------
 
       ! CurrNSRef - Near-surface current reference depth.
-
-   if ( InputFileData%Current%CurrMod == 1 )  then  ! .TRUE if we have standard current.
-
       if ( InputFileData%Current%CurrNSRef <= 0.0 ) then
          call SetErrStat( ErrID_Fatal,'CurrNSRef must be greater than zero.',ErrStat,ErrMsg,RoutineName)
          return
       end if
 
-   else
-
-      InputFileData%Current%CurrNSRef = 0.0
-
-   end if
-
-
-
-        ! CurrNSV0 - Near-surface current velocity at still water level.
-
-   if ( InputFileData%Current%CurrMod == 1 )  then  ! .TRUE if we have standard current.
-
+      ! CurrNSV0 - Near-surface current velocity at still water level.
       if ( InputFileData%Current%CurrNSV0 < 0.0 ) then
          call SetErrStat( ErrID_Fatal,'CurrNSV0 must not be less than zero.',ErrStat,ErrMsg,RoutineName)
          return
       end if
 
-   else
-
-      InputFileData%Current%CurrNSV0 = 0.0
-
-   end if
-
-
       ! CurrNSDir - Near-surface current heading direction.
-
-   if ( InputFileData%Current%CurrMod == 1 )  then  ! .TRUE if we have standard current.
-
       if ( ( InputFileData%Current%CurrNSDir <= -180.0 ) .OR. ( InputFileData%Current%CurrNSDir > 180.0 ) )  then
          call SetErrStat( ErrID_Fatal,'CurrNSDir must be greater than -180 and less than or equal to 180.',ErrStat,ErrMsg,RoutineName)
          return
       end if
 
-   else
-
-      InputFileData%Current%CurrNSDir = 0.0
-
-   end if
-
+      !---------------------- Depth-independent current ----------------------
 
       ! CurrDIV - Depth-independent current velocity.
-
-   if ( InputFileData%Current%CurrMod == 1 )  then  ! .TRUE if we have standard current.
-
       if ( InputFileData%Current%CurrDIV < 0.0 ) then
          call SetErrStat( ErrID_Fatal,'CurrDIV must not be less than zero.',ErrStat,ErrMsg,RoutineName)
          return
       end if
 
-   else
-
-      InputFileData%Current%CurrDIV = 0.0
-
-   end if
-
-
       ! CurrDIDir - Depth-independent current heading direction.
-
-   if ( InputFileData%Current%CurrMod == 1 )  then  ! .TRUE if we have standard current.
-
       if ( ( InputFileData%Current%CurrDIDir <= -180.0 ) .OR. ( InputFileData%Current%CurrDIDir > 180.0 ) ) then
          call SetErrStat( ErrID_Fatal,'CurrDIDir must be greater than -180 and less than or equal to 180.',ErrStat,ErrMsg,RoutineName)
          return
       end if
 
-   else
+   else ! No current or user-defined current
 
+      InputFileData%Current%CurrSSV0  = 0.0
+      InputFileData%Current%CurrSSDir = 0.0
+      InputFileData%Current%CurrNSRef = 0.0
+      InputFileData%Current%CurrNSV0  = 0.0
+      InputFileData%Current%CurrNSDir = 0.0
+      InputFileData%Current%CurrDIV   = 0.0
       InputFileData%Current%CurrDIDir = 0.0
 
    end if
