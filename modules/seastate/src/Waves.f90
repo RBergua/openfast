@@ -321,7 +321,7 @@ CONTAINS
 
       INTEGER(IntKi),  PARAMETER   :: maxIter = 20
       REAL(SiKi),      PARAMETER   :: tol = 1.0E-5
-      CHARACTER(*),    PARAMETER   :: RoutineName = 'WaveNumberCrnt'
+      CHARACTER(*),    PARAMETER   :: RoutineName = 'WaveDispRel'
 
       ErrStat = ErrID_None
       ErrMsg  = ""
