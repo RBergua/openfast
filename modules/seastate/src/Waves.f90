@@ -777,6 +777,7 @@ SUBROUTINE VariousWaves_Init ( InitInp, InitOut, WaveField, ErrStat, ErrMsg )
 
 
    REAL(ReKi)                   :: CurrVw0                  ! Projection of MSL current velocity on to the mean wave direction
+   REAL(SiKi)                   :: CurrV0                   ! Magnitude of MSL current velocity
    REAL(SiKi)                   :: OmegaCrit                ! Critial absolute wave angular frequency at which wave energy cannot propagate
    REAL(SiKi)                   :: Omega_i_Crit             ! Critial intrinsic wave angular frequency at which wave energy cannot propagate
    LOGICAL                      :: bFirstNonzeroWaveComponent
@@ -882,8 +883,9 @@ SUBROUTINE VariousWaves_Init ( InitInp, InitOut, WaveField, ErrStat, ErrMsg )
       CurrVw0   = 0.0_ReKi
    ENDIF
 
-   IF ( WaveField%WvCrntMod == WvCrntMod_Full ) THEN  ! Check if waves and current are colinear
-      IF ( .not. EqualRealNos( REAL(ABS(CurrVw0),SiKi), SQRT( InitInp%CurrVxi0**2 + InitInp%CurrVyi0**2 ) ) ) THEN
+   CurrV0 = SQRT( InitInp%CurrVxi0**2 + InitInp%CurrVyi0**2 )
+   IF ( WaveField%WvCrntMod == WvCrntMod_Full .and. CurrV0 > 0.0_ReKi ) THEN  ! Check if waves and current are colinear
+      IF ( ABS( CurrVw0/CurrV0 ) < COS( D2R*10.0 ) ) THEN
          CALL SetErrStat(ErrID_Fatal,' Waves and current must be colinear (aligned or opposing) when WvCrntMod = 2. Set WvCrntMod to 0 or 1. ',ErrStat,ErrMsg,RoutineName)
          CALL CleanUp()
          RETURN

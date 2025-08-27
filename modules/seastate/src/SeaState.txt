@@ -87,6 +87,7 @@ typedef   ^                  ^                      IntKi                    Com
 typedef   ^                  ^                      Logical                  SurfaceVis                      -     .FALSE.         -         "Turn on grid surface visualization outputs" -
 typedef   ^                  ^                      IntKi                    SurfaceVisNx                    -          0          -         "Number of points in X direction to output for visualization grid.  Use 0 or negative to set to SeaState resolution." -
 typedef   ^                  ^                      IntKi                    SurfaceVisNy                    -          0          -         "Number of points in Y direction to output for visualization grid.  Use 0 or negative to set to SeaState resolution." -
+typedef   ^                  ^                      FlowFieldType           *CurrField                       -          -          -         "Pointer to FlowField type from InflowWind containing the dynamic current information" (-)
 
 #
 #

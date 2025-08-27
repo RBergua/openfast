@@ -592,10 +592,12 @@ SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SE
       Init%InData_SeaSt%PtfmLocationY = p_FAST%TurbinePos(2)
 
       
-      IF ( p_FAST%MHK /= MHK_None .AND. p_FAST%CompInflow == Module_IfW) THEN
-         Init%InData_SeaSt%hasCurrField = .TRUE.
+      IF ( p_FAST%MHK /= MHK_None .AND. p_FAST%CompInflow == Module_IfW) THEN ! MHK turbine with dynamic current
+         ! Simulating an MHK turbine; load dynamic current from IfW
+         Init%InData_SeaSt%CurrField    => Init%OutData_IfW%FlowField
+         Init%InData_SeaSt%hasCurrField =  .TRUE.
       ELSE
-         Init%InData_SeaSt%hasCurrField = .FALSE.
+         Init%InData_SeaSt%hasCurrField =  .FALSE.
       END IF
 
          ! wave field visualization
@@ -620,13 +622,6 @@ SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SE
          p_FAST%VTK_surface%NWaveElevPts(2) = 0
       endif
 
-      IF ( p_FAST%MHK /= MHK_None .AND. p_FAST%CompInflow == Module_IfW) THEN ! MHK turbine with dynamic current
-         ! Simulating an MHK turbine; load dynamic current from IfW
-         SeaSt%p%WaveField%CurrField  => Init%OutData_IfW%FlowField
-         SeaSt%p%WaveField%hasCurrField = .TRUE.
-      ELSE ! Wind turbine
-         SeaSt%p%WaveField%hasCurrField = .FALSE.
-      END IF
    end if
 
    !----------------------------------------------------------------------------
