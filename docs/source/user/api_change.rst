@@ -53,6 +53,7 @@ AeroDyn driver                                24       CompSeaSt            1   
 AeroDyn driver                                25       SeaStFile            "MHK_RM1_Fixed_SeaState.dat"     SeaStFile     - Name of the SeaState input file [used only when CompSeaSt=1]
 AeroDyn                                       \*       TwrCp                1.0         [additional column in *Tower Influence and Aerodynamics* table]
 AeroDyn                                       \*       TwrCa                1.0         [additional column in *Tower Influence and Aerodynamics* table]
+SeaState                                      18       WvCrntMod            0     WvCrntMod     - Combined wave-current modeling option {0: simple superposition, 1: include Doppler effect, 2: include both Doppler effect and wave amplitude/spectrum scaling} (switch)
 ============================================= ======== ==================== ========================================================================================================================================================================================================
 
 
