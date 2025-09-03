@@ -15,6 +15,7 @@ PUBLIC WaveField_GetNodeWaveVel
 PUBLIC WaveField_GetNodeWaveVelAcc
 PUBLIC WaveField_GetWaveKin
 PUBLIC WaveField_GetWaveVelAcc_AD
+PUBLIC WaveField_GetMeanDynSurfCurr
 
 public WaveField_Interp_Setup3D, WaveField_Interp_Setup4D
 
@@ -644,6 +645,67 @@ contains
       FailedMsg = ErrStat >= AbortErrLev
    end function
 END SUBROUTINE WaveField_GetWaveVelAcc_AD
+
+!-------------------- Subroutine for wave field velocity only --------------------!
+SUBROUTINE WaveField_GetMeanDynSurfCurr( WaveField, WaveTMax, WaveDT, CurrVxi0, CurrVyi0, ErrStat, ErrMsg )
+   type(SeaSt_WaveFieldType),          intent(in   ) :: WaveField
+
+   real(DbKi),                         intent(in   ) :: WaveTMax
+   real(DbKi),                         intent(in   ) :: WaveDT
+
+   real(SiKi),                         intent(  out) :: CurrVxi0
+   real(SiKi),                         intent(  out) :: CurrVyi0
+   integer(IntKi),                     intent(  out) :: ErrStat ! Error status of the operation
+   character(*),                       intent(  out) :: ErrMsg  ! Error message if errStat /= ErrID_None
+
+   real(ReKi)                                        :: pos(3,1), PosOffset(3)
+   real(ReKi), allocatable                           :: FV_DC(:,:), FA_DC(:,:)
+   integer(IntKi)                                    :: startNode
+   integer(IntKi)                                    :: step
+   real(DbKi)                                        :: time
+   character(*),                       parameter     :: RoutineName = 'WaveField_GetMeanDynSurfCurr'
+   integer(IntKi)                                    :: errStat2
+   character(ErrMsgLen)                              :: errMsg2
+
+   ErrStat   = ErrID_None
+   ErrMsg    = ""
+
+   CurrVxi0 = 0.0_SiKi
+   CurrVyi0 = 0.0_SiKi
+
+   ! Get dynamic current velocity
+   IF ( WaveField%hasCurrField ) THEN
+
+      pos       = 0.0_ReKi
+      step      = 0_IntKi
+      time      = 0.0_DbKi
+      startNode = -1
+      PosOffset = (/0.0_ReKi,0.0_ReKi,WaveField%EffWtrDpth/)
+      ALLOCATE(FV_DC(3,1), STAT=ErrStat2); if (FailedMsg('Error allocating FV_DC')) return;
+
+      DO WHILE ( time <= WaveTMax)
+         CALL IfW_FlowField_GetVelAcc(WaveField%CurrField, startNode, Time, pos, FV_DC, FA_DC, ErrStat2, ErrMsg2, PosOffset=PosOffset); if (Failed()) return;
+         CurrVxi0 = CurrVxi0 + FV_DC(1,1)
+         CurrVyi0 = CurrVyi0 + FV_DC(2,1)
+         step = step + 1
+         time = time + WaveDT
+      END DO
+      CurrVxi0 = CurrVxi0 / REAL(step,SiKi)
+      CurrVyi0 = CurrVyi0 / REAL(step,SiKi)
+
+   END IF
+
+contains
+   logical function Failed()
+      call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+      Failed = ErrStat >= AbortErrLev
+   end function
+   logical function FailedMsg(ErrMsg2)
+      character(*), intent(in   ) :: ErrMsg2
+      call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+      FailedMsg = ErrStat >= AbortErrLev
+   end function
+END SUBROUTINE WaveField_GetMeanDynSurfCurr
 
 !----------------------------------------------------------------------------------------------------
 ! Interpolation related functions
