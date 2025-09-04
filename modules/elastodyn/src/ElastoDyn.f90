@@ -892,24 +892,27 @@ SUBROUTINE ED_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg )
 
       ! Blade Pitch Motions:
 
-   m%AllOuts(PtchPMzc1) = x%QT(DOF_BP(1))*R2D ! u%BlPitchCom(1)*R2D
-IF ( p%NumBl > 1 ) THEN
-   m%AllOuts(PtchPMzc2) = x%QT(DOF_BP(2))*R2D ! u%BlPitchCom(2)*R2D
-   IF ( p%NumBl > 2 )  THEN ! 3-blader
+   m%AllOuts(PtchPMzc1) = x%QT(DOF_BP(1))*R2D
 
-      m%AllOuts(PtchPMzc3) = x%QT(DOF_BP(3))*R2D ! u%BlPitchCom(3)*R2D
+   IF ( p%NumBl > 1 ) THEN
 
-   ELSE  ! 2-blader
+      m%AllOuts(PtchPMzc2) = x%QT(DOF_BP(2))*R2D
 
+      IF ( p%NumBl > 2 )  THEN ! 3-blader
 
-      ! Teeter Motions:
+         m%AllOuts(PtchPMzc3) = x%QT(DOF_BP(3))*R2D
 
-      m%AllOuts(  TeetPya) = x%QT  (DOF_Teet)*R2D
-      m%AllOuts(  TeetVya) = x%QDT (DOF_Teet)*R2D
-      m%AllOuts(  TeetAya) = m%QD2T(DOF_Teet)*R2D
+      ELSE  ! 2-blader
 
-   ENDIF
-END IF
+         ! Teeter Motions:
+
+         m%AllOuts(  TeetPya) = x%QT  (DOF_Teet)*R2D
+         m%AllOuts(  TeetVya) = x%QDT (DOF_Teet)*R2D
+         m%AllOuts(  TeetAya) = m%QD2T(DOF_Teet)*R2D
+
+      ENDIF
+
+   END IF
 
       ! Shaft Motions:
 
@@ -1821,7 +1824,7 @@ END IF
    y%Yaw      = x%QT( DOF_Yaw)
    y%YawRate  = x%QDT(DOF_Yaw)
    y%YawAngle = x%QT( DOF_Yaw) + x%QT(DOF_Y)  !crude approximation for yaw error... (without subtracting it from the wind direction)   
-   y%BlPitch  = x%QT( DOF_BP ) ! u%BlPitchCom !OtherState%BlPitch
+   y%BlPitch  = x%QT( DOF_BP )
    y%LSS_Spd  = x%QDT(DOF_GeAz)
    y%HSS_Spd  = ABS(p%GBRatio)*x%QDT(DOF_GeAz)
    y%RotSpeed = x%QDT(DOF_GeAz) + x%QDT(DOF_DrTr)
@@ -5981,7 +5984,6 @@ SUBROUTINE SetCoordSy( t, CoordSys, RtHSdat, p, x, ErrStat, ErrMsg )
       ! Subroutine arguments (passed variables)
 
    REAL(DbKi),                   INTENT(IN)    :: t                             !< Current simulation time, in seconds (used only for SmllRotTrans error messages)
- ! REAL(ReKi),                   INTENT(IN)    :: BlPitch (:)                   !< The current blade pitch
    TYPE(ED_CoordSys),            INTENT(INOUT) :: CoordSys                      !< The coordinate systems to be set
    TYPE(ED_RtHndSide),           INTENT(INOUT) :: RtHSdat                       !< data from the RtHndSid module
    TYPE(ED_ParameterType),       INTENT(IN)    :: p                             !< The module's parameters
@@ -6199,8 +6201,6 @@ SUBROUTINE SetCoordSy( t, CoordSys, RtHSdat, p, x, ErrStat, ErrMsg )
 
       ! Blade / pitched coordinate system:
 
-      ! CosPitch = COS( REAL(BlPitch(K),R8Ki) )
-      ! SinPitch = SIN( REAL(BlPitch(K),R8Ki) )
       CosPitch = COS( x%QT(DOF_BP(K)) )
       SinPitch = SIN( x%QT(DOF_BP(K)) )
 
@@ -6914,8 +6914,6 @@ ENDIF
 
    DO K = 1,p%NumBl ! Loop through all blades
 
-      ! EwM0 = RtHSdat%AngVelEH-CoordSys%j3(K,:)*x%QDT(DOF_BP(K))
-
       DO J = 0,p%TipNode ! Loop through the blade nodes / elements
       ! Define the partial angular velocities of the current node (body M(RNodes(J))) in the inertia frame:
       ! NOTE: PAngVelEM(K,J,I,D,:) = the Dth-derivative of the partial angular velocity
@@ -7299,7 +7297,6 @@ SUBROUTINE CalculateLinearVelPAcc( p, x, CoordSys, RtHSdat )
 
    DO K = 1,p%NumBl ! Loop through all blades
 
-      ! EwM0 = RtHSdat%AngVelEH-CoordSys%j3(K,:)*x%QDT(DOF_BP(K))
       EwM0 = RtHSdat%AngVelEM(:,0,K)
 
       DO J = 0,p%TipNode ! Loop through the blade nodes / elements
@@ -7586,7 +7583,6 @@ SUBROUTINE CalculateForcesMoments( p, x, CoordSys, u, RtHSdat )
       !   with the QD2T()'s and those that are not) at the blade root (point S(0))
       !   using the tip brake effects:
 
-      ! EwM0 = RtHSdat%AngVelEH-CoordSys%j3(K,:)*x%QDT(DOF_BP(K))
       EwM0 = RtHSdat%AngVelEM(:,0,K)
 
       RtHSdat%PFrcS0B(:,K,:) = 0.0 ! Initialize these partial
@@ -7625,8 +7621,7 @@ SUBROUTINE CalculateForcesMoments( p, x, CoordSys, u, RtHSdat )
 ! FrcS0Bt and MomH0Bt
 !.....................................
    DO K = 1,p%NumBl ! Loop through all blades
-   
-      ! EwM0 = RtHSdat%AngVelEH-CoordSys%j3(K,:)*x%QDT(DOF_BP(K))
+
       EwM0 = RtHSdat%AngVelEM(:,0,K)
 
       TmpVec1 = RtHSdat%FSTipDrag(:,K) - p%TipMass(K)*( p%Gravity*CoordSys%z2 + RtHSdat%LinAccESt(:,K,p%TipNode) ) ! The portion of FrcS0Bt associated with the tip brake
