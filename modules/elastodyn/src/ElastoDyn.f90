@@ -489,7 +489,7 @@ SUBROUTINE ED_UpdateStates( t, n, u, utimes, p, x, xd, z, OtherState, m, ErrStat
       INTEGER(IntKi),                     INTENT(  OUT) :: ErrStat    !< Error status of the operation
       CHARACTER(*),                       INTENT(  OUT) :: ErrMsg     !< Error message if ErrStat /= ErrID_None
 
-
+      INTEGER(IntKi)                                    :: K
 
          ! Initialize ErrStat
 
@@ -529,6 +529,13 @@ SUBROUTINE ED_UpdateStates( t, n, u, utimes, p, x, xd, z, OtherState, m, ErrStat
       ! bjj: why don't we just do a modulo on x%QT(DOF_GeAz) instead of using x%QT(DOF_DrTr) with it?   
       
       IF ( ( x%QT(DOF_GeAz) + x%QT(DOF_DrTr) ) >= TwoPi_D )  x%QT(DOF_GeAz) = x%QT(DOF_GeAz) - TwoPi_D
+
+      ! Might not be necessary, but keeping blade pitch angle between [-pi,pi) for now.
+      ! This interval is chosen to minimize jumps (blade pitch is usually between [0,pi/2]) and simplify controls.
+      DO K = 1,p%NumBl
+         IF ( x%QT(DOF_BP(K)) >=  Pi_D )  x%QT(DOF_BP(K)) = x%QT(DOF_BP(K)) - TwoPi_D
+         IF ( x%QT(DOF_BP(K)) <  -Pi_D )  x%QT(DOF_BP(K)) = x%QT(DOF_BP(K)) + TwoPi_D
+      END DO
             
 END SUBROUTINE ED_UpdateStates
 
@@ -1824,6 +1831,7 @@ END IF
    y%Yaw      = x%QT( DOF_Yaw)
    y%YawRate  = x%QDT(DOF_Yaw)
    y%YawAngle = x%QT( DOF_Yaw) + x%QT(DOF_Y)  !crude approximation for yaw error... (without subtracting it from the wind direction)   
+   y%BlPRate  = x%QDT(DOF_BP )
    y%BlPitch  = x%QT( DOF_BP )
    y%LSS_Spd  = x%QDT(DOF_GeAz)
    y%HSS_Spd  = ABS(p%GBRatio)*x%QDT(DOF_GeAz)
@@ -8261,7 +8269,12 @@ SUBROUTINE FillAugMat( p, x, CoordSys, u, HSSBrTrq, RtHSdat, AugMat )
          ENDIF
       ENDIF
 
+      ! If blade pitch DOFs are enabled, add input blade pitch torque
 
+      IF ( p%DOF_Flag(DOF_BP(K  )) )  THEN
+         AugMat(    DOF_BP(K  ),p%NAug) = AugMat(DOF_BP(K  ),p%NAug)      &
+                                        + u%BlPitchMom(K)
+      END IF
 
       ! If the associated DOFs are enabled, add the blade elasticity and damping
       !   forces to the forcing vector (these portions can't be calculated using
@@ -8623,7 +8636,11 @@ SUBROUTINE ED_AllocOutput( p, m, u, y, ErrStat, ErrMsg )
    CALL AllocAry( y%BlPitch, p%NumBl, 'BlPitch', ErrStat2, ErrMsg2 )
       CALL CheckError( ErrStat2, ErrMsg2 )
       IF (ErrStat >= AbortErrLev) RETURN
-      
+
+   CALL AllocAry( y%BlPRate, p%NumBl, 'BlPRate', ErrStat2, ErrMsg2 )
+      CALL CheckError( ErrStat2, ErrMsg2 )
+      IF (ErrStat >= AbortErrLev) RETURN
+
    !.......................................................
    ! Create Line2 Mesh for motion outputs on blades:
    !.......................................................
@@ -9015,13 +9032,20 @@ SUBROUTINE Init_u( u, p, x, InputFileData, m, ErrStat, ErrMsg )
    ErrMsg  = ""
 
    !.......................................................
-   ! allocate the u%BlPitchCom array    
+   ! allocate the u%BlPitchCom array < Remove this later
    !.......................................................
 
    CALL AllocAry( u%BlPitchCom, p%NumBl, 'BlPitchCom', ErrStat2, ErrMsg2 )
    if (Failed()) return
    ! will initialize u%BlPitchCom later, after getting undisplaced positions    
-   
+
+   !.......................................................
+   ! allocate the u%BlPitchMom array
+   !.......................................................
+
+   CALL AllocAry( u%BlPitchMom, p%NumBl, 'BlPitchMom', ErrStat2, ErrMsg2 )
+   if (Failed()) return
+
    !.......................................................
    ! we're going to calculate the non-displaced positions of
    ! several variables so we can set up meshes properly later.
@@ -9035,6 +9059,7 @@ SUBROUTINE Init_u( u, p, x, InputFileData, m, ErrStat, ErrMsg )
          CALL Zero2TwoPi( x_tmp%QT (DOF_GeAz) )
 
       u%BlPitchCom = 0.0_ReKi
+      u%BlPitchMom = 0.0_ReKi
       
       ! set the coordinate system variables:
    CALL SetCoordSy( -p%DT, m%CoordSys, m%RtHS, p, x_tmp, ErrStat2, ErrMsg2 )
@@ -11156,6 +11181,13 @@ subroutine ED_InitVars(u, p, x, y, m, Vars, InputFileData, Linearize, ErrStat, E
                   Perturb=2.0_R8Ki * D2R_D, &
                   LinNames=[('Blade '//trim(num2lstr(i))//' pitch command, rad', i=1,p%NumBl)])
 
+   call MV_AddVar(Vars%u, "BlPitchMom", FieldScalar, &
+                  DL=DatLoc(ED_u_BlPitchMom), iAry=1, &
+                  Num=p%NumBl, &
+                  Flags=VF_RotFrame + VF_Linearize, &
+                  Perturb=MaxTorque / 100.0_R8Ki, &
+                  LinNames=[('Blade '//trim(num2lstr(i))//' pitch moment, Nm', i=1,p%NumBl)])
+
    call MV_AddVar(Vars%u, "YawMom", FieldScalar, &
                   DL=DatLoc(ED_u_YawMom), &
                   Flags=VF_Linearize, &
@@ -11214,6 +11246,17 @@ subroutine ED_InitVars(u, p, x, y, m, Vars, InputFileData, Linearize, ErrStat, E
       call MV_AddMeshVar(Vars%y, 'Blade root '//Num2LStr(i), MotionFields, &
                          DatLoc(ED_y_BladeRootMotion, i), &
                          Mesh=y%BladeRootMotion(i))
+   end do
+
+   do i = 1, p%NumBl
+      call MV_AddVar(Vars%y, 'BlPitch'//Trim(Num2LStr(i)), FieldScalar, &
+                  DatLoc(ED_y_BlPitch, i), &
+                  Flags=VF_2PI, &
+                  LinNames=['Blade '//Num2LStr(i)//' pitch angle, rad'])
+
+      call MV_AddVar(Vars%y, 'BlPRate'//Trim(Num2LStr(i)), FieldScalar, &
+                  DatLoc(ED_y_BlPRate, i), &
+                  LinNames=['Blade '//Num2LStr(i)//' pitch rate, rad/s'])
    end do
 
    call MV_AddMeshVar(Vars%y, 'Nacelle', MotionFields, &

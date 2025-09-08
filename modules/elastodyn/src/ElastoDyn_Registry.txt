@@ -804,6 +804,7 @@ typedef	^	InputType	MeshType	TFinCMLoads 	-	-	-	"Aerodynamic forces and moments 
 typedef	^	InputType	ReKi	TwrAddedMass	{:}{:}{:}	-	-	"6-by-6 added mass matrix of the tower elements, per unit length-bjj: place on a mesh" 	"per unit length"
 typedef	^	InputType	ReKi	PtfmAddedMass	{6}{6}	-	-	"Platform added mass matrix"	"kg, kg-m, kg-m^2"
 typedef	^	InputType	ReKi	BlPitchCom	{:}	-	2pi	"Commanded blade pitch angles"	radians
+typedef	^	InputType	ReKi	BlPitchMom	{:}	-	-	"Blade pitch motor torque"	N-m
 typedef	^	InputType	ReKi	YawMom	-	-	-	"Torque transmitted through the yaw bearing"	N-m
 typedef	^	InputType	ReKi	GenTrq	-	-	-	"Electrical generator torque"	N-m
 typedef	^	InputType	ReKi	HSSBrTrqC	-	-	-	"Commanded HSS brake torque"	N-m
@@ -821,6 +822,7 @@ typedef	^	OutputType	MeshType	TFinCMMotion    	-	-	-	"For AeroDyn: motions of th
 # Define outputs that are not on this mesh here:
 typedef	^	OutputType	ReKi	WriteOutput	{:}	-	-	"Data to be written to an output file: see WriteOutputHdr for names of each variable"	"see WriteOutputUnt"
 typedef	^	OutputType	ReKi	BlPitch	{:}	-	2pi	"Current blade pitch angles"	radians
+typedef ^	OutputType	ReKi	BlPRate	{:}	-	-	"Current blade pitch rate"	rad/s
 typedef	^	OutputType	ReKi	Yaw	-	-	2pi	"Current nacelle yaw"	radians
 typedef	^	OutputType	ReKi	YawRate	-	-	-	"Current nacelle yaw rate"	rad/s
 typedef	^	OutputType	ReKi	LSS_Spd	-	-	-	"Low-speed shaft (LSS) speed at entrance to gearbox"	rad/s

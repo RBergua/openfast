@@ -803,6 +803,7 @@ IMPLICIT NONE
     REAL(ReKi) , DIMENSION(:,:,:), ALLOCATABLE  :: TwrAddedMass      !< 6-by-6 added mass matrix of the tower elements, per unit length-bjj: place on a mesh [per unit length]
     REAL(ReKi) , DIMENSION(1:6,1:6)  :: PtfmAddedMass = 0.0_ReKi      !< Platform added mass matrix [kg, kg-m, kg-m^2]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: BlPitchCom      !< Commanded blade pitch angles [radians]
+    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: BlPitchMom      !< Blade pitch motor torque [N-m]
     REAL(ReKi)  :: YawMom = 0.0_ReKi      !< Torque transmitted through the yaw bearing [N-m]
     REAL(ReKi)  :: GenTrq = 0.0_ReKi      !< Electrical generator torque [N-m]
     REAL(ReKi)  :: HSSBrTrqC = 0.0_ReKi      !< Commanded HSS brake torque [N-m]
@@ -819,6 +820,7 @@ IMPLICIT NONE
     TYPE(MeshType)  :: TFinCMMotion      !< For AeroDyn: motions of the tail find CM point (point J) [-]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: WriteOutput      !< Data to be written to an output file: see WriteOutputHdr for names of each variable [see WriteOutputUnt]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: BlPitch      !< Current blade pitch angles [radians]
+    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: BlPRate      !< Current blade pitch rate [rad/s]
     REAL(ReKi)  :: Yaw = 0.0_ReKi      !< Current nacelle yaw [radians]
     REAL(ReKi)  :: YawRate = 0.0_ReKi      !< Current nacelle yaw rate [rad/s]
     REAL(ReKi)  :: LSS_Spd = 0.0_ReKi      !< Low-speed shaft (LSS) speed at entrance to gearbox [rad/s]
@@ -881,44 +883,46 @@ IMPLICIT NONE
    integer(IntKi), public, parameter :: ED_u_TwrAddedMass                =   9 ! ED%TwrAddedMass
    integer(IntKi), public, parameter :: ED_u_PtfmAddedMass               =  10 ! ED%PtfmAddedMass
    integer(IntKi), public, parameter :: ED_u_BlPitchCom                  =  11 ! ED%BlPitchCom
-   integer(IntKi), public, parameter :: ED_u_YawMom                      =  12 ! ED%YawMom
-   integer(IntKi), public, parameter :: ED_u_GenTrq                      =  13 ! ED%GenTrq
-   integer(IntKi), public, parameter :: ED_u_HSSBrTrqC                   =  14 ! ED%HSSBrTrqC
-   integer(IntKi), public, parameter :: ED_y_BladeLn2Mesh                =  15 ! ED%BladeLn2Mesh(DL%i1)
-   integer(IntKi), public, parameter :: ED_y_PlatformPtMesh              =  16 ! ED%PlatformPtMesh
-   integer(IntKi), public, parameter :: ED_y_TowerLn2Mesh                =  17 ! ED%TowerLn2Mesh
-   integer(IntKi), public, parameter :: ED_y_HubPtMotion                 =  18 ! ED%HubPtMotion
-   integer(IntKi), public, parameter :: ED_y_BladeRootMotion             =  19 ! ED%BladeRootMotion(DL%i1)
-   integer(IntKi), public, parameter :: ED_y_NacelleMotion               =  20 ! ED%NacelleMotion
-   integer(IntKi), public, parameter :: ED_y_TFinCMMotion                =  21 ! ED%TFinCMMotion
-   integer(IntKi), public, parameter :: ED_y_WriteOutput                 =  22 ! ED%WriteOutput
-   integer(IntKi), public, parameter :: ED_y_BlPitch                     =  23 ! ED%BlPitch
-   integer(IntKi), public, parameter :: ED_y_Yaw                         =  24 ! ED%Yaw
-   integer(IntKi), public, parameter :: ED_y_YawRate                     =  25 ! ED%YawRate
-   integer(IntKi), public, parameter :: ED_y_LSS_Spd                     =  26 ! ED%LSS_Spd
-   integer(IntKi), public, parameter :: ED_y_HSS_Spd                     =  27 ! ED%HSS_Spd
-   integer(IntKi), public, parameter :: ED_y_RotSpeed                    =  28 ! ED%RotSpeed
-   integer(IntKi), public, parameter :: ED_y_TwrAccel                    =  29 ! ED%TwrAccel
-   integer(IntKi), public, parameter :: ED_y_YawAngle                    =  30 ! ED%YawAngle
-   integer(IntKi), public, parameter :: ED_y_RootMyc                     =  31 ! ED%RootMyc
-   integer(IntKi), public, parameter :: ED_y_YawBrTAxp                   =  32 ! ED%YawBrTAxp
-   integer(IntKi), public, parameter :: ED_y_YawBrTAyp                   =  33 ! ED%YawBrTAyp
-   integer(IntKi), public, parameter :: ED_y_LSSTipPxa                   =  34 ! ED%LSSTipPxa
-   integer(IntKi), public, parameter :: ED_y_RootMxc                     =  35 ! ED%RootMxc
-   integer(IntKi), public, parameter :: ED_y_LSSTipMxa                   =  36 ! ED%LSSTipMxa
-   integer(IntKi), public, parameter :: ED_y_LSSTipMya                   =  37 ! ED%LSSTipMya
-   integer(IntKi), public, parameter :: ED_y_LSSTipMza                   =  38 ! ED%LSSTipMza
-   integer(IntKi), public, parameter :: ED_y_LSSTipMys                   =  39 ! ED%LSSTipMys
-   integer(IntKi), public, parameter :: ED_y_LSSTipMzs                   =  40 ! ED%LSSTipMzs
-   integer(IntKi), public, parameter :: ED_y_YawBrMyn                    =  41 ! ED%YawBrMyn
-   integer(IntKi), public, parameter :: ED_y_YawBrMzn                    =  42 ! ED%YawBrMzn
-   integer(IntKi), public, parameter :: ED_y_NcIMURAxs                   =  43 ! ED%NcIMURAxs
-   integer(IntKi), public, parameter :: ED_y_NcIMURAys                   =  44 ! ED%NcIMURAys
-   integer(IntKi), public, parameter :: ED_y_NcIMURAzs                   =  45 ! ED%NcIMURAzs
-   integer(IntKi), public, parameter :: ED_y_RotPwr                      =  46 ! ED%RotPwr
-   integer(IntKi), public, parameter :: ED_y_LSShftFxa                   =  47 ! ED%LSShftFxa
-   integer(IntKi), public, parameter :: ED_y_LSShftFys                   =  48 ! ED%LSShftFys
-   integer(IntKi), public, parameter :: ED_y_LSShftFzs                   =  49 ! ED%LSShftFzs
+   integer(IntKi), public, parameter :: ED_u_BlPitchMom                  =  12 ! ED%BlPitchMom
+   integer(IntKi), public, parameter :: ED_u_YawMom                      =  13 ! ED%YawMom
+   integer(IntKi), public, parameter :: ED_u_GenTrq                      =  14 ! ED%GenTrq
+   integer(IntKi), public, parameter :: ED_u_HSSBrTrqC                   =  15 ! ED%HSSBrTrqC
+   integer(IntKi), public, parameter :: ED_y_BladeLn2Mesh                =  16 ! ED%BladeLn2Mesh(DL%i1)
+   integer(IntKi), public, parameter :: ED_y_PlatformPtMesh              =  17 ! ED%PlatformPtMesh
+   integer(IntKi), public, parameter :: ED_y_TowerLn2Mesh                =  18 ! ED%TowerLn2Mesh
+   integer(IntKi), public, parameter :: ED_y_HubPtMotion                 =  19 ! ED%HubPtMotion
+   integer(IntKi), public, parameter :: ED_y_BladeRootMotion             =  20 ! ED%BladeRootMotion(DL%i1)
+   integer(IntKi), public, parameter :: ED_y_NacelleMotion               =  21 ! ED%NacelleMotion
+   integer(IntKi), public, parameter :: ED_y_TFinCMMotion                =  22 ! ED%TFinCMMotion
+   integer(IntKi), public, parameter :: ED_y_WriteOutput                 =  23 ! ED%WriteOutput
+   integer(IntKi), public, parameter :: ED_y_BlPitch                     =  24 ! ED%BlPitch
+   integer(IntKi), public, parameter :: ED_y_BlPRate                     =  25 ! ED%BlPRate
+   integer(IntKi), public, parameter :: ED_y_Yaw                         =  26 ! ED%Yaw
+   integer(IntKi), public, parameter :: ED_y_YawRate                     =  27 ! ED%YawRate
+   integer(IntKi), public, parameter :: ED_y_LSS_Spd                     =  28 ! ED%LSS_Spd
+   integer(IntKi), public, parameter :: ED_y_HSS_Spd                     =  29 ! ED%HSS_Spd
+   integer(IntKi), public, parameter :: ED_y_RotSpeed                    =  30 ! ED%RotSpeed
+   integer(IntKi), public, parameter :: ED_y_TwrAccel                    =  31 ! ED%TwrAccel
+   integer(IntKi), public, parameter :: ED_y_YawAngle                    =  32 ! ED%YawAngle
+   integer(IntKi), public, parameter :: ED_y_RootMyc                     =  33 ! ED%RootMyc
+   integer(IntKi), public, parameter :: ED_y_YawBrTAxp                   =  34 ! ED%YawBrTAxp
+   integer(IntKi), public, parameter :: ED_y_YawBrTAyp                   =  35 ! ED%YawBrTAyp
+   integer(IntKi), public, parameter :: ED_y_LSSTipPxa                   =  36 ! ED%LSSTipPxa
+   integer(IntKi), public, parameter :: ED_y_RootMxc                     =  37 ! ED%RootMxc
+   integer(IntKi), public, parameter :: ED_y_LSSTipMxa                   =  38 ! ED%LSSTipMxa
+   integer(IntKi), public, parameter :: ED_y_LSSTipMya                   =  39 ! ED%LSSTipMya
+   integer(IntKi), public, parameter :: ED_y_LSSTipMza                   =  40 ! ED%LSSTipMza
+   integer(IntKi), public, parameter :: ED_y_LSSTipMys                   =  41 ! ED%LSSTipMys
+   integer(IntKi), public, parameter :: ED_y_LSSTipMzs                   =  42 ! ED%LSSTipMzs
+   integer(IntKi), public, parameter :: ED_y_YawBrMyn                    =  43 ! ED%YawBrMyn
+   integer(IntKi), public, parameter :: ED_y_YawBrMzn                    =  44 ! ED%YawBrMzn
+   integer(IntKi), public, parameter :: ED_y_NcIMURAxs                   =  45 ! ED%NcIMURAxs
+   integer(IntKi), public, parameter :: ED_y_NcIMURAys                   =  46 ! ED%NcIMURAys
+   integer(IntKi), public, parameter :: ED_y_NcIMURAzs                   =  47 ! ED%NcIMURAzs
+   integer(IntKi), public, parameter :: ED_y_RotPwr                      =  48 ! ED%RotPwr
+   integer(IntKi), public, parameter :: ED_y_LSShftFxa                   =  49 ! ED%LSShftFxa
+   integer(IntKi), public, parameter :: ED_y_LSShftFys                   =  50 ! ED%LSShftFys
+   integer(IntKi), public, parameter :: ED_y_LSShftFzs                   =  51 ! ED%LSShftFzs
 
 contains
 
@@ -6579,6 +6583,18 @@ subroutine ED_CopyInput(SrcInputData, DstInputData, CtrlCode, ErrStat, ErrMsg)
       end if
       DstInputData%BlPitchCom = SrcInputData%BlPitchCom
    end if
+   if (allocated(SrcInputData%BlPitchMom)) then
+      LB(1:1) = lbound(SrcInputData%BlPitchMom)
+      UB(1:1) = ubound(SrcInputData%BlPitchMom)
+      if (.not. allocated(DstInputData%BlPitchMom)) then
+         allocate(DstInputData%BlPitchMom(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstInputData%BlPitchMom.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstInputData%BlPitchMom = SrcInputData%BlPitchMom
+   end if
    DstInputData%YawMom = SrcInputData%YawMom
    DstInputData%GenTrq = SrcInputData%GenTrq
    DstInputData%HSSBrTrqC = SrcInputData%HSSBrTrqC
@@ -6620,6 +6636,9 @@ subroutine ED_DestroyInput(InputData, ErrStat, ErrMsg)
    if (allocated(InputData%BlPitchCom)) then
       deallocate(InputData%BlPitchCom)
    end if
+   if (allocated(InputData%BlPitchMom)) then
+      deallocate(InputData%BlPitchMom)
+   end if
 end subroutine
 
 subroutine ED_PackInput(RF, Indata)
@@ -6646,6 +6665,7 @@ subroutine ED_PackInput(RF, Indata)
    call RegPackAlloc(RF, InData%TwrAddedMass)
    call RegPack(RF, InData%PtfmAddedMass)
    call RegPackAlloc(RF, InData%BlPitchCom)
+   call RegPackAlloc(RF, InData%BlPitchMom)
    call RegPack(RF, InData%YawMom)
    call RegPack(RF, InData%GenTrq)
    call RegPack(RF, InData%HSSBrTrqC)
@@ -6682,6 +6702,7 @@ subroutine ED_UnPackInput(RF, OutData)
    call RegUnpackAlloc(RF, OutData%TwrAddedMass); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%PtfmAddedMass); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%BlPitchCom); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%BlPitchMom); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%YawMom); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%GenTrq); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%HSSBrTrqC); if (RegCheckErr(RF, RoutineName)) return
@@ -6771,6 +6792,18 @@ subroutine ED_CopyOutput(SrcOutputData, DstOutputData, CtrlCode, ErrStat, ErrMsg
       end if
       DstOutputData%BlPitch = SrcOutputData%BlPitch
    end if
+   if (allocated(SrcOutputData%BlPRate)) then
+      LB(1:1) = lbound(SrcOutputData%BlPRate)
+      UB(1:1) = ubound(SrcOutputData%BlPRate)
+      if (.not. allocated(DstOutputData%BlPRate)) then
+         allocate(DstOutputData%BlPRate(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstOutputData%BlPRate.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstOutputData%BlPRate = SrcOutputData%BlPRate
+   end if
    DstOutputData%Yaw = SrcOutputData%Yaw
    DstOutputData%YawRate = SrcOutputData%YawRate
    DstOutputData%LSS_Spd = SrcOutputData%LSS_Spd
@@ -6844,6 +6877,9 @@ subroutine ED_DestroyOutput(OutputData, ErrStat, ErrMsg)
    if (allocated(OutputData%BlPitch)) then
       deallocate(OutputData%BlPitch)
    end if
+   if (allocated(OutputData%BlPRate)) then
+      deallocate(OutputData%BlPRate)
+   end if
 end subroutine
 
 subroutine ED_PackOutput(RF, Indata)
@@ -6878,6 +6914,7 @@ subroutine ED_PackOutput(RF, Indata)
    call MeshPack(RF, InData%TFinCMMotion) 
    call RegPackAlloc(RF, InData%WriteOutput)
    call RegPackAlloc(RF, InData%BlPitch)
+   call RegPackAlloc(RF, InData%BlPRate)
    call RegPack(RF, InData%Yaw)
    call RegPack(RF, InData%YawRate)
    call RegPack(RF, InData%LSS_Spd)
@@ -6949,6 +6986,7 @@ subroutine ED_UnPackOutput(RF, OutData)
    call MeshUnpack(RF, OutData%TFinCMMotion) ! TFinCMMotion 
    call RegUnpackAlloc(RF, OutData%WriteOutput); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%BlPitch); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%BlPRate); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%Yaw); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%YawRate); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%LSS_Spd); if (RegCheckErr(RF, RoutineName)) return
@@ -7343,6 +7381,9 @@ SUBROUTINE ED_Input_ExtrapInterp1(u1, u2, tin, u_out, tin_out, ErrStat, ErrMsg )
          CALL Angles_ExtrapInterp( u1%BlPitchCom(i1), u2%BlPitchCom(i1), tin, u_out%BlPitchCom(i1), tin_out )
       END DO
    END IF ! check if allocated
+   IF (ALLOCATED(u_out%BlPitchMom) .AND. ALLOCATED(u1%BlPitchMom)) THEN
+      u_out%BlPitchMom = a1*u1%BlPitchMom + a2*u2%BlPitchMom
+   END IF ! check if allocated
    u_out%YawMom = a1*u1%YawMom + a2*u2%YawMom
    u_out%GenTrq = a1*u1%GenTrq + a2*u2%GenTrq
    u_out%HSSBrTrqC = a1*u1%HSSBrTrqC + a2*u2%HSSBrTrqC
@@ -7431,6 +7472,9 @@ SUBROUTINE ED_Input_ExtrapInterp2(u1, u2, u3, tin, u_out, tin_out, ErrStat, ErrM
       do i1 = lbound(u_out%BlPitchCom,1),ubound(u_out%BlPitchCom,1)
          CALL Angles_ExtrapInterp( u1%BlPitchCom(i1), u2%BlPitchCom(i1), u3%BlPitchCom(i1), tin, u_out%BlPitchCom(i1), tin_out )
       END DO
+   END IF ! check if allocated
+   IF (ALLOCATED(u_out%BlPitchMom) .AND. ALLOCATED(u1%BlPitchMom)) THEN
+      u_out%BlPitchMom = a1*u1%BlPitchMom + a2*u2%BlPitchMom + a3*u3%BlPitchMom
    END IF ! check if allocated
    u_out%YawMom = a1*u1%YawMom + a2*u2%YawMom + a3*u3%YawMom
    u_out%GenTrq = a1*u1%GenTrq + a2*u2%GenTrq + a3*u3%GenTrq
@@ -7564,6 +7608,9 @@ SUBROUTINE ED_Output_ExtrapInterp1(y1, y2, tin, y_out, tin_out, ErrStat, ErrMsg 
          CALL Angles_ExtrapInterp( y1%BlPitch(i1), y2%BlPitch(i1), tin, y_out%BlPitch(i1), tin_out )
       END DO
    END IF ! check if allocated
+   IF (ALLOCATED(y_out%BlPRate) .AND. ALLOCATED(y1%BlPRate)) THEN
+      y_out%BlPRate = a1*y1%BlPRate + a2*y2%BlPRate
+   END IF ! check if allocated
    CALL Angles_ExtrapInterp( y1%Yaw, y2%Yaw, tin, y_out%Yaw, tin_out )
    y_out%YawRate = a1*y1%YawRate + a2*y2%YawRate
    y_out%LSS_Spd = a1*y1%LSS_Spd + a2*y2%LSS_Spd
@@ -7676,6 +7723,9 @@ SUBROUTINE ED_Output_ExtrapInterp2(y1, y2, y3, tin, y_out, tin_out, ErrStat, Err
       do i1 = lbound(y_out%BlPitch,1),ubound(y_out%BlPitch,1)
          CALL Angles_ExtrapInterp( y1%BlPitch(i1), y2%BlPitch(i1), y3%BlPitch(i1), tin, y_out%BlPitch(i1), tin_out )
       END DO
+   END IF ! check if allocated
+   IF (ALLOCATED(y_out%BlPRate) .AND. ALLOCATED(y1%BlPRate)) THEN
+      y_out%BlPRate = a1*y1%BlPRate + a2*y2%BlPRate + a3*y3%BlPRate
    END IF ! check if allocated
    CALL Angles_ExtrapInterp( y1%Yaw, y2%Yaw, y3%Yaw, tin, y_out%Yaw, tin_out )
    y_out%YawRate = a1*y1%YawRate + a2*y2%YawRate + a3*y3%YawRate
@@ -7872,6 +7922,8 @@ subroutine ED_VarPackInput(V, u, ValAry)
          VarVals = u%PtfmAddedMass(V%iLB:V%iUB,V%j)                           ! Rank 2 Array
       case (ED_u_BlPitchCom)
          VarVals = u%BlPitchCom(V%iLB:V%iUB)                                  ! Rank 1 Array
+      case (ED_u_BlPitchMom)
+         VarVals = u%BlPitchMom(V%iLB:V%iUB)                                  ! Rank 1 Array
       case (ED_u_YawMom)
          VarVals(1) = u%YawMom                                                ! Scalar
       case (ED_u_GenTrq)
@@ -7918,6 +7970,8 @@ subroutine ED_VarUnpackInput(V, ValAry, u)
          u%PtfmAddedMass(V%iLB:V%iUB, V%j) = VarVals                          ! Rank 2 Array
       case (ED_u_BlPitchCom)
          u%BlPitchCom(V%iLB:V%iUB) = VarVals                                  ! Rank 1 Array
+      case (ED_u_BlPitchMom)
+         u%BlPitchMom(V%iLB:V%iUB) = VarVals                                  ! Rank 1 Array
       case (ED_u_YawMom)
          u%YawMom = VarVals(1)                                                ! Scalar
       case (ED_u_GenTrq)
@@ -7950,6 +8004,8 @@ function ED_InputFieldName(DL) result(Name)
        Name = "u%PtfmAddedMass"
    case (ED_u_BlPitchCom)
        Name = "u%BlPitchCom"
+   case (ED_u_BlPitchMom)
+       Name = "u%BlPitchMom"
    case (ED_u_YawMom)
        Name = "u%YawMom"
    case (ED_u_GenTrq)
@@ -7995,6 +8051,8 @@ subroutine ED_VarPackOutput(V, y, ValAry)
          VarVals = y%WriteOutput(V%iLB:V%iUB)                                 ! Rank 1 Array
       case (ED_y_BlPitch)
          VarVals = y%BlPitch(V%iLB:V%iUB)                                     ! Rank 1 Array
+      case (ED_y_BlPRate)
+         VarVals = y%BlPRate(V%iLB:V%iUB)                                     ! Rank 1 Array
       case (ED_y_Yaw)
          VarVals(1) = y%Yaw                                                   ! Scalar
       case (ED_y_YawRate)
@@ -8087,6 +8145,8 @@ subroutine ED_VarUnpackOutput(V, ValAry, y)
          y%WriteOutput(V%iLB:V%iUB) = VarVals                                 ! Rank 1 Array
       case (ED_y_BlPitch)
          y%BlPitch(V%iLB:V%iUB) = VarVals                                     ! Rank 1 Array
+      case (ED_y_BlPRate)
+         y%BlPRate(V%iLB:V%iUB) = VarVals                                     ! Rank 1 Array
       case (ED_y_Yaw)
          y%Yaw = VarVals(1)                                                   ! Scalar
       case (ED_y_YawRate)
@@ -8165,6 +8225,8 @@ function ED_OutputFieldName(DL) result(Name)
        Name = "y%WriteOutput"
    case (ED_y_BlPitch)
        Name = "y%BlPitch"
+   case (ED_y_BlPRate)
+       Name = "y%BlPRate"
    case (ED_y_Yaw)
        Name = "y%Yaw"
    case (ED_y_YawRate)
