@@ -1663,6 +1663,7 @@ subroutine Init_MiscVars( p, u, y, m, ErrStat, ErrMsg )
          ! E1, kappa -- used in force calculations
       CALL AllocAry(m%qp%E1,               p%dof_node/2,p%nqp,p%elem_total,                  'm%qp%E1    at quadrature point',ErrStat2,ErrMsg2); CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       CALL AllocAry(m%qp%kappa,            p%dof_node/2,p%nqp,p%elem_total,                  'm%qp%kappa at quadrature point',ErrStat2,ErrMsg2); CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+      CALL AllocAry(m%qp%strain,           p%dof_node  ,p%nqp,p%elem_total,                  'm%qp%strain at quadrature point',ErrStat2,ErrMsg2); CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       CALL AllocAry(m%qp%RR0,              3,3,         p%nqp,p%elem_total,                  'm%qp%RR0 at quadrature point',ErrStat2,ErrMsg2); CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       CALL AllocAry(m%qp%Stif,             6,6,         p%nqp,p%elem_total,                  'm%qp%Stif at quadrature point',ErrStat2,ErrMsg2); CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
@@ -2731,6 +2732,7 @@ SUBROUTINE BD_ElasticForce(nelem,p,m,fact)
                          p%E10(:,idx_qp,nelem), &
                          m%qp%E1(:,idx_qp,nelem), &
                          m%qp%kappa(1:3,idx_qp,nelem), &
+                         m%qp%strain(:,idx_qp,nelem), &
                          p%Stif0_QP(:,:,(nelem-1)*p%nqp+idx_qp), &
                          m%qp%Stif(:,:,idx_qp,nelem), &
                          m%qp%Fc(:,idx_qp,nelem), &
@@ -2744,6 +2746,7 @@ SUBROUTINE BD_ElasticForce(nelem,p,m,fact)
                          p%E10(:,idx_qp,nelem), &
                          m%qp%E1(:,idx_qp,nelem), &
                          m%qp%kappa(1:3,idx_qp,nelem), &
+                         m%qp%strain(:,idx_qp,nelem), &
                          p%Stif0_QP(:,:,(nelem-1)*p%nqp+idx_qp), &
                          m%qp%Stif(:,:,idx_qp,nelem), &
                          m%qp%Fc(:,idx_qp,nelem), &
@@ -2829,11 +2832,10 @@ contains
       Qe(4:6,4:6) = -MATMUL(tildeE,Oe(1:3,4:6))
    end subroutine
 
-   subroutine Calc_Fc_Fd(RR0, uuu, E10, E1, kappa, Stif0, Stif, Fc, Fd, cet, k1s)
+   subroutine Calc_Fc_Fd(RR0, uuu, E10, E1, kappa, strain, Stif0, Stif, Fc, Fd, cet, k1s)
       REAL(BDKi), intent(in)     :: RR0(:,:), uuu(:), E10(:), E1(:), kappa(:), Stif0(:,:), Stif(:,:)
-      REAL(BDKi), intent(out)    :: Fc(:), Fd(:), cet, k1s
+      REAL(BDKi), intent(out)    :: strain(:), Fc(:), Fd(:), cet, k1s
       REAL(BDKi)                 :: e1s
-      REAL(BDKi)                 :: eee(6)      !< intermediate array for calculation Strain and curvature terms of Fc
       REAL(BDKi)                 :: fff(6)      !< intermediate array for calculation of the elastic force, Fc
       REAL(BDKi)                 :: R(3,3)      !< rotation matrix at quatrature point
       REAL(BDKi)                 :: Rx0p(3)     !< \f$ \underline{R} \underline{x}^\prime_0 \f$
@@ -2852,7 +2854,7 @@ contains
       ! eee(1:3) = m%qp%E1(1:3,idx_qp,nelem) - m%qp%RR0(1:3,3,idx_qp,nelem)     ! Using RR0 z direction in IEC coords
       call BD_CrvMatrixR(uuu(4:6), R)  ! Get rotation at QP as a matrix
       Rx0p = matmul(R,E10)             ! Calculate rotated initial tangent
-      eee(1:3) = E1(1:3) - Rx0p        ! Use rotated initial tangent in place of RR0*i1 to eliminate likely mismatch between R0*i1 and x0'
+      strain(1:3) = E1(1:3) - Rx0p     ! Use rotated initial tangent in place of RR0*i1 to eliminate likely mismatch between R0*i1 and x0'
       
          !> ### Set the 1D sectional curvature, \f$ \underline{\kappa} \f$, equation (5)
          !! \f$ \underline{\kappa} = \underline{k} + \underline{\underline{R}}\underline{k}_i \f$
@@ -2872,7 +2874,7 @@ contains
          !!    \f$
          !! In other words, \f$ \tilde{k} = \left(\underline{\underline{R}}^\prime\underline{\underline{R}}^T \right) \f$.
          !! Note: \f$ \underline{\kappa} \f$ was already calculated in the BD_DisplacementQP routine
-      eee(4:6) = kappa(1:3)
+      strain(4:6) = kappa(1:3)
 
 
    !FIXME: note that the k_i terms may not be documented correctly here.
@@ -2904,7 +2906,7 @@ contains
          !!                \underline{k}
          !!          \end{array} \right\} \f$
          !!
-      fff(1:6) = MATMUL(Stif,eee)
+      fff(1:6) = MATMUL(Stif,strain)
 
 
          !> ###Calculate the extension twist coupling.
@@ -2915,13 +2917,13 @@ contains
          !! \f$ \kappa_{m} = \left( \underline{\underline{R}}\underline{\underline{R}}_0 \right) ^T \underline{k}\f$ \n
 
          ! Strain into the material basis (eq (39) of Dymore manual)
-      !Wrk(:) = MATMUL(TRANSPOSE(m%qp%RR0(:,:,idx_qp,nelem)),eee(1:3))
+      !Wrk(:) = MATMUL(TRANSPOSE(m%qp%RR0(:,:,idx_qp,nelem)),strain(1:3))
       !e1s = Wrk(3)      !epsilon_{1} in material basis (for major axis of blade, which is z in the IEC formulation)
-      e1s = dot_product( RR0(:,3), eee(1:3) )
+      e1s = dot_product( RR0(:,3), strain(1:3) )
 
-      !Wrk(:) = MATMUL(TRANSPOSE(m%qp%RR0(:,:,idx_qp,nelem)),eee(4:6))
+      !Wrk(:) = MATMUL(TRANSPOSE(m%qp%RR0(:,:,idx_qp,nelem)),strain(4:6))
       !k1s = Wrk(3)      !kappa_{1} in material basis (for major axis of blade, which is z in the IEC formulation)
-      k1s = dot_product( RR0(:,3), eee(4:6) )
+      k1s = dot_product( RR0(:,3), strain(4:6) )
 
 
       !> Add extension twist coupling terms to the \f$ \underline{F}^c_{a} \f$\n
