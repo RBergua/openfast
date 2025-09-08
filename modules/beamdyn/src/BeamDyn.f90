@@ -5966,16 +5966,16 @@ subroutine BD_InitVars(u, p, x, y, m, InitOut, Linearize, ErrStat, ErrMsg)
                       Perturbs=[MaxThrust/(100.0_R8Ki*3.0_R8Ki*u%PointLoad%Nnodes), &  ! FieldForce
                                 MaxTorque/(100.0_R8Ki*3.0_R8Ki*u%PointLoad%Nnodes)])   ! FieldMoment
 
-   call MV_AddMeshVar(InitOut%Vars%u, "HubMotion", MotionFields, &
-                      DatLoc(BD_u_HubMotion), &
-                      Mesh=u%HubMotion, &
-                      Flags=VF_NoLin, &
-                      Perturbs=[0.2_R8Ki*D2R_D * p%blade_length, &    ! FieldTransDisp
-                                0.2_R8Ki*D2R_D, &                     ! FieldOrientation
-                                0.2_R8Ki*D2R_D * p%blade_length, &    ! FieldTransVel
-                                0.2_R8Ki*D2R_D, &                     ! FieldAngularVel
-                                0.2_R8Ki*D2R_D * p%blade_length, &    ! FieldTransAcc
-                                0.2_R8Ki*D2R_D])                      ! FieldAngularAcc
+   ! call MV_AddMeshVar(InitOut%Vars%u, "HubMotion", MotionFields, &
+   !                    DatLoc(BD_u_HubMotion), &
+   !                    Mesh=u%HubMotion, &
+   !                    Flags=VF_NoLin, &
+   !                    Perturbs=[0.2_R8Ki*D2R_D * p%blade_length, &    ! FieldTransDisp
+   !                              0.2_R8Ki*D2R_D, &                     ! FieldOrientation
+   !                              0.2_R8Ki*D2R_D * p%blade_length, &    ! FieldTransVel
+   !                              0.2_R8Ki*D2R_D, &                     ! FieldAngularVel
+   !                              0.2_R8Ki*D2R_D * p%blade_length, &    ! FieldTransAcc
+   !                              0.2_R8Ki*D2R_D])                      ! FieldAngularAcc
 
    !----------------------------------------------------------------------------
    ! Output variables
