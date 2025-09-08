@@ -7276,6 +7276,8 @@ SUBROUTINE FAST_RestoreForVTKModeShape_Tary(t_initial, Turbine, InputFileName, E
    INTEGER(IntKi)                          :: i_turb
    INTEGER(IntKi)                          :: n_t_global          !< loop counter
    INTEGER(IntKi)                          :: NumTurbines         ! Number of turbines in this simulation
+   INTEGER(IntKi)                          :: i_ext
+   CHARACTER(1024)                         :: OutFileRoot
    TYPE(FAST_VTK_ModeShapeType)            :: VTK_Modes
 
 
@@ -7291,10 +7293,14 @@ SUBROUTINE FAST_RestoreForVTKModeShape_Tary(t_initial, Turbine, InputFileName, E
    CALL ReadModeShapeFile( Turbine(1)%p_FAST, trim(InputFileName), VTK_Modes, ErrStat2, ErrMsg2, checkpointOnly=.true. )
       CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       if (ErrStat >= AbortErrLev) return
+   
+   ! Save checkpoint root path as read from mode shape file and remove extension
+   OutFileRoot = VTK_modes%CheckpointRoot
+   i_ext = index(OutFileRoot, '.ModeShapeVTK', back=.true.)
+   if (i_ext > 1) OutFileRoot = OutFileRoot(:i_ext - 1)
 
    CALL FAST_RestoreFromCheckpoint_Tary( t_initial, n_t_global, Turbine, trim(VTK_modes%CheckpointRoot), ErrStat2, ErrMsg2, silent=.true. )
       CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-
 
    DO i_turb = 1,NumTurbines
       if (.not. allocated(Turbine(i_turb)%m_FAST%Lin%LinTimes)) then
@@ -7304,6 +7310,9 @@ SUBROUTINE FAST_RestoreForVTKModeShape_Tary(t_initial, Turbine, InputFileName, E
 
       CALL FAST_RestoreForVTKModeShape_T(t_initial, trim(InputFileName), VTK_Modes, Turbine(i_turb), ErrStat2, ErrMsg2)
       CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+
+      ! If extension was found, overwrite saved out file root
+      if (i_ext > 1) Turbine(i_turb)%p_FAST%OutFileRoot = OutFileRoot
    END DO
 
 
