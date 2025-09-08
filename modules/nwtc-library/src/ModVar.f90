@@ -1371,6 +1371,52 @@ pure function cross(a, b) result(c)
    c = [a(2)*b(3) - a(3)*b(2), a(3)*b(1) - a(1)*b(3), a(1)*b(2) - b(1)*a(2)]
 end function
 
+pure function quat_rotate_vec(q, v) result(v_out)
+   real(R8Ki), intent(in)  :: q(3), v(3)
+   real(R8Ki)              :: v_out(3), q0, q0q0, q1q1, q2q2, q3q3, q1q2, q1q3, q2q3, q0q1, q0q2, q0q3
+   q0 = quat_scalar(q)
+   q0q0 = q0**2
+   q1q1 = q(1)**2
+   q2q2 = q(2)**2
+   q3q3 = q(3)**2
+   q0q1 = q0*q(1)
+   q0q2 = q0*q(2)
+   q0q3 = q0*q(3)
+   q1q2 = q(1)*q(2)
+   q1q3 = q(1)*q(3)
+   q2q3 = q(2)*q(3)
+   v_out(1) = (q0q0 + q1q1 - q2q2 - q3q3)*v(1) + 2*(q1q2 - q0q3)*v(2) + 2*(q1q3 + q0q2)*v(3); 
+   v_out(2) = 2*(q1q2 + q0q3)*v(1) + (q0q0 - q1q1 + q2q2 - q3q3)*v(2) + 2*(q2q3 - q0q1)*v(3); 
+   v_out(3) = 2*(q1q3 - q0q2)*v(1) + 2*(q2q3 + q0q1)*v(2) + (q0q0 - q1q1 - q2q2 + q3q3)*v(3); 
+end function
+
+pure function project_vec(a, b) result(c)
+   real(R8Ki), intent(in) :: a(3), b(3)
+   real(R8Ki)             :: c(3)
+   c = dot_product(a, b) / dot_product(b, b) * b
+end function
+
+! Remove twist about axis from given quaternion
+! http://www.euclideanspace.com/maths/geometry/rotations/for/decomposition
+subroutine quat_to_swing_twist(q, twist_axis, q_swing, q_twist)
+   real(R8Ki), intent(in)  :: q(3), twist_axis(3)
+   real(R8Ki), intent(out) :: q_swing(3), q_twist(3)
+   real(R8Ki)              :: w, q_axis(3), p(3)
+
+   ! Get scalar part of quaternion
+   w = quat_scalar(q)
+
+   ! If scalar component is nearly 1, quaternion is identity
+   if (w + 1e-12_R8Ki > 1.0_R8Ki) then
+      q_swing = 0.0_R8Ki
+      q_twist = 0.0_R8Ki
+   else
+      q_twist = project_vec(q, twist_axis)
+      q_swing = quat_compose(q, -q_twist)
+   end if
+
+end subroutine
+
 !-------------------------------------------------------------------------------
 ! Debugging
 !-------------------------------------------------------------------------------
