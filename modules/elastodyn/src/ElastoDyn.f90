@@ -66,6 +66,7 @@ MODULE ElastoDyn
    
 
    PUBLIC :: ED_UpdateAzimuth
+   PUBLIC :: ED_UpdateBlPitch
    
 CONTAINS
 
@@ -550,6 +551,20 @@ SUBROUTINE ED_UpdateAzimuth(p, x, DT)
 
    ! If the azimuth is greater than 2pi, subtract 2pi
    IF ((x%QT(DOF_GeAz) + x%QT(DOF_DrTr)) >= TwoPi_D) x%QT(DOF_GeAz) = x%QT(DOF_GeAz) - TwoPi_D
+END SUBROUTINE
+
+SUBROUTINE ED_UpdateBlPitch(p, x)
+   TYPE(ED_ParameterType),       INTENT(IN   )  :: p          !< Parameters
+   TYPE(ED_ContinuousStateType), INTENT(INOUT)  :: x
+
+   INTEGER(IntKi)                               :: K
+
+   ! Might not be necessary, but keeping blade pitch angle between [-pi,pi) for now.
+   ! This interval is chosen to minimize jumps (blade pitch is usually between [0,pi/2]) and simplify controls.
+   DO K = 1,p%NumBl
+      IF ( x%QT(DOF_BP(K)) >=  Pi_D )  x%QT(DOF_BP(K)) = x%QT(DOF_BP(K)) - TwoPi_D
+      IF ( x%QT(DOF_BP(K)) <  -Pi_D )  x%QT(DOF_BP(K)) = x%QT(DOF_BP(K)) + TwoPi_D
+   END DO
 END SUBROUTINE
 
 !----------------------------------------------------------------------------------------------------------------------------------
