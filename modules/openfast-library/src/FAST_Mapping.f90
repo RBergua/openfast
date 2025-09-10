@@ -882,7 +882,6 @@ subroutine InitMappings_BD(Mappings, SrcMod, DstMod, Turbine, ErrStat, ErrMsg)
                          Active=NotCompAeroMaps)
       if (Failed()) return
 
-      ! Hub motion not used
       ! call MapMotionMesh(Turbine, Mappings, SrcMod=SrcMod, DstMod=DstMod, &
       !                    SrcDL=DatLoc(ED_y_HubPtMotion), &                     ! ED%y%HubED_y_HubPtMotion
       !                    DstDL=DatLoc(BD_u_HubMotion), &                       ! BD%Input(1, DstMod%Ins)%HubMotion

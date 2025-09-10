@@ -437,6 +437,12 @@ when* **StC_DOF_MODE==4**.
    number of commented header lines, and commented lines at any location in the
    input file.
 
+   For blade mounted StCs, a different time sereis input file can be given for
+   each blade (add additional file names on new lines). If only one file is 
+   provided, it will be used for all blades.  See example in the regression
+   test: `StC_test_OC4Semi_blade2` for an example setup.
+
+
 Example prescribed time series file :download:`(example prescribed force
 timeseries) <ExampleFiles/PrescribedForce.txt>`:
 
