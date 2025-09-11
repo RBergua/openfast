@@ -1609,9 +1609,9 @@ END IF
       y%BladeRootMotion(K)%TranslationVel(3,1)  =     m%RtHS%LinVelES(2,0,K)
 
       ! Rotation velocity  
-      y%BladeRootMotion(K)%RotationVel(1,1)     =      m%RtHS%AngVelEH(1)
-      y%BladeRootMotion(K)%RotationVel(2,1)     =  -1.*m%RtHS%AngVelEH(3)
-      y%BladeRootMotion(K)%RotationVel(3,1)     =      m%RtHS%AngVelEH(2)
+      y%BladeRootMotion(K)%RotationVel(1,1)     =      m%RtHS%AngVelEM(1,0,K)
+      y%BladeRootMotion(K)%RotationVel(2,1)     =  -1.*m%RtHS%AngVelEM(3,0,K)
+      y%BladeRootMotion(K)%RotationVel(3,1)     =      m%RtHS%AngVelEM(2,0,K)
       
       ! Translation acceleration
       y%BladeRootMotion(K)%TranslationAcc(1,1)  =      LinAccES(1,0,K)
@@ -1619,9 +1619,9 @@ END IF
       y%BladeRootMotion(K)%TranslationAcc(3,1)  =      LinAccES(2,0,K)
       
       ! Rotation acceleration  
-      y%BladeRootMotion(K)%RotationAcc(1,1)     =      AngAccEH(1) 
-      y%BladeRootMotion(K)%RotationAcc(2,1)     =  -1.*AngAccEH(3) 
-      y%BladeRootMotion(K)%RotationAcc(3,1)     =      AngAccEH(2)
+      y%BladeRootMotion(K)%RotationAcc(1,1)     =      AngAccEK(1,0,K)
+      y%BladeRootMotion(K)%RotationAcc(2,1)     =  -1.*AngAccEK(3,0,K)
+      y%BladeRootMotion(K)%RotationAcc(3,1)     =      AngAccEK(2,0,K)
       
    END DO   
    
