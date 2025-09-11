@@ -156,7 +156,7 @@ CONTAINS
       CHARACTER(*), PARAMETER       :: RoutineName = 'MD_Init'
 
       
-
+      ! Initialize Err stat
       ErrStat = ErrID_None
       ErrMsg  = ""
       m%zeros6 = 0.0_DbKi
@@ -240,13 +240,9 @@ CONTAINS
       !            read input file and create cross-referenced mooring system objects
       !---------------------------------------------------------------------------------------------
       
-      
-      ! Initialize ErrStat
-      ErrStat = ErrID_None
-      ErrMsg  = ""
 
 
-      CALL WrScr( '   Parsing MoorDyn input file: '//trim(InitInp%FileName) )
+      CALL WrScr( '  Parsing MoorDyn input file: '//trim(InitInp%FileName) )
 
 
       ! -----------------------------------------------------------------
@@ -289,6 +285,13 @@ CONTAINS
       Line = NextLine(i);     ! Get the line and increment counter.  See description of routine. 
       
       do while ( i <= FileInfo_In%NumLines )
+
+         if (INDEX(Line, "ECHO") > 0) then
+            ! check for Echo flag and if so, throw message suggesting write log
+            ErrStat2 = ErrID_Info
+            ErrMsg2 = 'MoorDyn does not support ECHO. Instead, enable the log file by setting WriteLog > 0.'
+            CALL CheckError( ErrStat2, ErrMsg2 )
+         end if
 
          if (INDEX(Line, "---") > 0) then ! look for a header line
 
@@ -437,10 +440,10 @@ CONTAINS
                      read (OptValue,*) p%writeLog
                      if (p%writeLog > 0) then   ! if not zero, open a log file for output
                         CALL GetNewUnit( p%UnLog )
-                        CALL OpenFOutFile ( p%UnLog, TRIM(p%RootName)//'.log', ErrStat, ErrMsg )
-                        IF ( ErrStat > AbortErrLev ) THEN
-                           ErrMsg = ' Failed to open MoorDyn log file: '//TRIM(ErrMsg)
-                           RETURN
+                        CALL OpenFOutFile ( p%UnLog, TRIM(p%RootName)//'.log', ErrStat2, ErrMsg2 )
+                        IF ( ErrStat2 > AbortErrLev ) THEN
+                           ErrMsg2 = ' Failed to open MoorDyn log file: '//TRIM(ErrMsg2)
+                           CALL CheckError( ErrStat2, ErrMsg2 ); IF (ErrStat >= AbortErrLev) RETURN
                         END IF
                         write(p%UnLog,'(A)', IOSTAT=ErrStat2) "MoorDyn v2 log file with output level "//TRIM(Num2LStr(p%writeLog))
                         write(p%UnLog,'(A)', IOSTAT=ErrStat2) "Note: options above the writeLog line in the input file will not be recorded."
@@ -489,7 +492,9 @@ CONTAINS
                   else if ( OptString == 'DISABLEOUTTIME') then
                      read (OptValue,*) p%disableOutTime
                   else
-                     CALL SetErrStat( ErrID_Warn, 'Unable to interpret input '//trim(OptString)//' in OPTIONS section.', ErrStat, ErrMsg, RoutineName )
+                     ErrStat2 = ErrID_Warn
+                     ErrMsg2 = 'Unable to interpret input '//trim(OptString)//' in OPTIONS section.'
+                     CALL CheckError( ErrStat2, ErrMsg2 )
                   end if
 
                   nOpts = nOpts + 1
@@ -547,7 +552,8 @@ CONTAINS
 
 
       ! set up seabed bathymetry
-      CALL setupBathymetry(DepthValue, InitInp%WtrDepth, m%BathymetryGrid, m%BathGrid_Xs, m%BathGrid_Ys, ErrStat2, ErrMsg2)
+      CALL setupBathymetry(p, DepthValue, InitInp%WtrDepth, m%BathymetryGrid, m%BathGrid_Xs, m%BathGrid_Ys, ErrStat2, ErrMsg2)
+      CALL CheckError( ErrStat2, ErrMsg2 ); IF (ErrStat >= AbortErrLev) RETURN
       CALL getDepthFromBathymetry(m%BathymetryGrid, m%BathGrid_Xs, m%BathGrid_Ys, 0.0_DbKi, 0.0_DbKi, p%WtrDpth, nvec)  ! set depth at 0,0 as nominal for waves etc
       
       
@@ -1253,10 +1259,6 @@ CONTAINS
                   IF (SUM(m%RodList(l)%OutFlagList) > 0)   m%RodList(l)%OutFlagList(1) = 1  ! this first entry signals whether to create any output file at all
                   ! the above letter-index combinations define which OutFlagList entry corresponds to which output type
 
-
-                  ! specify IdNum of line for error checking
-                  m%RodList(l)%IdNum = l  
-
                   if (p%writeLog > 1) then
                      write(p%UnLog, '(A)'        ) "  - Rod"//trim(num2lstr(m%RodList(l)%IdNum))//":"
                      write(p%UnLog, '(A15,I2)'   ) "   ID     : ", m%RodList(l)%IdNum
@@ -1267,7 +1269,7 @@ CONTAINS
 
                   ! check for sequential IdNums
                   IF ( m%RodList(l)%IdNum .NE. l ) THEN
-                     CALL SetErrStat( ErrID_Fatal, 'Line numbers must be sequential starting from 1.', ErrStat, ErrMsg, RoutineName )
+                     CALL SetErrStat( ErrID_Fatal, 'Rod numbers must be sequential starting from 1.', ErrStat, ErrMsg, RoutineName )
                      CALL CleanUp()
                      RETURN
                   END IF
@@ -1642,9 +1644,6 @@ CONTAINS
                   IF (SUM(m%LineList(l)%OutFlagList) > 0)   m%LineList(l)%OutFlagList(1) = 1  ! this first entry signals whether to create any output file at all
                   ! the above letter-index combinations define which OutFlagList entry corresponds to which output type
 
-
-                  ! specify IdNum of line for error checking
-                  m%LineList(l)%IdNum = l  
 
                   if (p%writeLog > 1) then
                      write(p%UnLog, '(A)'        ) "  - Line"//trim(num2lstr(m%LineList(l)%IdNum))//":"
@@ -2942,7 +2941,7 @@ CONTAINS
       ! Initialize module variables
       call MD_InitVars(InitOut%Vars, InitInp, u, p, x, z, y, m, InitOut, InitInp%Linearize, ErrStat2, ErrMsg2); if(Failed()) return
       
-      CALL WrScr('   MoorDyn initialization completed.')
+      CALL WrScr('  MoorDyn initialization completed.')
       if (p%writeLog > 0) then
          write(p%UnLog, '(A)') NewLine//"MoorDyn initialization completed."//NewLine
          if (ErrStat /= ErrID_None) then
@@ -2992,7 +2991,7 @@ CONTAINS
 
             IF (ErrStat /= ErrID_None) ErrMsg = TRIM(ErrMsg)//NewLine   ! if there's a pre-existing warning/error, retain the message and start a new line
 
-            ErrMsg = TRIM(ErrMsg)//' MD_Init:'//TRIM(Msg)
+            ErrMsg = TRIM(ErrMsg)//RoutineName//":"//TRIM(Msg)
             ErrStat = MAX(ErrStat, ErrID)
 
             Msg = "" ! Reset the error message now that it has been logged into ErrMsg

@@ -128,9 +128,10 @@ MODULE MoorDyn_IO
 CONTAINS
 
 
-   SUBROUTINE setupBathymetry(inputString, defaultDepth, BathGrid, BathGrid_Xs, BathGrid_Ys, ErrStat3, ErrMsg3)
+   SUBROUTINE setupBathymetry(p, inputString, defaultDepth, BathGrid, BathGrid_Xs, BathGrid_Ys, ErrStat3, ErrMsg3)
    ! SUBROUTINE getBathymetry(inputString, BathGrid, BathGrid_Xs, BathGrid_Ys, BathGrid_npoints, ErrStat3, ErrMsg3)
 
+      TYPE(MD_ParameterType),  INTENT(INOUT)  :: p                   ! Parameters
       CHARACTER(40),           INTENT(IN   )  :: inputString         ! string describing water depth or bathymetry filename
       REAL(ReKi),              INTENT(IN   )  :: defaultDepth        ! depth to use if inputString is empty
       REAL(DbKi), ALLOCATABLE, INTENT(INOUT)  :: BathGrid (:,:)
@@ -144,7 +145,8 @@ CONTAINS
       
       INTEGER(IntKi)                   :: ErrStat4
       CHARACTER(120)                   :: ErrMsg4         
-      CHARACTER(4096)                   :: Line2
+      CHARACTER(4096)                  :: Line2
+      CHARACTER(1024)                  :: FileName 
 
       CHARACTER(20)                    :: nGridX_string  ! string to temporarily hold the nGridX string from Line2
       CHARACTER(20)                    :: nGridY_string  ! string to temporarily hold the nGridY string from Line3
@@ -177,41 +179,63 @@ CONTAINS
       ELSE ! otherwise interpret the input as a file name to load the bathymetry lookup data from
          CALL WrScr("   The depth input contains letters so will load a bathymetry file.")
          
+         IF ( PathIsRelative( inputString ) ) THEN   ! properly handle relative path <<<
+            FileName = TRIM(p%PriPath)//TRIM(inputString)
+         ELSE
+            FileName = trim(inputString)
+         END IF
+
          ! load lookup table data from file
          CALL GetNewUnit( UnCoef ) ! unit number for coefficient input file
-         CALL OpenFInpFile( UnCoef, TRIM(inputString), ErrStat4, ErrMsg4 )
-         cALL SetErrStat(ErrStat4, ErrMsg4, ErrStat3, ErrMsg3, 'MDIO_getBathymetry')
+         CALL OpenFInpFile( UnCoef, FileName, ErrStat4, ErrMsg4 )
+         CALL SetErrStat(ErrStat4, ErrMsg4, ErrStat3, ErrMsg3, 'MDIO_getBathymetry')
 
          READ(UnCoef,'(A)',IOSTAT=ErrStat4) Line2   ! skip the first title line
          READ(UnCoef,*,IOSTAT=ErrStat4) nGridX_string, nGridX  ! read in the second line as the number of x values in the BathGrid
          READ(UnCoef,*,IOSTAT=ErrStat4) nGridY_string, nGridY  ! read in the third line as the number of y values in the BathGrid
+
+         ! error check that the number of x and y values were read in correctly
+         IF (ErrStat4 /= 0) THEN
+            CALL SetErrStat(ErrID_Fatal, "Error reading the number of x and y values from the bathymetry file "//TRIM(inputString), ErrStat3, ErrMsg3, 'MDIO_getBathymetry')
+            CLOSE (UnCoef)
+            RETURN
+         ENDIF
 
          ! Allocate the bathymetry matrix and associated grid x and y values
          ALLOCATE(BathGrid(nGridY, nGridX), STAT=ErrStat4)
          ALLOCATE(BathGrid_Xs(nGridX), STAT=ErrStat4)
          ALLOCATE(BathGrid_Ys(nGridY), STAT=ErrStat4)
 
+         ! Error check that allocation was successful
+         IF (ErrStat4 /= 0) THEN
+            CALL SetErrStat(ErrID_Fatal, "Error allocating memory for the bathymetry grid from file "//TRIM(inputString), ErrStat3, ErrMsg3, 'MDIO_getBathymetry')
+            CLOSE (UnCoef)
+            RETURN
+         ENDIF
+
          DO I = 1, nGridY+1  ! loop through each line in the rest of the bathymetry file
 
             READ(UnCoef,'(A)',IOSTAT=ErrStat4) Line2   ! read into a line and call it Line2
-            IF (ErrStat4 > 0) EXIT
 
             IF (I==1) THEN    ! if it's the first line in the Bathymetry Grid, then it's a list of all the x values
                READ(Line2, *,IOSTAT=ErrStat4) BathGrid_Xs
             ELSE              ! if it's not the first line, then the first value is a y value and the rest are the depth values
                READ(Line2, *,IOSTAT=ErrStat4) BathGrid_Ys(I-1), BathGrid(I-1,:)
             ENDIF
+
+            IF (ErrStat4 /= 0) THEN
+               CALL SetErrStat(ErrID_Fatal, "Error reading the bathymetry file "//TRIM(inputString)//" at table line "//trIM(Num2Lstr(I)), ErrStat3, ErrMsg3, 'MDIO_getBathymetry')
+               CLOSE (UnCoef)
+               RETURN
+            ENDIF
          
          END DO
 
+         CLOSE (UnCoef)
+
          IF (I < 2) THEN
-            ErrStat3 = ErrID_Fatal
-            ErrMsg3 = "Less than the minimum of 2 data lines found in file "//TRIM(inputString)
-            CLOSE (UnCoef)
+            CALL SetErrStat(ErrID_Fatal, "Less than the minimum of 2 data lines found in file "//TRIM(inputString), ErrStat3, ErrMsg3, 'MDIO_getBathymetry')
             RETURN
-         ELSE 
-            ! BathGrid_npoints = nGridX*nGridY       ! save the number of points in the grid
-            CLOSE (UnCoef)
          END IF
       
       END IF

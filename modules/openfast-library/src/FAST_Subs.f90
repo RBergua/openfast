@@ -6841,7 +6841,10 @@ SUBROUTINE ExitThisProgram_T( Turbine, ErrLevel_in, StopTheProgram, ErrLocMsg, S
    END IF
 
    ! Close summary file if opened
-   IF (UnSum > 0) CLOSE(UnSum)
+   IF (UnSum > 0) then
+      CLOSE(UnSum)
+      Turbine%y_FAST%UnSum = -1
+   end if
 
    if (StopTheProgram) then
 #if (defined COMPILE_SIMULINK || defined COMPILE_LABVIEW)
