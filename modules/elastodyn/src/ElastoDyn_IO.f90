@@ -2509,7 +2509,14 @@ SUBROUTINE ReadPrimaryFile( InputFile, InputFileData, BldFile, FurlFile, TwrFile
          RETURN
       END IF
 
-   CALL AllocAry( InputFileData%PitchIner, MaxBl, 'PitchIner input array', ErrStat2, ErrMsg2 )
+   CALL AllocAry( InputFileData%PitchBrIner, MaxBl, 'PitchBrIner input array', ErrStat2, ErrMsg2 )
+      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+      IF ( ErrStat >= AbortErrLev ) THEN
+         CALL Cleanup()
+         RETURN
+      END IF
+
+   CALL AllocAry( InputFileData%BlPitchIner, MaxBl, 'BlPitchIner input array', ErrStat2, ErrMsg2 )
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       IF ( ErrStat >= AbortErrLev ) THEN
          CALL Cleanup()
@@ -3149,8 +3156,16 @@ SUBROUTINE ReadPrimaryFile( InputFile, InputFileData, BldFile, FurlFile, TwrFile
          RETURN
       END IF
 
-      ! PitchIner - Blade inertia about the pitch axis (kg):
-   CALL ReadAryLines( UnIn, InputFile, InputFileData%PitchIner, MaxBl, "PitchIner", "Blade inertia about the pitch axis (kg m^2)", ErrStat2, ErrMsg2, UnEc)
+      ! PitchBrIner - Pitch bearing inertia about the pitch axis (kg m^2):
+   CALL ReadAryLines( UnIn, InputFile, InputFileData%PitchBrIner, MaxBl, "PitchBrIner", "Pitch bearing inertia about the pitch axis (kg m^2)", ErrStat2, ErrMsg2, UnEc)
+      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+      IF ( ErrStat >= AbortErrLev ) THEN
+         CALL Cleanup()
+         RETURN
+      END IF
+
+      ! BlPitchIner - Blade inertia about the pitch axis (kg m^2):
+   CALL ReadAryLines( UnIn, InputFile, InputFileData%BlPitchIner, MaxBl, "BlPitchIner", "Blade inertia about the pitch axis (kg m^2)", ErrStat2, ErrMsg2, UnEc)
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       IF ( ErrStat >= AbortErrLev ) THEN
          CALL Cleanup()
@@ -4336,7 +4351,11 @@ SUBROUTINE ValidatePrimaryData( InputFileData, BD4Blades, Linearize, MHK, ErrSta
    ENDDO ! K
 
    DO K=1,InputFileData%NumBl
-      IF ( InputFileData%PitchIner(K) <= 0.0_ReKi) call SetErrStat(ErrID_Fatal,'PitchIner('//TRIM( Num2LStr( K ) )//') must not be less than or equal to zero.',ErrStat,ErrMsg,RoutineName)
+      IF ( InputFileData%PitchBrIner(K) < 0.0_ReKi) call SetErrStat(ErrID_Fatal,'PitchBrIner('//TRIM( Num2LStr( K ) )//') must not be negative.',ErrStat,ErrMsg,RoutineName)
+   ENDDO ! K
+
+   DO K=1,InputFileData%NumBl
+      IF ( InputFileData%BlPitchIner(K) < 0.0_ReKi) call SetErrStat(ErrID_Fatal,'BlPitchIner('//TRIM( Num2LStr( K ) )//') must not be negative.',ErrStat,ErrMsg,RoutineName)
    ENDDO ! K
 
    IF ( InputFileData%NacYIner < 0.0_ReKi) call SetErrStat(ErrID_Fatal,'NacYIner must not be negative.',ErrStat,ErrMsg,RoutineName)

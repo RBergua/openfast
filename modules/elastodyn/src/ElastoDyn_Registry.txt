@@ -139,7 +139,8 @@ typedef	^	ED_InputFile	ReKi	PtfmRefxt	-	-	-	"Downwind distance from the ground l
 typedef	^	ED_InputFile	ReKi	PtfmRefyt	-	-	-	"Lateral distance from the ground level [onshore], MSL [offshore wind or floating MHK], or seabed [fixed MHK] to the platform reference point"	meters
 typedef	^	ED_InputFile	ReKi	PtfmRefzt	-	-	-	"Vertical distance from the ground level [onshore], MSL [offshore wind or floating MHK], or seabed [fixed MHK] to the platform reference point"	meters
 typedef	^	ED_InputFile	ReKi	TipMass	{:}	-	-	"Tip-brake masses"	kg
-typedef	^	ED_InputFile	ReKi	PitchIner	{:}	-	-	"Blade inertia about the pitch axis"	kg m^2
+typedef	^	ED_InputFile	ReKi	PitchBrIner	{:}	-	-	"Pitch bearing inertia about the pitch axis"	kg m^2
+typedef	^	ED_InputFile	ReKi	BlPitchIner	{:}	-	-	"Blade inertia about the pitch axis"	kg m^2
 typedef	^	ED_InputFile	ReKi	HubMass	-	-	-	"Hub mass"	kg
 typedef	^	ED_InputFile	ReKi	HubIner	-	-	-	"Hub inertia about teeter axis (2-blader) or rotor axis (3-blader)"	"kg m^2"
 typedef	^	ED_InputFile	ReKi	GenIner	-	-	-	"Generator inertia about HSS"	"kg m^2"
