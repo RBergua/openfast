@@ -57,6 +57,8 @@ IMPLICIT NONE
     REAL(SiKi) , DIMENSION(:), ALLOCATABLE  :: WaveKinGridzi      !< zi-coordinates for grid points where the incident wave kinematics will be computed (grid points); these are relative to the mean sea level [(meters)]
     REAL(SiKi) , DIMENSION(:), ALLOCATABLE  :: CurrVxi      !< xi-component of the current velocity at elevation i [(m/s)]
     REAL(SiKi) , DIMENSION(:), ALLOCATABLE  :: CurrVyi      !< yi-component of the current velocity at elevation i [(m/s)]
+    REAL(SiKi)  :: CurrVxi0 = 0.0_R4Ki      !< xi-component of the current velocity at MSL [(m/s)]
+    REAL(SiKi)  :: CurrVyi0 = 0.0_R4Ki      !< yi-component of the current velocity at MSL [(m/s)]
     REAL(SiKi)  :: PCurrVxiPz0 = 0.0_R4Ki      !< xi-component of the partial derivative of the current velocity at elevation near mean sea level [(m/s)]
     REAL(SiKi)  :: PCurrVyiPz0 = 0.0_R4Ki      !< yi-component of the partial derivative of the current velocity at elevation near mean sea level [(m/s)]
     TYPE(NWTC_RandomNumber_ParameterType)  :: RNG      !< Parameters for the pseudo random number generator [-]
@@ -168,6 +170,8 @@ subroutine Waves_CopyInitInput(SrcInitInputData, DstInitInputData, CtrlCode, Err
       end if
       DstInitInputData%CurrVyi = SrcInitInputData%CurrVyi
    end if
+   DstInitInputData%CurrVxi0 = SrcInitInputData%CurrVxi0
+   DstInitInputData%CurrVyi0 = SrcInitInputData%CurrVyi0
    DstInitInputData%PCurrVxiPz0 = SrcInitInputData%PCurrVxiPz0
    DstInitInputData%PCurrVyiPz0 = SrcInitInputData%PCurrVyiPz0
    call NWTC_Library_CopyNWTC_RandomNumber_ParameterType(SrcInitInputData%RNG, DstInitInputData%RNG, CtrlCode, ErrStat2, ErrMsg2)
@@ -238,6 +242,8 @@ subroutine Waves_PackInitInput(RF, Indata)
    call RegPackAlloc(RF, InData%WaveKinGridzi)
    call RegPackAlloc(RF, InData%CurrVxi)
    call RegPackAlloc(RF, InData%CurrVyi)
+   call RegPack(RF, InData%CurrVxi0)
+   call RegPack(RF, InData%CurrVyi0)
    call RegPack(RF, InData%PCurrVxiPz0)
    call RegPack(RF, InData%PCurrVyiPz0)
    call NWTC_Library_PackNWTC_RandomNumber_ParameterType(RF, InData%RNG) 
@@ -282,6 +288,8 @@ subroutine Waves_UnPackInitInput(RF, OutData)
    call RegUnpackAlloc(RF, OutData%WaveKinGridzi); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%CurrVxi); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%CurrVyi); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%CurrVxi0); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%CurrVyi0); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%PCurrVxiPz0); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%PCurrVyiPz0); if (RegCheckErr(RF, RoutineName)) return
    call NWTC_Library_UnpackNWTC_RandomNumber_ParameterType(RF, OutData%RNG) ! RNG 

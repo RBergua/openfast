@@ -49,6 +49,9 @@ IMPLICIT NONE
     INTEGER(IntKi), PUBLIC, PARAMETER  :: ConstWaveMod_None                = 0      ! ConstWaveMod = 0 [Constrained wave model: No constrained waves] [-]
     INTEGER(IntKi), PUBLIC, PARAMETER  :: ConstWaveMod_CrestElev           = 1      ! ConstWaveMod = 1 [Constrained wave model: Constrained wave with specified crest elevation, alpha] [-]
     INTEGER(IntKi), PUBLIC, PARAMETER  :: ConstWaveMod_Peak2Trough         = 2      ! ConstWaveMod = 2 [Constrained wave model: Constrained wave with guaranteed peak-to-trough crest height, HCrest] [-]
+    INTEGER(IntKi), PUBLIC, PARAMETER  :: WvCrntMod_Superpose              = 0      ! WvCrntMod = 0 [Simpler superposition] [-]
+    INTEGER(IntKi), PUBLIC, PARAMETER  :: WvCrntMod_Doppler                = 1      ! WvCrntMod = 1 [Doppler effect] [-]
+    INTEGER(IntKi), PUBLIC, PARAMETER  :: WvCrntMod_Full                   = 2      ! WvCrntMod = 2 [Doppler effect and amplitude/spectrum scaling] [-]
 ! =========  SeaSt_WaveField_ParameterType  =======
   TYPE, PUBLIC :: SeaSt_WaveField_ParameterType
     INTEGER(IntKi) , DIMENSION(1:4)  :: n = 0_IntKi      !< number of evenly-spaced grid points in the t, x, y, and z directions [-]
@@ -105,6 +108,7 @@ IMPLICIT NONE
     REAL(SiKi)  :: WvHiCOffS = 0.0_R4Ki      !< Maximum frequency used in the sum-QTF method     [Ignored if SumQTF = 0] [(rad/s)]
     REAL(SiKi)  :: WaveDOmega = 0.0_R4Ki      !< Frequency step for incident wave calculations [(rad/s)]
     INTEGER(IntKi)  :: WaveMod = 0_IntKi      !< Incident wave kinematics model: See valid values in SeaSt_WaveField module parameters. [-]
+    INTEGER(IntKi)  :: WvCrntMod = 0_IntKi      !< Wave-current modeling option. [-]
     INTEGER(IntKi)  :: NStepWave = 0_IntKi      !< Total number of frequency components = total number of time steps in the incident wave [-]
     INTEGER(IntKi)  :: NStepWave2 = 0_IntKi      !< NStepWave / 2 [-]
     TYPE(Current_InitInputType)  :: Current_InitInput      !< InitInputs in the Current Module. For coupling with MD. [-]
@@ -426,6 +430,7 @@ subroutine SeaSt_WaveField_CopySeaSt_WaveFieldType(SrcSeaSt_WaveFieldTypeData, D
    DstSeaSt_WaveFieldTypeData%WvHiCOffS = SrcSeaSt_WaveFieldTypeData%WvHiCOffS
    DstSeaSt_WaveFieldTypeData%WaveDOmega = SrcSeaSt_WaveFieldTypeData%WaveDOmega
    DstSeaSt_WaveFieldTypeData%WaveMod = SrcSeaSt_WaveFieldTypeData%WaveMod
+   DstSeaSt_WaveFieldTypeData%WvCrntMod = SrcSeaSt_WaveFieldTypeData%WvCrntMod
    DstSeaSt_WaveFieldTypeData%NStepWave = SrcSeaSt_WaveFieldTypeData%NStepWave
    DstSeaSt_WaveFieldTypeData%NStepWave2 = SrcSeaSt_WaveFieldTypeData%NStepWave2
    call Current_CopyInitInput(SrcSeaSt_WaveFieldTypeData%Current_InitInput, DstSeaSt_WaveFieldTypeData%Current_InitInput, CtrlCode, ErrStat2, ErrMsg2)
@@ -543,6 +548,7 @@ subroutine SeaSt_WaveField_PackSeaSt_WaveFieldType(RF, Indata)
    call RegPack(RF, InData%WvHiCOffS)
    call RegPack(RF, InData%WaveDOmega)
    call RegPack(RF, InData%WaveMod)
+   call RegPack(RF, InData%WvCrntMod)
    call RegPack(RF, InData%NStepWave)
    call RegPack(RF, InData%NStepWave2)
    call Current_PackInitInput(RF, InData%Current_InitInput) 
@@ -613,6 +619,7 @@ subroutine SeaSt_WaveField_UnPackSeaSt_WaveFieldType(RF, OutData)
    call RegUnpack(RF, OutData%WvHiCOffS); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%WaveDOmega); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%WaveMod); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%WvCrntMod); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%NStepWave); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%NStepWave2); if (RegCheckErr(RF, RoutineName)) return
    call Current_UnpackInitInput(RF, OutData%Current_InitInput) ! Current_InitInput 
