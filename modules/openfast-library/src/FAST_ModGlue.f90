@@ -780,6 +780,7 @@ subroutine ModGlue_CalcSteady(n_t_global, t_global, p, m, y, p_FAST, m_FAST, T, 
       ! If converged or in first rotation, save this operating point for linearization later
       if (m%CS%IsConverged .or. m%CS%NumRotations == 0) then !
          y%Lin%Times(m%Lin%AzimuthIndex) = t_global
+         m_FAST%Lin%LinTimes = y%Lin%Times
          call ModGlue_SaveOperatingPoint(p, m, m%Lin%AzimuthIndex, m%CS%NumRotations == 0, T, ErrStat2, ErrMsg2)
          if (Failed()) return
       end if
