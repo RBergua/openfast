@@ -531,11 +531,14 @@ SUBROUTINE ED_UpdateStates( t, n, u, utimes, p, x, xd, z, OtherState, m, ErrStat
       
       IF ( ( x%QT(DOF_GeAz) + x%QT(DOF_DrTr) ) >= TwoPi_D )  x%QT(DOF_GeAz) = x%QT(DOF_GeAz) - TwoPi_D
 
-      ! Might not be necessary, but keeping blade pitch angle between [-pi,pi) for now.
-      ! This interval is chosen to minimize jumps (blade pitch is usually between [0,pi/2]) and simplify controls.
       DO K = 1,p%NumBl
-         IF ( x%QT(DOF_BP(K)) >=  Pi_D )  x%QT(DOF_BP(K)) = x%QT(DOF_BP(K)) - TwoPi_D
-         IF ( x%QT(DOF_BP(K)) <  -Pi_D )  x%QT(DOF_BP(K)) = x%QT(DOF_BP(K)) + TwoPi_D
+         IF ( p%DOF_Flag(DOF_BP(K)) ) THEN
+            IF      ( x%QT(DOF_BP(K)) >=  Pi_D ) THEN
+               x%QT(DOF_BP(K)) = x%QT(DOF_BP(K)) - TwoPi_D
+            ELSE IF ( x%QT(DOF_BP(K)) <  -Pi_D ) THEN
+               x%QT(DOF_BP(K)) = x%QT(DOF_BP(K)) + TwoPi_D
+            END IF
+         END IF
       END DO
             
 END SUBROUTINE ED_UpdateStates
@@ -556,14 +559,16 @@ END SUBROUTINE
 SUBROUTINE ED_UpdateBlPitch(p, x)
    TYPE(ED_ParameterType),       INTENT(IN   )  :: p          !< Parameters
    TYPE(ED_ContinuousStateType), INTENT(INOUT)  :: x
-
    INTEGER(IntKi)                               :: K
 
-   ! Might not be necessary, but keeping blade pitch angle between [-pi,pi) for now.
-   ! This interval is chosen to minimize jumps (blade pitch is usually between [0,pi/2]) and simplify controls.
    DO K = 1,p%NumBl
-      IF ( x%QT(DOF_BP(K)) >=  Pi_D )  x%QT(DOF_BP(K)) = x%QT(DOF_BP(K)) - TwoPi_D
-      IF ( x%QT(DOF_BP(K)) <  -Pi_D )  x%QT(DOF_BP(K)) = x%QT(DOF_BP(K)) + TwoPi_D
+      IF ( p%DOF_Flag(DOF_BP(K)) ) THEN
+         IF      ( x%QT(DOF_BP(K)) >=  Pi_D ) THEN
+            x%QT(DOF_BP(K)) = x%QT(DOF_BP(K)) - TwoPi_D
+         ELSE IF ( x%QT(DOF_BP(K)) <  -Pi_D ) THEN
+            x%QT(DOF_BP(K)) = x%QT(DOF_BP(K)) + TwoPi_D
+         END IF
+      END IF
    END DO
 END SUBROUTINE
 
@@ -911,30 +916,42 @@ SUBROUTINE ED_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg )
    END DO !K
 
 
-
       ! Blade Pitch Motions:
 
-   m%AllOuts(PtchPMzc1) = x%QT(DOF_BP(1))*R2D
+   IF ( p%DOF_Flag(DOF_BP(1)) ) THEN
+      m%AllOuts(PtchPMzc1) = x%QT(DOF_BP(1))*R2D
+   ELSE
+      m%AllOuts(PtchPMzc1) = u%BlPitchCom(1)*R2D
+   END IF
 
-   IF ( p%NumBl > 1 ) THEN
+   IF ( p%NumBl > 1_IntKi ) THEN
 
-      m%AllOuts(PtchPMzc2) = x%QT(DOF_BP(2))*R2D
+      IF ( p%DOF_Flag(DOF_BP(2)) ) THEN
+         m%AllOuts(PtchPMzc2) = x%QT(DOF_BP(2))*R2D
+      ELSE
+         m%AllOuts(PtchPMzc2) = u%BlPitchCom(2)*R2D
+      END IF
 
-      IF ( p%NumBl > 2 )  THEN ! 3-blader
+      IF ( p%NumBl > 2_IntKi ) THEN ! 3-blader
 
-         m%AllOuts(PtchPMzc3) = x%QT(DOF_BP(3))*R2D
+         IF ( p%DOF_Flag(DOF_BP(3)) ) THEN
+            m%AllOuts(PtchPMzc3) = x%QT(DOF_BP(3))*R2D
+         ELSE
+            m%AllOuts(PtchPMzc3) = u%BlPitchCom(3)*R2D
+         END IF
 
-      ELSE  ! 2-blader
+      ELSE ! 2-blader
 
-         ! Teeter Motions:
+            ! Teeter Motions:
 
-         m%AllOuts(  TeetPya) = x%QT  (DOF_Teet)*R2D
-         m%AllOuts(  TeetVya) = x%QDT (DOF_Teet)*R2D
-         m%AllOuts(  TeetAya) = m%QD2T(DOF_Teet)*R2D
+         m%AllOuts(TeetPya) = x%QT  (DOF_Teet)*R2D
+         m%AllOuts(TeetVya) = x%QDT (DOF_Teet)*R2D
+         m%AllOuts(TeetAya) = m%QD2T(DOF_Teet)*R2D
 
-      ENDIF
+      END IF
 
    END IF
+
 
       ! Shaft Motions:
 
@@ -1845,9 +1862,16 @@ END IF
    
    y%Yaw      = x%QT( DOF_Yaw)
    y%YawRate  = x%QDT(DOF_Yaw)
-   y%YawAngle = x%QT( DOF_Yaw) + x%QT(DOF_Y)  !crude approximation for yaw error... (without subtracting it from the wind direction)   
-   y%BlPRate  = x%QDT(DOF_BP )
-   y%BlPitch  = x%QT( DOF_BP )
+   y%YawAngle = x%QT( DOF_Yaw) + x%QT(DOF_Y)  !crude approximation for yaw error... (without subtracting it from the wind direction)
+   DO K=1,p%NumBl
+      IF ( p%DOF_Flag(DOF_BP(K)) ) THEN
+         y%BlPRate(K) = x%QDT( DOF_BP(K) )
+         y%BlPitch(K) = x%QT(  DOF_BP(K) )
+      ELSE
+         y%BlPRate(K) = 0.0_ReKi
+         y%BlPitch(K) = u%BlPitchCom(K)
+      END IF
+   END DO
    y%LSS_Spd  = x%QDT(DOF_GeAz)
    y%HSS_Spd  = ABS(p%GBRatio)*x%QDT(DOF_GeAz)
    y%RotSpeed = x%QDT(DOF_GeAz) + x%QDT(DOF_DrTr)
@@ -1937,7 +1961,7 @@ SUBROUTINE ED_CalcContStateDeriv( t, u, p, x, xd, z, OtherState, m, dxdt, ErrSta
        !OtherState%BlPitch = u%BlPitchCom
        
          ! set the coordinate system variables:
-      CALL SetCoordSy( t, m%CoordSys, m%RtHS, p, x, ErrStat2, ErrMsg2 )
+      CALL SetCoordSy( t, m%CoordSys, m%RtHS, u%BlPitchCom, p, x, ErrStat2, ErrMsg2 )
          call setErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
          IF (ErrStat >= AbortErrLev) RETURN
    
@@ -3312,11 +3336,14 @@ SUBROUTINE SetPrimaryParameters( InitInp, p, InputFileData, ErrStat, ErrMsg  )
    INTEGER(IntKi),           INTENT(OUT)    :: ErrStat                      !< Error status
    CHARACTER(*),             INTENT(OUT)    :: ErrMsg                       !< Error message
 
+   INTEGER(IntKi)                           :: K
+
 !bjj: ERROR CHECKING!!!
 
       ! Initialize error data
    ErrStat = ErrID_None
    ErrMsg  = ''
+
 
    !p%Twr2Shft  = InputFileData%Twr2Shft
    !p%HubIner   = InputFileData%HubIner
@@ -3429,6 +3456,10 @@ SUBROUTINE SetPrimaryParameters( InitInp, p, InputFileData, ErrStat, ErrMsg  )
       ! initialize all of the DOF parameters:
    CALL Init_DOFparameters( InputFileData, p, ErrStat, ErrMsg ) !sets p%NDOF and p%NAug
       IF (ErrStat >= AbortErrLev) RETURN
+
+   DO K = 1,p%NumBl
+      IF ( .not.p%DOF_Flag(DOF_BP(K)) )  p%PitchIner(K) = 0.0_ReKi
+   END DO
 
       ! Set parameters for output channels:
    CALL SetOutParam(InputFileData%OutList, p, ErrStat, ErrMsg ) ! requires: p%NumOuts, p%NumBl, p%NBlGages, p%NTwGages; sets: p%OutParam.
@@ -6005,11 +6036,12 @@ END SUBROUTINE SetEnabledDOFIndexArrays
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine is used to define the internal coordinate systems for this particular time step.
 !! It also sets the TeeterAng and TeetAngVel for this time step.
-SUBROUTINE SetCoordSy( t, CoordSys, RtHSdat, p, x, ErrStat, ErrMsg )
+SUBROUTINE SetCoordSy( t, CoordSys, RtHSdat, BlPitch, p, x, ErrStat, ErrMsg )
 
       ! Subroutine arguments (passed variables)
 
    REAL(DbKi),                   INTENT(IN)    :: t                             !< Current simulation time, in seconds (used only for SmllRotTrans error messages)
+   REAL(ReKi),                   INTENT(IN)    :: BlPitch (:)                   !< The current blade pitch command
    TYPE(ED_CoordSys),            INTENT(INOUT) :: CoordSys                      !< The coordinate systems to be set
    TYPE(ED_RtHndSide),           INTENT(INOUT) :: RtHSdat                       !< data from the RtHndSid module
    TYPE(ED_ParameterType),       INTENT(IN)    :: p                             !< The module's parameters
@@ -6227,8 +6259,13 @@ SUBROUTINE SetCoordSy( t, CoordSys, RtHSdat, p, x, ErrStat, ErrMsg )
 
       ! Blade / pitched coordinate system:
 
-      CosPitch = COS( x%QT(DOF_BP(K)) )
-      SinPitch = SIN( x%QT(DOF_BP(K)) )
+      IF ( p%DOF_Flag(DOF_BP(K)) ) THEN
+         CosPitch = COS( x%QT(DOF_BP(K)) )
+         SinPitch = SIN( x%QT(DOF_BP(K)) )
+      ELSE
+         CosPitch = COS( REAL(BlPitch(K),R8Ki) )
+         SinPitch = SIN( REAL(BlPitch(K),R8Ki) )
+      END IF
 
       CoordSys%j1(K,:) = CosPitch*CoordSys%i1(K,:) - SinPitch*CoordSys%i2(K,:)      ! j1(K,:) = vector / direction j1 for blade K (=  xbK from the IEC coord. system).
       CoordSys%j2(K,:) = SinPitch*CoordSys%i1(K,:) + CosPitch*CoordSys%i2(K,:)      ! j2(K,:) = vector / direction j2 for blade K (=  ybK from the IEC coord. system).
@@ -9050,7 +9087,7 @@ SUBROUTINE Init_u( u, p, x, InputFileData, m, ErrStat, ErrMsg )
    ErrMsg  = ""
 
    !.......................................................
-   ! allocate the u%BlPitchCom array < Remove this later
+   ! allocate the u%BlPitchCom array
    !.......................................................
 
    CALL AllocAry( u%BlPitchCom, p%NumBl, 'BlPitchCom', ErrStat2, ErrMsg2 )
@@ -9080,7 +9117,7 @@ SUBROUTINE Init_u( u, p, x, InputFileData, m, ErrStat, ErrMsg )
       u%BlPitchMom = 0.0_ReKi
       
       ! set the coordinate system variables:
-   CALL SetCoordSy( -p%DT, m%CoordSys, m%RtHS, p, x_tmp, ErrStat2, ErrMsg2 )
+   CALL SetCoordSy( -p%DT, m%CoordSys, m%RtHS, u%BlPitchCom, p, x_tmp, ErrStat2, ErrMsg2 )
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
    
    CALL CalculatePositions( p, x_tmp, m%CoordSys, m%RtHS ) ! calculate positions
