@@ -154,12 +154,24 @@ SUBROUTINE SeaSt_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, Init
       
       ! Initialize Current module
       CALL Current_Init(InputFileData%Current, Current_InitOut, ErrStat2, ErrMsg2 ); if(Failed()) return;
+      p%WaveField%Current_InitInput = InputFileData%Current ! Save the current input data for later use by MD (What if InflowWind current is used?)
 
-      p%WaveField%Current_InitInput = InputFileData%Current ! Save the current input data for later use by MD
+      ! Dynamic current from IfW
+      p%WaveField%hasCurrField = InitInp%hasCurrField
+      IF ( p%WaveField%hasCurrField ) THEN
+         ! Load dynamic current from IfW
+         p%WaveField%CurrField  => InitInp%CurrField
+         IF ( InputFileData%WvCrntMod /= WvCrntMod_Superpose ) THEN
+            CALL WaveField_GetMeanDynSurfCurr( p%WaveField, InputFileData%Waves%WaveTMax, InputFileData%Waves%WaveDT, Current_InitOut%CurrVxi0, Current_InitOut%CurrVyi0, ErrStat2, ErrMsg2 ); if(Failed()) return;
+         END IF
+      END IF
       
       ! Move initialization output data from Current module into the initialization input data for the Waves module
       IF (ALLOCATED(Current_InitOut%CurrVxi)) CALL Move_Alloc( Current_InitOut%CurrVxi, InputFileData%Waves%CurrVxi )
       IF (ALLOCATED(Current_InitOut%CurrVyi)) CALL Move_Alloc( Current_InitOut%CurrVyi, InputFileData%Waves%CurrVyi )
+
+      InputFileData%Waves%CurrVxi0      = Current_InitOut%CurrVxi0
+      InputFileData%Waves%CurrVyi0      = Current_InitOut%CurrVyi0
       
       InputFileData%Waves%PCurrVxiPz0   = Current_InitOut%PCurrVxiPz0
       InputFileData%Waves%PCurrVyiPz0   = Current_InitOut%PCurrVyiPz0

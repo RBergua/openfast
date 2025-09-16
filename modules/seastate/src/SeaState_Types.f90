@@ -82,6 +82,7 @@ IMPLICIT NONE
     REAL(SiKi)  :: WvHiCOffS = 0.0_R4Ki      !< Maximum frequency used in the sum-QTF method     [Ignored if SumQTF = 0] [(rad/s)]
     REAL(SiKi)  :: WaveDOmega = 0.0_R4Ki      !< Frequency step for incident wave calculations [(rad/s)]
     INTEGER(IntKi)  :: WaveMod = 0_IntKi      !< Incident wave kinematics model: See valid values in SeaSt_WaveField module parameters. [-]
+    INTEGER(IntKi)  :: WvCrntMod = 0_IntKi      !< Wave-current modeling option [-]
   END TYPE SeaSt_InputFile
 ! =======================
 ! =========  SeaSt_InitInputType  =======
@@ -107,6 +108,7 @@ IMPLICIT NONE
     LOGICAL  :: SurfaceVis = .FALSE.      !< Turn on grid surface visualization outputs [-]
     INTEGER(IntKi)  :: SurfaceVisNx = 0      !< Number of points in X direction to output for visualization grid.  Use 0 or negative to set to SeaState resolution. [-]
     INTEGER(IntKi)  :: SurfaceVisNy = 0      !< Number of points in Y direction to output for visualization grid.  Use 0 or negative to set to SeaState resolution. [-]
+    TYPE(FlowFieldType) , POINTER :: CurrField => NULL()      !< Pointer to FlowField type from InflowWind containing the dynamic current information [(-)]
   END TYPE SeaSt_InitInputType
 ! =======================
 ! =========  SeaSt_InitOutputType  =======
@@ -318,6 +320,7 @@ subroutine SeaSt_CopyInputFile(SrcInputFileData, DstInputFileData, CtrlCode, Err
    DstInputFileData%WvHiCOffS = SrcInputFileData%WvHiCOffS
    DstInputFileData%WaveDOmega = SrcInputFileData%WaveDOmega
    DstInputFileData%WaveMod = SrcInputFileData%WaveMod
+   DstInputFileData%WvCrntMod = SrcInputFileData%WvCrntMod
 end subroutine
 
 subroutine SeaSt_DestroyInputFile(InputFileData, ErrStat, ErrMsg)
@@ -401,6 +404,7 @@ subroutine SeaSt_PackInputFile(RF, Indata)
    call RegPack(RF, InData%WvHiCOffS)
    call RegPack(RF, InData%WaveDOmega)
    call RegPack(RF, InData%WaveMod)
+   call RegPack(RF, InData%WvCrntMod)
    if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
@@ -453,6 +457,7 @@ subroutine SeaSt_UnPackInputFile(RF, OutData)
    call RegUnpack(RF, OutData%WvHiCOffS); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%WaveDOmega); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%WaveMod); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%WvCrntMod); if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
 subroutine SeaSt_CopyInitInput(SrcInitInputData, DstInitInputData, CtrlCode, ErrStat, ErrMsg)
@@ -461,6 +466,7 @@ subroutine SeaSt_CopyInitInput(SrcInitInputData, DstInitInputData, CtrlCode, Err
    integer(IntKi),  intent(in   ) :: CtrlCode
    integer(IntKi),  intent(  out) :: ErrStat
    character(*),    intent(  out) :: ErrMsg
+   integer(B4Ki)                  :: LB(0), UB(0)
    integer(IntKi)                 :: ErrStat2
    character(ErrMsgLen)           :: ErrMsg2
    character(*), parameter        :: RoutineName = 'SeaSt_CopyInitInput'
@@ -489,6 +495,7 @@ subroutine SeaSt_CopyInitInput(SrcInitInputData, DstInitInputData, CtrlCode, Err
    DstInitInputData%SurfaceVis = SrcInitInputData%SurfaceVis
    DstInitInputData%SurfaceVisNx = SrcInitInputData%SurfaceVisNx
    DstInitInputData%SurfaceVisNy = SrcInitInputData%SurfaceVisNy
+   DstInitInputData%CurrField => SrcInitInputData%CurrField
 end subroutine
 
 subroutine SeaSt_DestroyInitInput(InitInputData, ErrStat, ErrMsg)
@@ -502,12 +509,14 @@ subroutine SeaSt_DestroyInitInput(InitInputData, ErrStat, ErrMsg)
    ErrMsg  = ''
    call NWTC_Library_DestroyFileInfoType(InitInputData%PassedFileData, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   nullify(InitInputData%CurrField)
 end subroutine
 
 subroutine SeaSt_PackInitInput(RF, Indata)
    type(RegFile), intent(inout) :: RF
    type(SeaSt_InitInputType), intent(in) :: InData
    character(*), parameter         :: RoutineName = 'SeaSt_PackInitInput'
+   logical         :: PtrInIndex
    if (RF%ErrStat >= AbortErrLev) return
    call RegPack(RF, InData%InputFile)
    call RegPack(RF, InData%UseInputFile)
@@ -530,6 +539,13 @@ subroutine SeaSt_PackInitInput(RF, Indata)
    call RegPack(RF, InData%SurfaceVis)
    call RegPack(RF, InData%SurfaceVisNx)
    call RegPack(RF, InData%SurfaceVisNy)
+   call RegPack(RF, associated(InData%CurrField))
+   if (associated(InData%CurrField)) then
+      call RegPackPointer(RF, c_loc(InData%CurrField), PtrInIndex)
+      if (.not. PtrInIndex) then
+         call IfW_FlowField_PackFlowFieldType(RF, InData%CurrField) 
+      end if
+   end if
    if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
@@ -537,6 +553,11 @@ subroutine SeaSt_UnPackInitInput(RF, OutData)
    type(RegFile), intent(inout)    :: RF
    type(SeaSt_InitInputType), intent(inout) :: OutData
    character(*), parameter            :: RoutineName = 'SeaSt_UnPackInitInput'
+   integer(B4Ki)   :: LB(0), UB(0)
+   integer(IntKi)  :: stat
+   logical         :: IsAllocAssoc
+   integer(B8Ki)   :: PtrIdx
+   type(c_ptr)     :: Ptr
    if (RF%ErrStat /= ErrID_None) return
    call RegUnpack(RF, OutData%InputFile); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%UseInputFile); if (RegCheckErr(RF, RoutineName)) return
@@ -559,6 +580,24 @@ subroutine SeaSt_UnPackInitInput(RF, OutData)
    call RegUnpack(RF, OutData%SurfaceVis); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%SurfaceVisNx); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%SurfaceVisNy); if (RegCheckErr(RF, RoutineName)) return
+   if (associated(OutData%CurrField)) deallocate(OutData%CurrField)
+   call RegUnpack(RF, IsAllocAssoc); if (RegCheckErr(RF, RoutineName)) return
+   if (IsAllocAssoc) then
+      call RegUnpackPointer(RF, Ptr, PtrIdx); if (RegCheckErr(RF, RoutineName)) return
+      if (c_associated(Ptr)) then
+         call c_f_pointer(Ptr, OutData%CurrField)
+      else
+         allocate(OutData%CurrField,stat=stat)
+         if (stat /= 0) then 
+            call SetErrStat(ErrID_Fatal, 'Error allocating OutData%CurrField.', RF%ErrStat, RF%ErrMsg, RoutineName)
+            return
+         end if
+         RF%Pointers(PtrIdx) = c_loc(OutData%CurrField)
+         call IfW_FlowField_UnpackFlowFieldType(RF, OutData%CurrField) ! CurrField 
+      end if
+   else
+      OutData%CurrField => null()
+   end if
 end subroutine
 
 subroutine SeaSt_CopyInitOutput(SrcInitOutputData, DstInitOutputData, CtrlCode, ErrStat, ErrMsg)
