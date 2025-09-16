@@ -162,8 +162,8 @@ IMPLICIT NONE
     REAL(ReKi)  :: PtfmRefyt = 0.0_ReKi      !< Lateral distance from the ground level [onshore], MSL [offshore wind or floating MHK], or seabed [fixed MHK] to the platform reference point [meters]
     REAL(ReKi)  :: PtfmRefzt = 0.0_ReKi      !< Vertical distance from the ground level [onshore], MSL [offshore wind or floating MHK], or seabed [fixed MHK] to the platform reference point [meters]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: TipMass      !< Tip-brake masses [kg]
-    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: PitchBrIner      !< Pitch bearing inertia about the pitch axis [kg]
-    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: BlPitchIner      !< Blade inertia about the pitch axis [kg]
+    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: PBrIner      !< Pitch bearing inertia about the pitch axis [kg]
+    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: BlPIner      !< Blade inertia about the pitch axis [kg]
     REAL(ReKi)  :: HubMass = 0.0_ReKi      !< Hub mass [kg]
     REAL(ReKi)  :: HubIner = 0.0_ReKi      !< Hub inertia about teeter axis (2-blader) or rotor axis (3-blader) [kg m^2]
     REAL(ReKi)  :: GenIner = 0.0_ReKi      !< Generator inertia about HSS [kg m^2]
@@ -1582,29 +1582,29 @@ subroutine ED_CopyInputFile(SrcInputFileData, DstInputFileData, CtrlCode, ErrSta
       end if
       DstInputFileData%TipMass = SrcInputFileData%TipMass
    end if
-   if (allocated(SrcInputFileData%PitchBrIner)) then
-      LB(1:1) = lbound(SrcInputFileData%PitchBrIner)
-      UB(1:1) = ubound(SrcInputFileData%PitchBrIner)
-      if (.not. allocated(DstInputFileData%PitchBrIner)) then
-         allocate(DstInputFileData%PitchBrIner(LB(1):UB(1)), stat=ErrStat2)
+   if (allocated(SrcInputFileData%PBrIner)) then
+      LB(1:1) = lbound(SrcInputFileData%PBrIner)
+      UB(1:1) = ubound(SrcInputFileData%PBrIner)
+      if (.not. allocated(DstInputFileData%PBrIner)) then
+         allocate(DstInputFileData%PBrIner(LB(1):UB(1)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstInputFileData%PitchBrIner.', ErrStat, ErrMsg, RoutineName)
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstInputFileData%PBrIner.', ErrStat, ErrMsg, RoutineName)
             return
          end if
       end if
-      DstInputFileData%PitchBrIner = SrcInputFileData%PitchBrIner
+      DstInputFileData%PBrIner = SrcInputFileData%PBrIner
    end if
-   if (allocated(SrcInputFileData%BlPitchIner)) then
-      LB(1:1) = lbound(SrcInputFileData%BlPitchIner)
-      UB(1:1) = ubound(SrcInputFileData%BlPitchIner)
-      if (.not. allocated(DstInputFileData%BlPitchIner)) then
-         allocate(DstInputFileData%BlPitchIner(LB(1):UB(1)), stat=ErrStat2)
+   if (allocated(SrcInputFileData%BlPIner)) then
+      LB(1:1) = lbound(SrcInputFileData%BlPIner)
+      UB(1:1) = ubound(SrcInputFileData%BlPIner)
+      if (.not. allocated(DstInputFileData%BlPIner)) then
+         allocate(DstInputFileData%BlPIner(LB(1):UB(1)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstInputFileData%BlPitchIner.', ErrStat, ErrMsg, RoutineName)
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstInputFileData%BlPIner.', ErrStat, ErrMsg, RoutineName)
             return
          end if
       end if
-      DstInputFileData%BlPitchIner = SrcInputFileData%BlPitchIner
+      DstInputFileData%BlPIner = SrcInputFileData%BlPIner
    end if
    DstInputFileData%HubMass = SrcInputFileData%HubMass
    DstInputFileData%HubIner = SrcInputFileData%HubIner
@@ -1905,11 +1905,11 @@ subroutine ED_DestroyInputFile(InputFileData, ErrStat, ErrMsg)
    if (allocated(InputFileData%TipMass)) then
       deallocate(InputFileData%TipMass)
    end if
-   if (allocated(InputFileData%PitchBrIner)) then
-      deallocate(InputFileData%PitchBrIner)
+   if (allocated(InputFileData%PBrIner)) then
+      deallocate(InputFileData%PBrIner)
    end if
-   if (allocated(InputFileData%BlPitchIner)) then
-      deallocate(InputFileData%BlPitchIner)
+   if (allocated(InputFileData%BlPIner)) then
+      deallocate(InputFileData%BlPIner)
    end if
    if (allocated(InputFileData%InpBlMesh)) then
       LB(1:1) = lbound(InputFileData%InpBlMesh)
@@ -2035,8 +2035,8 @@ subroutine ED_PackInputFile(RF, Indata)
    call RegPack(RF, InData%PtfmRefyt)
    call RegPack(RF, InData%PtfmRefzt)
    call RegPackAlloc(RF, InData%TipMass)
-   call RegPackAlloc(RF, InData%PitchBrIner)
-   call RegPackAlloc(RF, InData%BlPitchIner)
+   call RegPackAlloc(RF, InData%PBrIner)
+   call RegPackAlloc(RF, InData%BlPIner)
    call RegPack(RF, InData%HubMass)
    call RegPack(RF, InData%HubIner)
    call RegPack(RF, InData%GenIner)
@@ -2241,8 +2241,8 @@ subroutine ED_UnPackInputFile(RF, OutData)
    call RegUnpack(RF, OutData%PtfmRefyt); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%PtfmRefzt); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%TipMass); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%PitchBrIner); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%BlPitchIner); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%PBrIner); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%BlPIner); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%HubMass); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%HubIner); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%GenIner); if (RegCheckErr(RF, RoutineName)) return

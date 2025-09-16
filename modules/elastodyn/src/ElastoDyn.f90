@@ -3448,9 +3448,9 @@ SUBROUTINE SetPrimaryParameters( InitInp, p, InputFileData, ErrStat, ErrMsg  )
 
    CALL AllocAry( p%PitchIner, p%NumBl, 'PitchIner', ErrStat, ErrMsg )
    IF ( ErrStat >= AbortErrLev ) RETURN
-   p%PitchIner = InputFileData%PitchBrIner(1:p%NumBl)
+   p%PitchIner = InputFileData%PBrIner(1:p%NumBl)
    IF (.not.p%BD4Blades) THEN
-      p%PitchIner = p%PitchIner + InputFileData%BlPitchIner(1:p%NumBl)
+      p%PitchIner = p%PitchIner + InputFileData%BlPIner(1:p%NumBl)
    END IF
 
       ! initialize all of the DOF parameters:
