@@ -346,6 +346,7 @@ of_regression("5MW_OC4Jckt_ExtPtfm"                    "openfast;elastodyn;extpt
 of_regression("HelicalWake_OLAF"                       "openfast;aerodyn;olaf")
 of_regression("EllipticalWing_OLAF"                    "openfast;aerodyn;olaf")
 of_regression("StC_test_OC4Semi"                       "openfast;servodyn;hydrodyn;moordyn;offshore;stc")
+of_regression("StC_test_OC4Semi_blade2"                "openfast;servodyn;hydrodyn;moordyn;offshore;stc")
 of_regression("MHK_RM1_Fixed"                          "openfast;elastodyn;aerodyn;mhk;offshore")
 of_regression("MHK_RM1_Floating"                       "openfast;elastodyn;aerodyn;hydrodyn;moordyn;mhk;offshore")
 of_regression("MHK_RM1_Floating_wNacDrag"              "openfast;elastodyn;aerodyn;hydrodyn;moordyn;mhk;offshore")

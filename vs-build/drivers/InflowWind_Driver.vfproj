@@ -97,28 +97,28 @@
 		<Filter Name="Registry Files" Filter="txt">
 			<File RelativePath="..\..\modules\inflowwind\src\InflowWind_Driver_Registry.txt">
 			<FileConfiguration Name="Debug|x64">
-					<Tool CommandLine="CALL ..\RunRegistry.bat InflowWind_Driver" Description="Running Registry for InflowWind_Driver" Name="VFCustomBuildTool" Outputs="..\..\modules\seastate\src\InflowWind_Driver_Types.f90"/>
+					<Tool CommandLine="CALL ..\RunRegistry.bat InflowWind_Driver" Description="Running Registry for InflowWind_Driver" Name="VFCustomBuildTool" Outputs="..\..\modules\inflowwind\src\InflowWind_Driver_Types.f90"/>
 				</FileConfiguration>
 				<FileConfiguration Name="Debug_Double|x64">
-					<Tool CommandLine="CALL ..\RunRegistry.bat InflowWind_Driver" Description="Running Registry for InflowWind_Driver" Name="VFCustomBuildTool" Outputs="..\..\modules\seastate\src\InflowWind_Driver_Types.f90"/>
+					<Tool CommandLine="CALL ..\RunRegistry.bat InflowWind_Driver" Description="Running Registry for InflowWind_Driver" Name="VFCustomBuildTool" Outputs="..\..\modules\inflowwind\src\InflowWind_Driver_Types.f90"/>
 				</FileConfiguration>
 				<FileConfiguration Name="Debug_Matlab|x64">
-					<Tool CommandLine="CALL ..\RunRegistry.bat InflowWind_Driver" Description="Running Registry for InflowWind_Driver" Name="VFCustomBuildTool" Outputs="..\..\modules\seastate\src\InflowWind_Driver_Types.f90"/>
+					<Tool CommandLine="CALL ..\RunRegistry.bat InflowWind_Driver" Description="Running Registry for InflowWind_Driver" Name="VFCustomBuildTool" Outputs="..\..\modules\inflowwind\src\InflowWind_Driver_Types.f90"/>
 				</FileConfiguration>
 				<FileConfiguration Name="Release|x64">
-					<Tool CommandLine="CALL ..\RunRegistry.bat InflowWind_Driver" Description="Running Registry for InflowWind_Driver" Name="VFCustomBuildTool" Outputs="..\..\modules\seastate\src\InflowWind_Driver_Types.f90"/>
+					<Tool CommandLine="CALL ..\RunRegistry.bat InflowWind_Driver" Description="Running Registry for InflowWind_Driver" Name="VFCustomBuildTool" Outputs="..\..\modules\inflowwind\src\InflowWind_Driver_Types.f90"/>
 				</FileConfiguration>
 				<FileConfiguration Name="Release_Double|x64">
-					<Tool CommandLine="CALL ..\RunRegistry.bat InflowWind_Driver" Description="Running Registry for InflowWind_Driver" Name="VFCustomBuildTool" Outputs="..\..\modules\seastate\src\InflowWind_Driver_Types.f90"/>
+					<Tool CommandLine="CALL ..\RunRegistry.bat InflowWind_Driver" Description="Running Registry for InflowWind_Driver" Name="VFCustomBuildTool" Outputs="..\..\modules\inflowwind\src\InflowWind_Driver_Types.f90"/>
 				</FileConfiguration>
 				<FileConfiguration Name="Release_Matlab|x64">
-					<Tool CommandLine="CALL ..\RunRegistry.bat InflowWind_Driver" Description="Running Registry for InflowWind_Driver" Name="VFCustomBuildTool" Outputs="..\..\modules\seastate\src\InflowWind_Driver_Types.f90"/>
+					<Tool CommandLine="CALL ..\RunRegistry.bat InflowWind_Driver" Description="Running Registry for InflowWind_Driver" Name="VFCustomBuildTool" Outputs="..\..\modules\inflowwind\src\InflowWind_Driver_Types.f90"/>
 				</FileConfiguration>
 				<FileConfiguration Name="Release_OpenMP|x64">
-					<Tool CommandLine="CALL ..\RunRegistry.bat InflowWind_Driver" Description="Running Registry for InflowWind_Driver" Name="VFCustomBuildTool" Outputs="..\..\modules\seastate\src\InflowWind_Driver_Types.f90"/>
+					<Tool CommandLine="CALL ..\RunRegistry.bat InflowWind_Driver" Description="Running Registry for InflowWind_Driver" Name="VFCustomBuildTool" Outputs="..\..\modules\inflowwind\src\InflowWind_Driver_Types.f90"/>
 				</FileConfiguration>
 				<FileConfiguration Name="Release_Double_OpenMP|x64">
-					<Tool CommandLine="CALL ..\RunRegistry.bat InflowWind_Driver" Description="Running Registry for InflowWind_Driver" Name="VFCustomBuildTool" Outputs="..\..\modules\seastate\src\InflowWind_Driver_Types.f90"/>
+					<Tool CommandLine="CALL ..\RunRegistry.bat InflowWind_Driver" Description="Running Registry for InflowWind_Driver" Name="VFCustomBuildTool" Outputs="..\..\modules\inflowwind\src\InflowWind_Driver_Types.f90"/>
 				</FileConfiguration>
 			</File>
 		</Filter>

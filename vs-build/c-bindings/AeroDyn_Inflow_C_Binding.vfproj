@@ -95,8 +95,37 @@
 		</Configuration>
 	</Configurations>
 	<Files>
+		<Filter Filter="txt" Name="Registry Files">
+			<File RelativePath="..\..\modules\aerodyn\src\AeroDyn_Inflow_C_Binding_Registry.txt">
+				<FileConfiguration Name="Debug|x64">
+					<Tool CommandLine="CALL ..\RunRegistry.bat ADI" Description="Running Registry for ADI" Name="VFCustomBuildTool" Outputs="..\..\modules\aerodyn\src\AeroDyn_Inflow_C_Binding_Types.f90"/>
+				</FileConfiguration>
+				<FileConfiguration Name="Debug_Double|x64">
+					<Tool CommandLine="CALL ..\RunRegistry.bat ADI" Description="Running Registry for ADI" Name="VFCustomBuildTool" Outputs="..\..\modules\aerodyn\src\AeroDyn_Inflow_C_Binding_Types.f90"/>
+				</FileConfiguration>
+				<FileConfiguration Name="Debug_Matlab|x64">
+					<Tool CommandLine="CALL ..\RunRegistry.bat ADI" Description="Running Registry for ADI" Name="VFCustomBuildTool" Outputs="..\..\modules\aerodyn\src\AeroDyn_Inflow_C_Binding_Types.f90"/>
+				</FileConfiguration>
+				<FileConfiguration Name="Release|x64">
+					<Tool CommandLine="CALL ..\RunRegistry.bat ADI" Description="Running Registry for ADI" Name="VFCustomBuildTool" Outputs="..\..\modules\aerodyn\src\AeroDyn_Inflow_C_Binding_Types.f90"/>
+				</FileConfiguration>
+				<FileConfiguration Name="Release_Double|x64">
+					<Tool CommandLine="CALL ..\RunRegistry.bat ADI" Description="Running Registry for ADI" Name="VFCustomBuildTool" Outputs="..\..\modules\aerodyn\src\AeroDyn_Inflow_C_Binding_Types.f90"/>
+				</FileConfiguration>
+				<FileConfiguration Name="Release_Matlab|x64">
+					<Tool CommandLine="CALL ..\RunRegistry.bat ADI" Description="Running Registry for ADI" Name="VFCustomBuildTool" Outputs="..\..\modules\aerodyn\src\AeroDyn_Inflow_C_Binding_Types.f90"/>
+				</FileConfiguration>
+				<FileConfiguration Name="Release_OpenMP|x64">
+					<Tool CommandLine="CALL ..\RunRegistry.bat ADI" Description="Running Registry for ADI" Name="VFCustomBuildTool" Outputs="..\..\modules\aerodyn\src\AeroDyn_Inflow_C_Binding_Types.f90"/>
+				</FileConfiguration>
+				<FileConfiguration Name="Release_Double_OpenMP|x64">
+					<Tool CommandLine="CALL ..\RunRegistry.bat ADI" Description="Running Registry for ADI" Name="VFCustomBuildTool" Outputs="..\..\modules\aerodyn\src\AeroDyn_Inflow_C_Binding_Types.f90"/>
+				</FileConfiguration>
+			</File>
+		</Filter>
 		<Filter Filter="f90;for;f;fpp;ftn;def;odl;idl" Name="Source Files">
 			<File RelativePath="..\..\modules\aerodyn\src\AeroDyn_Inflow_C_Binding.f90"/>
+			<File RelativePath="..\..\modules\aerodyn\src\AeroDyn_Inflow_C_Binding_types.f90"/>
 		</Filter>
 	</Files>
 	<Globals/>

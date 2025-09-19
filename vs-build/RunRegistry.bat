@@ -185,6 +185,12 @@ SET Output_Loc=%CURR_LOC%
 %REGISTRY% "%CURR_LOC%\AeroDyn_Inflow_Registry.txt" %ALL_FAST_Includes% -O "%Output_Loc%" -noextrap
 GOTO checkError
 
+:ADI_cbind
+SET CURR_LOC=%AD_Loc%
+SET Output_Loc=%CURR_LOC%
+%REGISTRY% "%CURR_LOC%\AeroDyn_Inflow_C_Binding_Registry.txt" -I "%NWTC_Lib_Loc%" -I %IfW_Loc% -I "%CURR_LOC%" -O "%Output_Loc%" -noextrap
+GOTO checkError
+
 
 :AFI
 SET CURR_LOC=%AD_Loc%

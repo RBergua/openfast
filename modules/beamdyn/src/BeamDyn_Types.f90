@@ -253,6 +253,7 @@ IMPLICIT NONE
     REAL(R8Ki) , DIMENSION(:,:,:,:), ALLOCATABLE  :: RR0      !< Rotation tensor at current QP \f$ \left(\underline{\underline{R}}\underline{\underline{R}}_0\right) \f$ [-]
     REAL(R8Ki) , DIMENSION(:,:,:), ALLOCATABLE  :: kappa      !< Curvature vector \f$ \underline{k} \f$ at current QP (note this is not \kappa, but a term in \kappa) [-]
     REAL(R8Ki) , DIMENSION(:,:,:), ALLOCATABLE  :: E1      !< \vec{e_1} = x_0^\prime + u^\prime (3) at current QP [-]
+    REAL(R8Ki) , DIMENSION(:,:,:), ALLOCATABLE  :: strain      !< strain vector [-]
     REAL(R8Ki) , DIMENSION(:,:,:,:), ALLOCATABLE  :: Stif      !< C/S stiffness matrix resolved in inertial frame at current QP. 6x6 [-]
     REAL(R8Ki) , DIMENSION(:,:,:), ALLOCATABLE  :: Fb      !< Gyroscopic forces at current QP. 6 [-]
     REAL(R8Ki) , DIMENSION(:,:,:), ALLOCATABLE  :: Fc      !< Elastic force \f$ \underline{F}^c \f$ at current QP. 6 [-]
@@ -2100,6 +2101,18 @@ subroutine BD_CopyEqMotionQP(SrcEqMotionQPData, DstEqMotionQPData, CtrlCode, Err
       end if
       DstEqMotionQPData%E1 = SrcEqMotionQPData%E1
    end if
+   if (allocated(SrcEqMotionQPData%strain)) then
+      LB(1:3) = lbound(SrcEqMotionQPData%strain)
+      UB(1:3) = ubound(SrcEqMotionQPData%strain)
+      if (.not. allocated(DstEqMotionQPData%strain)) then
+         allocate(DstEqMotionQPData%strain(LB(1):UB(1),LB(2):UB(2),LB(3):UB(3)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstEqMotionQPData%strain.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstEqMotionQPData%strain = SrcEqMotionQPData%strain
+   end if
    if (allocated(SrcEqMotionQPData%Stif)) then
       LB(1:4) = lbound(SrcEqMotionQPData%Stif)
       UB(1:4) = ubound(SrcEqMotionQPData%Stif)
@@ -2409,6 +2422,9 @@ subroutine BD_DestroyEqMotionQP(EqMotionQPData, ErrStat, ErrMsg)
    if (allocated(EqMotionQPData%E1)) then
       deallocate(EqMotionQPData%E1)
    end if
+   if (allocated(EqMotionQPData%strain)) then
+      deallocate(EqMotionQPData%strain)
+   end if
    if (allocated(EqMotionQPData%Stif)) then
       deallocate(EqMotionQPData%Stif)
    end if
@@ -2493,6 +2509,7 @@ subroutine BD_PackEqMotionQP(RF, Indata)
    call RegPackAlloc(RF, InData%RR0)
    call RegPackAlloc(RF, InData%kappa)
    call RegPackAlloc(RF, InData%E1)
+   call RegPackAlloc(RF, InData%strain)
    call RegPackAlloc(RF, InData%Stif)
    call RegPackAlloc(RF, InData%Fb)
    call RegPackAlloc(RF, InData%Fc)
@@ -2535,6 +2552,7 @@ subroutine BD_UnPackEqMotionQP(RF, OutData)
    call RegUnpackAlloc(RF, OutData%RR0); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%kappa); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%E1); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%strain); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%Stif); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%Fb); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%Fc); if (RegCheckErr(RF, RoutineName)) return
