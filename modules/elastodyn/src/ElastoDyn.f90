@@ -11303,16 +11303,15 @@ subroutine ED_InitVars(u, p, x, y, m, Vars, InputFileData, Linearize, ErrStat, E
                          Mesh=y%BladeRootMotion(i))
    end do
 
-   do i = 1, p%NumBl
-      call MV_AddVar(Vars%y, 'BlPitch'//Trim(Num2LStr(i)), FieldScalar, &
-                  DatLoc(ED_y_BlPitch, i), &
-                  Flags=VF_2PI, &
-                  LinNames=['Blade '//Num2LStr(i)//' pitch angle, rad'])
+   call MV_AddVar(Vars%y, 'BlPitch', FieldScalar, &
+                  DatLoc(ED_y_BlPitch), &
+                  Num=p%NumBl, &
+                  LinNames=[('Blade '//trim(num2lstr(i))//' pitch angle, rad', i=1,p%NumBl)])
 
-      call MV_AddVar(Vars%y, 'BlPRate'//Trim(Num2LStr(i)), FieldScalar, &
-                  DatLoc(ED_y_BlPRate, i), &
-                  LinNames=['Blade '//Num2LStr(i)//' pitch rate, rad/s'])
-   end do
+   call MV_AddVar(Vars%y, 'BlPRate', FieldScalar, &
+                  DatLoc(ED_y_BlPRate), &
+                  Num=p%NumBl, &
+                  LinNames=[('Blade '//trim(num2lstr(i))//' pitch rate, rad/s', i=1,p%NumBl)])
 
    call MV_AddMeshVar(Vars%y, 'Nacelle', MotionFields, &
                       DatLoc(ED_y_NacelleMotion), &

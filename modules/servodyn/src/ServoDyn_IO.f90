@@ -1057,6 +1057,28 @@ subroutine ParseInputFileInfo( PriPath, InputFile, OutFileRoot, FileInfo_In, Inp
    call ParseVar( FileInfo_In, CurLine, 'TPCOn', InputFileData%TPCOn, ErrStat2, ErrMsg2, UnEcho )
       if (Failed())  return;
 
+      !  PitNeut  - Neutral pitch position--pitch spring moment is zero at this pitch (degrees)
+   do i=1,size(InputFileData%PitNeut)
+      TmpChr='PitNeut('//trim(Num2LStr(i))//')'
+      call ParseVar( FileInfo_In, CurLine, trim(TmpChr), InputFileData%PitNeut(i), ErrStat2, ErrMsg2, UnEcho )
+         if (Failed())  return;
+      InputFileData%PitNeut = InputFileData%PitNeut*D2R
+   enddo
+
+      !  PitSpr  - Blade-pitch spring constant (N-m/rad)
+   do i=1,size(InputFileData%PitSpr)
+      TmpChr='PitSpr('//trim(Num2LStr(i))//')'
+      call ParseVar( FileInfo_In, CurLine, trim(TmpChr), InputFileData%PitSpr(i), ErrStat2, ErrMsg2, UnEcho )
+         if (Failed())  return;
+   enddo
+
+      !  PitDamp  - Blade-pitch damping constant (N-m/(rad/s))
+   do i=1,size(InputFileData%PitDamp)
+      TmpChr='PitDamp('//trim(Num2LStr(i))//')'
+      call ParseVar( FileInfo_In, CurLine, trim(TmpChr), InputFileData%PitDamp(i), ErrStat2, ErrMsg2, UnEcho )
+         if (Failed())  return;
+   enddo
+
       !  TPitManS       - Time to start override pitch maneuver for blade 1 and end standard pitch control (s)
    do i=1,size(InputFileData%TPitManS)
       TmpChr='TPitManS('//trim(Num2LStr(i))//')'

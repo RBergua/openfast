@@ -80,6 +80,9 @@ typedef	ServoDyn/SrvD	SrvD_InputFile	DbKi	DT	-	-	-	"Communication interval for c
 typedef	^	SrvD_InputFile	LOGICAL	Echo	-	-	-	"Echo the input file out" -
 typedef	^	SrvD_InputFile	IntKi	PCMode	-	-	-	"Pitch control mode"	-
 typedef	^	SrvD_InputFile	DbKi	TPCOn	-	-	-	"Time to enable active pitch control [unused when PCMode=0]"	s
+typedef	^	SrvD_InputFile	ReKi	PitNeut	3	-	-	"Neutral pitch position--pitch spring moment is zero at this pitch"	deg
+typedef	^	SrvD_InputFile	ReKi	PitSpr	3	-	-	"Blade-pitch spring constant"	N-m/rad
+typedef	^	SrvD_InputFile	ReKi	PitDamp	3	-	-	"Blade-pitch damping constant"	N-m/(rad/s)
 typedef	^	SrvD_InputFile	DbKi	TPitManS	3	-	-	"Time to start override pitch maneuver for blade (K) and end standard pitch control"	s
 typedef	^	SrvD_InputFile	ReKi	PitManRat	3	-	-	"Pitch rates at which override pitch maneuvers head toward final pitch angles"	rad/s
 typedef	^	SrvD_InputFile	ReKi	BlPitchF	3	-	-	"Blade (K) final pitch for pitch maneuvers"	radians
@@ -386,7 +389,10 @@ typedef	^	ParameterType	LOGICAL	GenTiStr	-	-	-	"Start generator based upon T: ti
 typedef	^	ParameterType	ReKi	VS_Rgn2K	-	-	-	"Generator torque constant in Region 2 for simple variable-speed generator control (HSS side) [used only when VSContrl=1]"	N-m/(rad/s)^2
 typedef	^	ParameterType	ReKi	YawNeut	-	-	-	"Neutral yaw position--yaw spring force is zero at this yaw"	radians
 typedef	^	ParameterType	ReKi	YawSpr	-	-	-	"Nacelle-yaw spring constant"	N-m/rad
-typedef	^	ParameterType	ReKi	YawDamp	-	-	-	"Nacelle-yaw constant"	N-m/(rad/s)
+typedef	^	ParameterType	ReKi	YawDamp	-	-	-	"Nacelle-yaw damping constant"	N-m/(rad/s)
+typedef	^	ParameterType	ReKi	PitNeut	{:}	-	-	"Neutral blade pitch position--pitch spring force is zero at this angle"	rad
+typedef	^	ParameterType	ReKi	PitSpr	{:}	-	-	"Blade-pitch spring constant"	N-m/rad
+typedef	^	ParameterType	ReKi	PitDamp	{:}	-	-	"Blade-pitch damping constant"	N-m/(rad/s)
 typedef	^	ParameterType	DbKi	TpBrDT	-	-	-	"Time for tip-brake to reach full deployment once released"	s
 typedef	^	ParameterType	ReKi	TBDepISp	{:}	-	-	"Deployment-initiation speed for the tip brakes"	rad/s
 typedef	^	ParameterType	ReKi	TBDrConN	-	-	-	"Tip-brake drag constant during normal operation, Cd*Area"
@@ -463,6 +469,7 @@ typedef	^	ParameterType	IntKi	NumPulseGate	 -   -	-	"Number of pulse gates" -
 # ..... Inputs ....................................................................................................................
 # Define inputs that are not on this mesh here:
 typedef	^	InputType	ReKi	BlPitch	{:}	-	2pi	"Current blade pitch angles"	radians
+typedef	^	InputType	ReKi	BlPRate	{:}	-	-	"Current blade pitch rate"	rad/s
 typedef	^	InputType	ReKi	Yaw	-	-	2pi	"Current nacelle yaw"	radians
 typedef	^	InputType	ReKi	YawRate	-	-	-	"Current nacelle yaw rate"	rad/s
 typedef	^	InputType	ReKi	LSS_Spd	-	-	-	"Low-speed shaft (LSS) speed at entrance to gearbox"	rad/s
@@ -518,6 +525,7 @@ typedef	^	InputType	ReKi	MsrPositionsZ	{:}     -	-	"Lidar Z direction measuremen
 #typedef	^	OutputType	MeshType	MeshedOutput	-	-	-	"Meshed output data"	-
 # Define outputs that are not on this mesh here:
 typedef	^	OutputType	ReKi	WriteOutput	{:}	-	-	"Data to be written to an output file: see WriteOutputHdr for names of each variable"	"see WriteOutputUnt"
+typedef	^	OutputType	ReKi	BlPitchMom	{:}	-	-	"Blade-pitch moment transmitted to the blades"	N-m
 typedef	^	OutputType	ReKi	BlPitchCom	{:}	-	2pi	"Commanded blade pitch angles"	radians
 typedef	^	OutputType	ReKi	BlAirfoilCom	{:}	-	-	"Commanded Airfoil UserProp for blade.  Passed to AD15 for airfoil interpolation (must be same units as given in AD15 airfoil tables)"	-
 typedef	^	OutputType	ReKi	YawMom	-	-	-	"Torque transmitted through the yaw bearing"	N-m

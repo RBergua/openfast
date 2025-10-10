@@ -1173,6 +1173,11 @@ subroutine InitMappings_ED(Mappings, SrcMod, DstMod, Turbine, ErrStat, ErrMsg)
                        ErrStat=ErrStat2, ErrMsg=ErrMsg2); if (Failed()) return
 
       call MapVariable(Mappings, &
+                       SrcMod=SrcMod, SrcDL=DatLoc(SrvD_y_BlPitchMom), &
+                       DstMod=DstMod, DstDL=DatLoc(ED_u_BlPitchMom), &
+                       ErrStat=ErrStat2, ErrMsg=ErrMsg2); if (Failed()) return
+
+      call MapVariable(Mappings, &
                        SrcMod=SrcMod, SrcDL=DatLoc(SrvD_y_YawMom), &
                        DstMod=DstMod, DstDL=DatLoc(ED_u_YawMom), &
                        ErrStat=ErrStat2, ErrMsg=ErrMsg2); if (Failed()) return
@@ -1978,6 +1983,16 @@ subroutine InitMappings_SrvD(Mappings, SrcMod, DstMod, Turbine, ErrStat, ErrMsg)
    case (Module_ED)
 
       call MapCustom(Mappings, Custom_ED_to_SrvD, SrcMod, DstMod)
+
+      call MapVariable(Mappings, &
+                       SrcMod=SrcMod, SrcDL=DatLoc(ED_y_BlPitch), &
+                       DstMod=DstMod, DstDL=DatLoc(SrvD_u_BlPitch), &
+                       ErrStat=ErrStat2, ErrMsg=ErrMsg2); if (Failed()) return
+
+      call MapVariable(Mappings, &
+                       SrcMod=SrcMod, SrcDL=DatLoc(ED_y_BlPRate), &
+                       DstMod=DstMod, DstDL=DatLoc(SrvD_u_BlPRate), &
+                       ErrStat=ErrStat2, ErrMsg=ErrMsg2); if (Failed()) return
 
       call MapVariable(Mappings, &
                        SrcMod=SrcMod, SrcDL=DatLoc(ED_y_Yaw), &
@@ -3186,6 +3201,7 @@ subroutine Custom_InputSolve(Mapping, ModSrc, ModDst, iInput, T, ErrStat, ErrMsg
       T%ED%Input(iInput, ModDst%Ins)%GenTrq = T%SrvD%y(ModSrc%Ins)%GenTrq
       T%ED%Input(iInput, ModDst%Ins)%HSSBrTrqC = T%SrvD%y(ModSrc%Ins)%HSSBrTrqC
       T%ED%Input(iInput, ModDst%Ins)%BlPitchCom = T%SrvD%y(ModSrc%Ins)%BlPitchCom
+      T%ED%Input(iInput, ModDst%Ins)%BlPitchMom = T%SrvD%y(ModSrc%Ins)%BlPitchMom
       T%ED%Input(iInput, ModDst%Ins)%YawMom = T%SrvD%y(ModSrc%Ins)%YawMom
 
    case (Custom_ED_Tower_Damping)
