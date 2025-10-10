@@ -1062,8 +1062,8 @@ subroutine ParseInputFileInfo( PriPath, InputFile, OutFileRoot, FileInfo_In, Inp
       TmpChr='PitNeut('//trim(Num2LStr(i))//')'
       call ParseVar( FileInfo_In, CurLine, trim(TmpChr), InputFileData%PitNeut(i), ErrStat2, ErrMsg2, UnEcho )
          if (Failed())  return;
-      InputFileData%PitNeut = InputFileData%PitNeut*D2R
    enddo
+   InputFileData%PitNeut = InputFileData%PitNeut*D2R
 
       !  PitSpr  - Blade-pitch spring constant (N-m/rad)
    do i=1,size(InputFileData%PitSpr)
