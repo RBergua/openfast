@@ -2439,6 +2439,9 @@ subroutine RotCavtCrit(u, p, m, errStat, errMsg)
    errStat = ErrID_None
    errMsg  = ''
 
+   ! Skip the cavitation check if no wake mod
+   if ( p%Wake_Mod == WakeMod_none ) return
+
    do iR = 1,size(p%rotors)
       if ( p%rotors(iR)%CavitCheck ) then  ! Calculate the cavitation number for the airfoil at the node in quesiton, and compare to the critical cavitation number based on the vapour pressure and submerged depth       
          do j = 1,p%rotors(iR)%numBlades  ! Loop through all blades
