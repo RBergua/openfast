@@ -403,7 +403,6 @@ of_regression_linear("5MW_OC3Spar_Linear"             ""                "openfas
 of_regression_linear("5MW_OC3Mnpl_Linear"             ""                "openfast;linear;hydrodyn;servodyn;moordyn")
 of_regression_linear("MHK_RM1_Floating_MR_Linear"     "-highpass=0.05"  "openfast;linear;elastodyn;aerodyn;servodyn;hydrodyn;moordyn;multirotor;offshore;mhk")
 
-
 # FAST Farm regression tests
 if(BUILD_FASTFARM)
   ff_regression("TSinflow"          ""                               "fastfarm")
