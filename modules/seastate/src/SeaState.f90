@@ -712,7 +712,7 @@ SUBROUTINE SeaSt_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, ErrStat, Er
       REAL(SiKi)                           :: WaveAcc(3,p%NWaveKin)
       REAL(SiKi)                           :: WaveAccMCF(3,p%NWaveKin)
       REAL(SiKi)                           :: WaveDynP(p%NWaveKin)
-      REAL(ReKi)                           :: AllOuts(MaxOutPts)
+      REAL(ReKi)                           :: AllOuts(0:MaxOutPts)
       real(ReKi)                           :: positionXYZ(3), positionXY(2)
 
       REAL(SiKi)                           :: zeta
