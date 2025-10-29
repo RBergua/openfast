@@ -263,6 +263,10 @@ SUBROUTINE SrvD_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitO
    CALL AllocAry( m%xd_BlPitchFilter,  p%NumBl, 'BlPitchFilter',  ErrStat2, ErrMsg2 )
       if (Failed())  return;
    m%xd_BlPitchFilter = p%BlPitchInit
+
+   CALL AllocAry( m%xd_BlPRateFilter,  p%NumBl, 'BlPRateFilter',  ErrStat2, ErrMsg2 )
+      if (Failed())  return;
+   m%xd_BlPitchFilter = 0.0_ReKi
    
       !.......................
       ! Other states for pitch maneuver
@@ -380,6 +384,10 @@ SUBROUTINE SrvD_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitO
    CALL AllocAry( y%BlPitchCom, p%NumBl, 'BlPitchCom', ErrStat2, ErrMsg2 )
       if (Failed())  return;
    y%BlPitchCom = InputFileData%PitNeut(1:p%NumBl)
+
+   CALL AllocAry( y%BlPRateCom, p%NumBl, 'BlPRateCom', ErrStat2, ErrMsg2 )
+      if (Failed())  return;
+   y%BlPRateCom = 0.0_ReKi
 
    CALL AllocAry( y%BlPitchMom, p%NumBl, 'BlPitchMom', ErrStat2, ErrMsg2 )
       if (Failed())  return;
@@ -2478,7 +2486,7 @@ SUBROUTINE SrvD_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg
       if (Failed()) return;
 
       ! Pitch control:
-   CALL Pitch_CalcOutput( t, u, p, x, xd, z, OtherState, y%BlPitchCom, y%BlPitchMom, y%ElecPwr, m, ErrStat2, ErrMsg2 )
+   CALL Pitch_CalcOutput( t, u, p, x, xd, z, OtherState, y%BlPitchCom, y%BlPRateCom, y%BlPitchMom, y%ElecPwr, m, ErrStat2, ErrMsg2 )
       if (Failed()) return;
 
       ! Yaw control:
@@ -5375,7 +5383,7 @@ SUBROUTINE Yaw_UpdateStates( t, u, p, x, xd, z, OtherState, m, ErrStat, ErrMsg )
 END SUBROUTINE Yaw_UpdateStates
 !----------------------------------------------------------------------------------------------------------------------------------
 !> Routine for computing the pitch output: blade pitch commands. This routine is used in both loose and tight coupling.
-SUBROUTINE Pitch_CalcOutput( t, u, p, x, xd, z, OtherState, BlPitchCom, BlPitchMom, ElecPwr, m, ErrStat, ErrMsg )
+SUBROUTINE Pitch_CalcOutput( t, u, p, x, xd, z, OtherState, BlPitchCom, BlPRateCom, BlPitchMom, ElecPwr, m, ErrStat, ErrMsg )
 !..................................................................................................................................
 
    REAL(DbKi),                     INTENT(IN   )  :: t           !< Current simulation time in seconds
@@ -5387,6 +5395,9 @@ SUBROUTINE Pitch_CalcOutput( t, u, p, x, xd, z, OtherState, BlPitchCom, BlPitchM
    TYPE(SrvD_OtherStateType),      INTENT(IN   )  :: OtherState  !< Other states at t
    REAL(ReKi),                     INTENT(INOUT)  :: BlPitchCom(:) !< pitch command outputs computed at t (Input only so that mesh con-
                                                                  !!   nectivity information does not have to be recalculated)
+   REAL(ReKi),                     INTENT(INOUT)  :: BlPRateCom(:) !< pitch rate command outputs computed at t (Input only so that mesh con-
+                                                                 !!   nectivity information does not have to be recalculated)
+                                                                 !!   Not directly used currently. Only used to compute pitch moments.
    REAL(ReKi),                     INTENT(INOUT)  :: BlPitchMom(:) !< pitch moment outputs computed at t (Input only so that mesh con-
                                                                  !!   nectivity information does not have to be recalculated)
    REAL(ReKi),                     INTENT(IN )    :: ElecPwr     !< Electrical power (watts)
@@ -5396,7 +5407,6 @@ SUBROUTINE Pitch_CalcOutput( t, u, p, x, xd, z, OtherState, BlPitchCom, BlPitchM
 
       ! local variables
    REAL(ReKi)                                     :: factor
-   REAL(ReKi)                                     :: PitManRat
    INTEGER(IntKi)                                 :: K           ! counter for blades
 
 
@@ -5424,10 +5434,12 @@ SUBROUTINE Pitch_CalcOutput( t, u, p, x, xd, z, OtherState, BlPitchCom, BlPitchM
          CASE ( ControlMode_USER )              ! User-defined from routine PitchCntrl().
 
             CALL PitchCntrl ( u%BlPitch, ElecPwr, u%LSS_Spd, u%TwrAccel, p%NumBl, t, p%DT, p%PriPath, BlPitchCom )
+            BlPRateCom = 0.0_ReKi                 ! Enable this optionally in the future
 
          CASE ( ControlMode_EXTERN )              ! User-defined from Simulink or LabVIEW.
 
             BlPitchCom = u%ExternalBlPitchCom(1:p%NumBl)
+            BlPRateCom = 0.0_ReKi                 ! Enable this optionally in the future
          
          CASE ( ControlMode_DLL )                                ! User-defined pitch control from Bladed-style DLL
 
@@ -5440,13 +5452,18 @@ SUBROUTINE Pitch_CalcOutput( t, u, p, x, xd, z, OtherState, BlPitchCom, BlPitchM
                BlPitchCom = m%dll_data%BlPitchCom(1:p%NumBl)
             end if
 
+            ! Estimate pitch rate command using finite differencing
+            BlPRateCom = ( m%dll_data%BlPitchCom(1:p%NumBl) - m%dll_data%PrevBlPitch(1:p%NumBl) ) / m%dll_data%DLL_DT
+
                ! update the filter state once per time step
             IF ( EqualRealNos( t - p%DT, m%LastTimeFiltered ) ) THEN
                m%xd_BlPitchFilter = p%BlAlpha * m%xd_BlPitchFilter + (1.0_ReKi - p%BlAlpha) * BlPitchCom
+               m%xd_BlPRateFilter = p%BlAlpha * m%xd_BlPRateFilter + (1.0_ReKi - p%BlAlpha) * BlPRateCom
                m%LastTimeFiltered = t
             END IF
 
             BlPitchCom = p%BlAlpha * m%xd_BlPitchFilter + (1.0_ReKi - p%BlAlpha) * BlPitchCom
+            BlPRateCom = p%BlAlpha * m%xd_BlPRateFilter + (1.0_ReKi - p%BlAlpha) * BlPRateCom
 
       END SELECT
 
@@ -5455,9 +5472,9 @@ SUBROUTINE Pitch_CalcOutput( t, u, p, x, xd, z, OtherState, BlPitchCom, BlPitchM
       ! Use the initial blade pitch angles:
 
       BlPitchCom = p%PitNeut(1:p%NumBl)
+      BlPRateCom = 0.0_ReKi
 
    ENDIF
-
 
    !...................................................................
    ! Override standard pitch control with a linear maneuver if necessary:
@@ -5471,11 +5488,12 @@ SUBROUTINE Pitch_CalcOutput( t, u, p, x, xd, z, OtherState, BlPitchCom, BlPitchM
          IF ( t >= OtherState%TPitManE(K) )  THEN      ! Override pitch maneuver has ended, blade is locked at BlPitchF.
 
             BlPitchCom(K) = p%BlPitchF(K)
+            BlPRateCom(K) = 0.0_ReKi
 
          ELSE
 
-            PitManRat     = SIGN( p%PitManRat(K), p%BlPitchF(K) - OtherState%BlPitchI(K) )   ! Modify the sign of PitManRat based on the direction of the pitch maneuever
-            BlPitchCom(K) = OtherState%BlPitchI(K) + PitManRat*( t - p%TPitManS(K) )         ! Increment the blade pitch using PitManRat
+            BlPRateCom(K) = SIGN( p%PitManRat(K), p%BlPitchF(K) - OtherState%BlPitchI(K) )   ! Modify the sign of PitManRat based on the direction of the pitch maneuever
+            BlPitchCom(K) = OtherState%BlPitchI(K) + BlPRateCom(K)*( t - p%TPitManS(K) )     ! Increment the blade pitch using PitManRat
 
          END IF
 
@@ -5489,7 +5507,7 @@ SUBROUTINE Pitch_CalcOutput( t, u, p, x, xd, z, OtherState, BlPitchCom, BlPitchM
    !...................................................................
 
    BlPitchMom = - p%PitSpr  * ( u%BlPitch - BlPitchCom )  &
-                - p%PitDamp *   u%BlPRate
+                - p%PitDamp * ( u%BlPRate - BlPRateCom )
 
    !...................................................................
    ! Apply trim case for linearization:

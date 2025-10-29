@@ -528,6 +528,7 @@ IMPLICIT NONE
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: WriteOutput      !< Data to be written to an output file: see WriteOutputHdr for names of each variable [see WriteOutputUnt]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: BlPitchMom      !< Blade-pitch moment transmitted to the blades [N-m]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: BlPitchCom      !< Commanded blade pitch angles [radians]
+    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: BlPRateCom      !< Commanded blade pitch rates; only used to compute blade-pitch moment [rad/s]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: BlAirfoilCom      !< Commanded Airfoil UserProp for blade.  Passed to AD15 for airfoil interpolation (must be same units as given in AD15 airfoil tables) [-]
     REAL(ReKi)  :: YawMom = 0.0_ReKi      !< Torque transmitted through the yaw bearing [N-m]
     REAL(ReKi)  :: YawPosCom = 0.0_ReKi      !< Yaw command from controller (for SED module) [rad]
@@ -550,7 +551,8 @@ IMPLICIT NONE
     TYPE(BladedDLLType)  :: dll_data      !< data used for Bladed DLL [-]
     LOGICAL  :: FirstWarn = .false.      !< Whether or not this is the first warning about the DLL being called without Explicit-Loose coupling. [-]
     REAL(DbKi)  :: LastTimeFiltered = 0.0_R8Ki      !< last time the CalcOutput/Bladed DLL was filtered [s]
-    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: xd_BlPitchFilter      !< blade pitch filter [-]
+    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: xd_BlPitchFilter      !< blade pitch filter [rad]
+    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: xd_BlPRateFilter      !< blade pitch rate filter [rad/s]
     TYPE(StC_MiscVarType) , DIMENSION(:), ALLOCATABLE  :: BStC      !< StC module misc vars - blade [-]
     TYPE(StC_MiscVarType) , DIMENSION(:), ALLOCATABLE  :: NStC      !< StC module misc vars - nacelle [-]
     TYPE(StC_MiscVarType) , DIMENSION(:), ALLOCATABLE  :: TStC      !< StC module misc vars - tower [-]
@@ -629,20 +631,21 @@ IMPLICIT NONE
    integer(IntKi), public, parameter :: SrvD_y_WriteOutput               =  55 ! SrvD%WriteOutput
    integer(IntKi), public, parameter :: SrvD_y_BlPitchMom                =  56 ! SrvD%BlPitchMom
    integer(IntKi), public, parameter :: SrvD_y_BlPitchCom                =  57 ! SrvD%BlPitchCom
-   integer(IntKi), public, parameter :: SrvD_y_BlAirfoilCom              =  58 ! SrvD%BlAirfoilCom
-   integer(IntKi), public, parameter :: SrvD_y_YawMom                    =  59 ! SrvD%YawMom
-   integer(IntKi), public, parameter :: SrvD_y_YawPosCom                 =  60 ! SrvD%YawPosCom
-   integer(IntKi), public, parameter :: SrvD_y_YawRateCom                =  61 ! SrvD%YawRateCom
-   integer(IntKi), public, parameter :: SrvD_y_GenTrq                    =  62 ! SrvD%GenTrq
-   integer(IntKi), public, parameter :: SrvD_y_HSSBrTrqC                 =  63 ! SrvD%HSSBrTrqC
-   integer(IntKi), public, parameter :: SrvD_y_ElecPwr                   =  64 ! SrvD%ElecPwr
-   integer(IntKi), public, parameter :: SrvD_y_TBDrCon                   =  65 ! SrvD%TBDrCon
-   integer(IntKi), public, parameter :: SrvD_y_CableDeltaL               =  66 ! SrvD%CableDeltaL
-   integer(IntKi), public, parameter :: SrvD_y_CableDeltaLdot            =  67 ! SrvD%CableDeltaLdot
-   integer(IntKi), public, parameter :: SrvD_y_BStCLoadMesh              =  68 ! SrvD%BStCLoadMesh(DL%i1, DL%i2)
-   integer(IntKi), public, parameter :: SrvD_y_NStCLoadMesh              =  69 ! SrvD%NStCLoadMesh(DL%i1)
-   integer(IntKi), public, parameter :: SrvD_y_TStCLoadMesh              =  70 ! SrvD%TStCLoadMesh(DL%i1)
-   integer(IntKi), public, parameter :: SrvD_y_SStCLoadMesh              =  71 ! SrvD%SStCLoadMesh(DL%i1)
+   integer(IntKi), public, parameter :: SrvD_y_BlPRateCom                =  58 ! SrvD%BlPRateCom
+   integer(IntKi), public, parameter :: SrvD_y_BlAirfoilCom              =  59 ! SrvD%BlAirfoilCom
+   integer(IntKi), public, parameter :: SrvD_y_YawMom                    =  60 ! SrvD%YawMom
+   integer(IntKi), public, parameter :: SrvD_y_YawPosCom                 =  61 ! SrvD%YawPosCom
+   integer(IntKi), public, parameter :: SrvD_y_YawRateCom                =  62 ! SrvD%YawRateCom
+   integer(IntKi), public, parameter :: SrvD_y_GenTrq                    =  63 ! SrvD%GenTrq
+   integer(IntKi), public, parameter :: SrvD_y_HSSBrTrqC                 =  64 ! SrvD%HSSBrTrqC
+   integer(IntKi), public, parameter :: SrvD_y_ElecPwr                   =  65 ! SrvD%ElecPwr
+   integer(IntKi), public, parameter :: SrvD_y_TBDrCon                   =  66 ! SrvD%TBDrCon
+   integer(IntKi), public, parameter :: SrvD_y_CableDeltaL               =  67 ! SrvD%CableDeltaL
+   integer(IntKi), public, parameter :: SrvD_y_CableDeltaLdot            =  68 ! SrvD%CableDeltaLdot
+   integer(IntKi), public, parameter :: SrvD_y_BStCLoadMesh              =  69 ! SrvD%BStCLoadMesh(DL%i1, DL%i2)
+   integer(IntKi), public, parameter :: SrvD_y_NStCLoadMesh              =  70 ! SrvD%NStCLoadMesh(DL%i1)
+   integer(IntKi), public, parameter :: SrvD_y_TStCLoadMesh              =  71 ! SrvD%TStCLoadMesh(DL%i1)
+   integer(IntKi), public, parameter :: SrvD_y_SStCLoadMesh              =  72 ! SrvD%SStCLoadMesh(DL%i1)
 
 contains
 
@@ -5304,6 +5307,18 @@ subroutine SrvD_CopyOutput(SrcOutputData, DstOutputData, CtrlCode, ErrStat, ErrM
       end if
       DstOutputData%BlPitchCom = SrcOutputData%BlPitchCom
    end if
+   if (allocated(SrcOutputData%BlPRateCom)) then
+      LB(1:1) = lbound(SrcOutputData%BlPRateCom)
+      UB(1:1) = ubound(SrcOutputData%BlPRateCom)
+      if (.not. allocated(DstOutputData%BlPRateCom)) then
+         allocate(DstOutputData%BlPRateCom(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstOutputData%BlPRateCom.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstOutputData%BlPRateCom = SrcOutputData%BlPRateCom
+   end if
    if (allocated(SrcOutputData%BlAirfoilCom)) then
       LB(1:1) = lbound(SrcOutputData%BlAirfoilCom)
       UB(1:1) = ubound(SrcOutputData%BlAirfoilCom)
@@ -5446,6 +5461,9 @@ subroutine SrvD_DestroyOutput(OutputData, ErrStat, ErrMsg)
    if (allocated(OutputData%BlPitchCom)) then
       deallocate(OutputData%BlPitchCom)
    end if
+   if (allocated(OutputData%BlPRateCom)) then
+      deallocate(OutputData%BlPRateCom)
+   end if
    if (allocated(OutputData%BlAirfoilCom)) then
       deallocate(OutputData%BlAirfoilCom)
    end if
@@ -5508,6 +5526,7 @@ subroutine SrvD_PackOutput(RF, Indata)
    call RegPackAlloc(RF, InData%WriteOutput)
    call RegPackAlloc(RF, InData%BlPitchMom)
    call RegPackAlloc(RF, InData%BlPitchCom)
+   call RegPackAlloc(RF, InData%BlPRateCom)
    call RegPackAlloc(RF, InData%BlAirfoilCom)
    call RegPack(RF, InData%YawMom)
    call RegPack(RF, InData%YawPosCom)
@@ -5571,6 +5590,7 @@ subroutine SrvD_UnPackOutput(RF, OutData)
    call RegUnpackAlloc(RF, OutData%WriteOutput); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%BlPitchMom); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%BlPitchCom); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%BlPRateCom); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%BlAirfoilCom); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%YawMom); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%YawPosCom); if (RegCheckErr(RF, RoutineName)) return
@@ -5667,6 +5687,18 @@ subroutine SrvD_CopyMisc(SrcMiscData, DstMiscData, CtrlCode, ErrStat, ErrMsg)
          end if
       end if
       DstMiscData%xd_BlPitchFilter = SrcMiscData%xd_BlPitchFilter
+   end if
+   if (allocated(SrcMiscData%xd_BlPRateFilter)) then
+      LB(1:1) = lbound(SrcMiscData%xd_BlPRateFilter)
+      UB(1:1) = ubound(SrcMiscData%xd_BlPRateFilter)
+      if (.not. allocated(DstMiscData%xd_BlPRateFilter)) then
+         allocate(DstMiscData%xd_BlPRateFilter(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstMiscData%xd_BlPRateFilter.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstMiscData%xd_BlPRateFilter = SrcMiscData%xd_BlPRateFilter
    end if
    if (allocated(SrcMiscData%BStC)) then
       LB(1:1) = lbound(SrcMiscData%BStC)
@@ -5905,6 +5937,9 @@ subroutine SrvD_DestroyMisc(MiscData, ErrStat, ErrMsg)
    if (allocated(MiscData%xd_BlPitchFilter)) then
       deallocate(MiscData%xd_BlPitchFilter)
    end if
+   if (allocated(MiscData%xd_BlPRateFilter)) then
+      deallocate(MiscData%xd_BlPRateFilter)
+   end if
    if (allocated(MiscData%BStC)) then
       LB(1:1) = lbound(MiscData%BStC)
       UB(1:1) = ubound(MiscData%BStC)
@@ -6047,6 +6082,7 @@ subroutine SrvD_PackMisc(RF, Indata)
    call RegPack(RF, InData%FirstWarn)
    call RegPack(RF, InData%LastTimeFiltered)
    call RegPackAlloc(RF, InData%xd_BlPitchFilter)
+   call RegPackAlloc(RF, InData%xd_BlPRateFilter)
    call RegPack(RF, allocated(InData%BStC))
    if (allocated(InData%BStC)) then
       call RegPackBounds(RF, 1, lbound(InData%BStC), ubound(InData%BStC))
@@ -6187,6 +6223,7 @@ subroutine SrvD_UnPackMisc(RF, OutData)
    call RegUnpack(RF, OutData%FirstWarn); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%LastTimeFiltered); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%xd_BlPitchFilter); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%xd_BlPRateFilter); if (RegCheckErr(RF, RoutineName)) return
    if (allocated(OutData%BStC)) deallocate(OutData%BStC)
    call RegUnpack(RF, IsAllocAssoc); if (RegCheckErr(RF, RoutineName)) return
    if (IsAllocAssoc) then
@@ -6822,6 +6859,9 @@ SUBROUTINE SrvD_Output_ExtrapInterp1(y1, y2, tin, y_out, tin_out, ErrStat, ErrMs
          CALL Angles_ExtrapInterp( y1%BlPitchCom(i1), y2%BlPitchCom(i1), tin, y_out%BlPitchCom(i1), tin_out )
       END DO
    END IF ! check if allocated
+   IF (ALLOCATED(y_out%BlPRateCom) .AND. ALLOCATED(y1%BlPRateCom)) THEN
+      y_out%BlPRateCom = a1*y1%BlPRateCom + a2*y2%BlPRateCom
+   END IF ! check if allocated
    IF (ALLOCATED(y_out%BlAirfoilCom) .AND. ALLOCATED(y1%BlAirfoilCom)) THEN
       y_out%BlAirfoilCom = a1*y1%BlAirfoilCom + a2*y2%BlAirfoilCom
    END IF ! check if allocated
@@ -6935,6 +6975,9 @@ SUBROUTINE SrvD_Output_ExtrapInterp2(y1, y2, y3, tin, y_out, tin_out, ErrStat, E
       do i1 = lbound(y_out%BlPitchCom,1),ubound(y_out%BlPitchCom,1)
          CALL Angles_ExtrapInterp( y1%BlPitchCom(i1), y2%BlPitchCom(i1), y3%BlPitchCom(i1), tin, y_out%BlPitchCom(i1), tin_out )
       END DO
+   END IF ! check if allocated
+   IF (ALLOCATED(y_out%BlPRateCom) .AND. ALLOCATED(y1%BlPRateCom)) THEN
+      y_out%BlPRateCom = a1*y1%BlPRateCom + a2*y2%BlPRateCom + a3*y3%BlPRateCom
    END IF ! check if allocated
    IF (ALLOCATED(y_out%BlAirfoilCom) .AND. ALLOCATED(y1%BlAirfoilCom)) THEN
       y_out%BlAirfoilCom = a1*y1%BlAirfoilCom + a2*y2%BlAirfoilCom + a3*y3%BlAirfoilCom
@@ -7498,6 +7541,8 @@ subroutine SrvD_VarPackOutput(V, y, ValAry)
          VarVals = y%BlPitchMom(V%iLB:V%iUB)                                  ! Rank 1 Array
       case (SrvD_y_BlPitchCom)
          VarVals = y%BlPitchCom(V%iLB:V%iUB)                                  ! Rank 1 Array
+      case (SrvD_y_BlPRateCom)
+         VarVals = y%BlPRateCom(V%iLB:V%iUB)                                  ! Rank 1 Array
       case (SrvD_y_BlAirfoilCom)
          VarVals = y%BlAirfoilCom(V%iLB:V%iUB)                                ! Rank 1 Array
       case (SrvD_y_YawMom)
@@ -7554,6 +7599,8 @@ subroutine SrvD_VarUnpackOutput(V, ValAry, y)
          y%BlPitchMom(V%iLB:V%iUB) = VarVals                                  ! Rank 1 Array
       case (SrvD_y_BlPitchCom)
          y%BlPitchCom(V%iLB:V%iUB) = VarVals                                  ! Rank 1 Array
+      case (SrvD_y_BlPRateCom)
+         y%BlPRateCom(V%iLB:V%iUB) = VarVals                                  ! Rank 1 Array
       case (SrvD_y_BlAirfoilCom)
          y%BlAirfoilCom(V%iLB:V%iUB) = VarVals                                ! Rank 1 Array
       case (SrvD_y_YawMom)
@@ -7596,6 +7643,8 @@ function SrvD_OutputFieldName(DL) result(Name)
        Name = "y%BlPitchMom"
    case (SrvD_y_BlPitchCom)
        Name = "y%BlPitchCom"
+   case (SrvD_y_BlPRateCom)
+       Name = "y%BlPRateCom"
    case (SrvD_y_BlAirfoilCom)
        Name = "y%BlAirfoilCom"
    case (SrvD_y_YawMom)

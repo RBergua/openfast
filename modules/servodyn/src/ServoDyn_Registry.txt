@@ -527,6 +527,7 @@ typedef	^	InputType	ReKi	MsrPositionsZ	{:}     -	-	"Lidar Z direction measuremen
 typedef	^	OutputType	ReKi	WriteOutput	{:}	-	-	"Data to be written to an output file: see WriteOutputHdr for names of each variable"	"see WriteOutputUnt"
 typedef	^	OutputType	ReKi	BlPitchMom	{:}	-	-	"Blade-pitch moment transmitted to the blades"	N-m
 typedef	^	OutputType	ReKi	BlPitchCom	{:}	-	2pi	"Commanded blade pitch angles"	radians
+typedef	^	OutputType	ReKi	BlPRateCom	{:}	-	-	"Commanded blade pitch rates; only used to compute blade-pitch moment"	rad/s
 typedef	^	OutputType	ReKi	BlAirfoilCom	{:}	-	-	"Commanded Airfoil UserProp for blade.  Passed to AD15 for airfoil interpolation (must be same units as given in AD15 airfoil tables)"	-
 typedef	^	OutputType	ReKi	YawMom	-	-	-	"Torque transmitted through the yaw bearing"	N-m
 typedef	^	OutputType	ReKi	YawPosCom	-	-	-	"Yaw command from controller (for SED module)"	rad
@@ -549,7 +550,8 @@ typedef	^	MiscVarType	DbKi	LastTimeCalled	-	-	-	"last time the CalcOutput/Bladed
 typedef	^	MiscVarType	BladedDLLType	dll_data	-	-	-	"data used for Bladed DLL"	-
 typedef	^	MiscVarType	logical	FirstWarn	-	-	-	"Whether or not this is the first warning about the DLL being called without Explicit-Loose coupling."	-
 typedef	^	MiscVarType	DbKi	LastTimeFiltered	-	-	-	"last time the CalcOutput/Bladed DLL was filtered"	s
-typedef	^	MiscVarType	ReKi	xd_BlPitchFilter	{:}	-	-	"blade pitch filter"	-
+typedef	^	MiscVarType	ReKi	xd_BlPitchFilter	{:}	-	-	"blade pitch filter"	rad
+typedef	^	MiscVarType	ReKi	xd_BlPRateFilter	{:}	-	-	"blade pitch rate filter"	rad/s
 typedef	^	MiscVarType	StC_MiscVarType	BStC	{:}	-	-	"StC module misc vars - blade"	-
 typedef	^	MiscVarType	StC_MiscVarType	NStC	{:}	-	-	"StC module misc vars - nacelle"	-
 typedef	^	MiscVarType	StC_MiscVarType	TStC	{:}	-	-	"StC module misc vars - tower"	-
