@@ -469,6 +469,61 @@ jobs:
         run: |
           ctest -VV \
           -L openfast -L offshore \
+          -LE "cpp|linear|python|fastlib|multirotor"
+      - name: Failing test artifacts
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: rtest-OF-offshore
+          path: |
+            ${{github.workspace}}/build/reg_tests/glue-codes/openfast
+            !${{github.workspace}}/build/reg_tests/glue-codes/openfast/5MW_Baseline
+            !${{github.workspace}}/build/reg_tests/glue-codes/openfast/AOC
+            !${{github.workspace}}/build/reg_tests/glue-codes/openfast/AWT27
+            !${{github.workspace}}/build/reg_tests/glue-codes/openfast/SWRT
+            !${{github.workspace}}/build/reg_tests/glue-codes/openfast/UAE_VI
+            !${{github.workspace}}/build/reg_tests/glue-codes/openfast/WP_Baseline
+
+  rtest-OF-multirotor:
+    runs-on: ubuntu-24.04
+    needs: build-all-release
+    steps:
+      - name: Restore workspace from artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-all-release
+      - name: Untar workspace
+        run: |
+          tar -xf workspace.tar -C${{github.workspace}}
+          rm workspace.tar
+      - name: List files in workspace
+        run: ls
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        working-directory: ${{github.workspace}}
+        run: |
+          pip install -r requirements.txt
+          pip install glue-codes/python/.   # Installs the interface library
+          sudo apt-get update -y
+          sudo apt-get install -y libopenblas-dev libopenblas-openmp-dev
+          sudo apt-get install -y libhdf5-dev libnetcdf-dev libopenmpi-dev libyaml-cpp-dev
+      - name: Configure Tests
+        working-directory: ${{github.workspace}}/build
+        run: |
+          cmake \
+            -DPython_ROOT_DIR:PATH=${{env.pythonLocation}} \
+            -DBUILD_TESTING:BOOL=ON \
+            -DCTEST_PLOT_ERRORS:BOOL=ON \
+            ${GITHUB_WORKSPACE}
+          cmake --build . --target regression_test_controllers
+      - name: Run 5MW tests
+        working-directory: ${{github.workspace}}/build
+        run: |
+          ctest -VV \
+          -L openfast -L multirotor \
           -LE "cpp|linear|python|fastlib"
       - name: Failing test artifacts
         uses: actions/upload-artifact@v4
@@ -484,7 +539,6 @@ jobs:
             !${{github.workspace}}/build/reg_tests/glue-codes/openfast/UAE_VI
             !${{github.workspace}}/build/reg_tests/glue-codes/openfast/WP_Baseline
 
- 
   rtest-OF-linearization:
     runs-on: ubuntu-24.04
     needs: build-all-release
