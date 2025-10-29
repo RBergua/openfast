@@ -758,6 +758,12 @@ subroutine SrvD_InitVars(InitInp, u, p, x, y, m, InitOut, Linearize, ErrStat, Er
                   Num=size(y%BlPitchCom), &
                   LinNames=[('BlPitchCom('//trim(Num2LStr(i))//'), rad', i = 1, size(y%BlPitchCom))])
 
+   call MV_AddVar(InitOut%Vars%y, "BlPRateCom", FieldScalar, &
+                  DatLoc(SrvD_y_BlPRateCom), &
+                  Flags=VF_RotFrame, &
+                  Num=size(y%BlPRateCom), &
+                  LinNames=[('BlPRateCom('//trim(Num2LStr(i))//'), rad/s', i = 1, size(y%BlPRateCom))])
+
    call MV_AddVar(InitOut%Vars%y, "BlPitchMom", FieldScalar, &
                   DatLoc(SrvD_y_BlPitchMom), &
                   Flags=VF_RotFrame, &
@@ -902,6 +908,7 @@ contains
       ! outputs always passed
       p%Jac_ny = p%Jac_ny              &
             + size(y%BlPitchCom)       &  ! y%BlPitchCom(:)
+            + size(y%BlPRateCom)       &  ! y%BlPRateCom(:)
             + size(y%BlPitchMom)       &  ! y%BlPitchMom(:)
             + 1                        &  ! y%YawMom
             + 1                        &  ! y%GenTrq
@@ -929,6 +936,13 @@ contains
       ! y%BlPitchCom -- NOTE: assumed order of these outputs
       do i=1,size(y%BlPitchCom)
          InitOut%LinNames_y(index_next) = 'BlPitchCom('//trim(num2lstr(i))//'), rad'
+         InitOut%RotFrame_y(index_next) = .true.
+         index_next = index_next + 1
+      end do
+
+      ! y%BlPRateCom -- NOTE: assumed order of these outputs
+      do i=1,size(y%BlPRateCom)
+         InitOut%LinNames_y(index_next) = 'BlPRateCom('//trim(num2lstr(i))//'), rad/s'
          InitOut%RotFrame_y(index_next) = .true.
          index_next = index_next + 1
       end do
@@ -998,6 +1012,9 @@ contains
       do i=1,p%NumOuts
          InitOut%LinNames_y(index_next) = trim(p%OutParam(i)%Name)//', '//p%OutParam(i)%Units
          if (ANY( p%OutParam(i)%Indx == BlPitchC ))   InitOut%RotFrame_y(index_next) = .true.   ! WriteOutput BlPitch commands
+         if (ANY( p%OutParam(i)%Indx == BlPRateC ))   InitOut%RotFrame_y(index_next) = .true.   ! WriteOutput BlPRate commands
+         if (ANY( p%OutParam(i)%Indx == BlPitchM ))   InitOut%RotFrame_y(index_next) = .true.   ! WriteOutput BlPitch moments
+
          ! Blade StC local output channels
          if (ANY( p%OutParam(i)%Indx == BStC_XQ  ))   InitOut%RotFrame_y(index_next) = .true.   ! Blade StC X displacements
          if (ANY( p%OutParam(i)%Indx == BStC_XQD ))   InitOut%RotFrame_y(index_next) = .true.   ! Blade StC X displacement velocities
@@ -3041,38 +3058,48 @@ contains
       integer                 :: SrvD_Indx_Y_GenTrq
       integer                 :: SrvD_Indx_Y_ElecPwr
       integer                 :: SrvD_Indx_Y_WrOutput
-      real(R8Ki)              :: AllOuts(3,MaxOutPts)             ! Extra precision here since analytical
+      real(R8Ki)              :: AllOuts(9,MaxOutPts)             ! Extra precision here since analytical
 
-      SrvD_Indx_Y_BlPitchMom = p%NumBl + (/1,2,3/)                ! Only the first p%NumBl entries are used
-
-      SrvD_Indx_Y_YawMom   = 2*p%NumBl + 1
-      SrvD_Indx_Y_GenTrq   = SrvD_Indx_Y_YawMom + 1
-      SrvD_Indx_Y_ElecPwr  = SrvD_Indx_Y_GenTrq + 1
-      SrvD_Indx_Y_WrOutput = p%Jac_ny - p%NumOuts                 ! Index to location before user requested outputs
+      SrvD_Indx_Y_BlPitchMom = 2*p%NumBl + (/1,2,3/)              ! Only the first p%NumBl entries are used
+      SrvD_Indx_Y_YawMom     = 3*p%NumBl + 1
+      SrvD_Indx_Y_GenTrq     = SrvD_Indx_Y_YawMom + 1
+      SrvD_Indx_Y_ElecPwr    = SrvD_Indx_Y_GenTrq + 1
+      SrvD_Indx_Y_WrOutput   = p%Jac_ny - p%NumOuts               ! Index to location before user requested outputs
 
       Indx_u_BlPitch = (/1,2,3/)                                  ! Only the first p%NumBl entries are used
       Indx_u_BlPRate = p%NumBl + (/1,2,3/)                        ! Only the first p%NumBl entries are used
-
-      Indx_u_Yaw           = SrvD_Indx_Y_YawMom
-      Indx_u_YawRate       = Indx_u_Yaw + 1
-      Indx_u_HSS_Spd       = Indx_u_YawRate + 1
+      Indx_u_Yaw     = 2*p%NumBl + 1
+      Indx_u_YawRate = Indx_u_Yaw + 1
+      Indx_u_HSS_Spd = Indx_u_YawRate + 1
 
       !> \f{equation}{ \frac{\partial Y}{\partial u} = \begin{bmatrix}
-      !! \frac{\partial Y_{BlPitchCom_1}}{\partial u_{Yaw}}  & \frac{\partial Y_{BlPitchCom_1}}{\partial u_{YawRate}}  & \frac{\partial Y_{BlPitchCom_1}}{\partial u_{HSS\_Spd}} \\
-      !! \frac{\partial Y_{BlPitchCom_2}}{\partial u_{Yaw}}  & \frac{\partial Y_{BlPitchCom_2}}{\partial u_{YawRate}}  & \frac{\partial Y_{BlPitchCom_2}}{\partial u_{HSS\_Spd}} \\
-      !! \frac{\partial Y_{BlPitchCom_3}}{\partial u_{Yaw}}  & \frac{\partial Y_{BlPitchCom_3}}{\partial u_{YawRate}}  & \frac{\partial Y_{BlPitchCom_3}}{\partial u_{HSS\_Spd}} \\
-      !! \frac{\partial Y_{YawMom}}{\partial u_{Yaw}}        & \frac{\partial Y_{YawMom}}{\partial u_{YawRate}}        & \frac{\partial Y_{YawMom}}{\partial u_{HSS\_Spd}} \\
-      !! \frac{\partial Y_{GenTrq}}{\partial u_{Yaw}}        & \frac{\partial Y_{GenTrq}}{\partial u_{YawRate}}        & \frac{\partial Y_{GenTrq}}{\partial u_{HSS\_Spd}} \\
-      !! \frac{\partial Y_{ElecPwr}}{\partial u_{Yaw}}       & \frac{\partial Y_{ElecPwr}}{\partial u_{YawRate}}       & \frac{\partial Y_{ElecPwr}}{\partial u_{HSS\_Spd}} \\
-      !! \frac{\partial Y_{WriteOutput_i}}{\partial u_{Yaw}} & \frac{\partial Y_{WriteOutput_i}}{\partial u_{YawRate}} & \frac{\partial Y_{WriteOutput_i}}{\partial u_{HSS\_Spd}} \end{bmatrix}
+      !! \frac{\partial Y_{BlPitchCom_1}}{\partial u_{BlPitch_1}}  & \frac{\partial Y_{BlPitchCom_1}}{\partial u_{BlPitch_2}}  & \frac{\partial Y_{BlPitchCom_1}}{\partial u_{BlPitch_3}}  & \frac{\partial Y_{BlPitchCom_1}}{\partial u_{BlPRate_1}}  & \frac{\partial Y_{BlPitchCom_1}}{\partial u_{BlPRate_2}}  & \frac{\partial Y_{BlPitchCom_1}}{\partial u_{BlPRate_3}}  & \frac{\partial Y_{BlPitchCom_1}}{\partial u_{Yaw}}   & \frac{\partial Y_{BlPitchCom_1}}{\partial u_{YawRate}}   & \frac{\partial Y_{BlPitchCom_1}}{\partial u_{HSS\_Spd}}  \\
+      !! \frac{\partial Y_{BlPitchCom_2}}{\partial u_{BlPitch_1}}  & \frac{\partial Y_{BlPitchCom_2}}{\partial u_{BlPitch_2}}  & \frac{\partial Y_{BlPitchCom_2}}{\partial u_{BlPitch_3}}  & \frac{\partial Y_{BlPitchCom_2}}{\partial u_{BlPRate_1}}  & \frac{\partial Y_{BlPitchCom_2}}{\partial u_{BlPRate_2}}  & \frac{\partial Y_{BlPitchCom_2}}{\partial u_{BlPRate_3}}  & \frac{\partial Y_{BlPitchCom_2}}{\partial u_{Yaw}}   & \frac{\partial Y_{BlPitchCom_2}}{\partial u_{YawRate}}   & \frac{\partial Y_{BlPitchCom_2}}{\partial u_{HSS\_Spd}}  \\
+      !! \frac{\partial Y_{BlPitchCom_3}}{\partial u_{BlPitch_1}}  & \frac{\partial Y_{BlPitchCom_3}}{\partial u_{BlPitch_2}}  & \frac{\partial Y_{BlPitchCom_3}}{\partial u_{BlPitch_3}}  & \frac{\partial Y_{BlPitchCom_3}}{\partial u_{BlPRate_1}}  & \frac{\partial Y_{BlPitchCom_3}}{\partial u_{BlPRate_2}}  & \frac{\partial Y_{BlPitchCom_3}}{\partial u_{BlPRate_3}}  & \frac{\partial Y_{BlPitchCom_3}}{\partial u_{Yaw}}   & \frac{\partial Y_{BlPitchCom_3}}{\partial u_{YawRate}}   & \frac{\partial Y_{BlPitchCom_3}}{\partial u_{HSS\_Spd}}  \\
+      !! \frac{\partial Y_{BlPRateCom_1}}{\partial u_{BlPitch_1}}  & \frac{\partial Y_{BlPRateCom_1}}{\partial u_{BlPitch_2}}  & \frac{\partial Y_{BlPRateCom_1}}{\partial u_{BlPitch_3}}  & \frac{\partial Y_{BlPRateCom_1}}{\partial u_{BlPRate_1}}  & \frac{\partial Y_{BlPRateCom_1}}{\partial u_{BlPRate_2}}  & \frac{\partial Y_{BlPRateCom_1}}{\partial u_{BlPRate_3}}  & \frac{\partial Y_{BlPRateCom_1}}{\partial u_{Yaw}}   & \frac{\partial Y_{BlPRateCom_1}}{\partial u_{YawRate}}   & \frac{\partial Y_{BlPRateCom_1}}{\partial u_{HSS\_Spd}}  \\
+      !! \frac{\partial Y_{BlPRateCom_2}}{\partial u_{BlPitch_1}}  & \frac{\partial Y_{BlPRateCom_2}}{\partial u_{BlPitch_2}}  & \frac{\partial Y_{BlPRateCom_2}}{\partial u_{BlPitch_3}}  & \frac{\partial Y_{BlPRateCom_2}}{\partial u_{BlPRate_1}}  & \frac{\partial Y_{BlPRateCom_2}}{\partial u_{BlPRate_2}}  & \frac{\partial Y_{BlPRateCom_2}}{\partial u_{BlPRate_3}}  & \frac{\partial Y_{BlPRateCom_2}}{\partial u_{Yaw}}   & \frac{\partial Y_{BlPRateCom_2}}{\partial u_{YawRate}}   & \frac{\partial Y_{BlPRateCom_2}}{\partial u_{HSS\_Spd}}  \\
+      !! \frac{\partial Y_{BlPRateCom_3}}{\partial u_{BlPitch_1}}  & \frac{\partial Y_{BlPRateCom_3}}{\partial u_{BlPitch_2}}  & \frac{\partial Y_{BlPRateCom_3}}{\partial u_{BlPitch_3}}  & \frac{\partial Y_{BlPRateCom_3}}{\partial u_{BlPRate_1}}  & \frac{\partial Y_{BlPRateCom_3}}{\partial u_{BlPRate_2}}  & \frac{\partial Y_{BlPRateCom_3}}{\partial u_{BlPRate_3}}  & \frac{\partial Y_{BlPRateCom_3}}{\partial u_{Yaw}}   & \frac{\partial Y_{BlPRateCom_3}}{\partial u_{YawRate}}   & \frac{\partial Y_{BlPRateCom_3}}{\partial u_{HSS\_Spd}}  \\
+      !! \frac{\partial Y_{BlPitchMom_1}}{\partial u_{BlPitch_1}}  & \frac{\partial Y_{BlPitchMom_1}}{\partial u_{BlPitch_2}}  & \frac{\partial Y_{BlPitchMom_1}}{\partial u_{BlPitch_3}}  & \frac{\partial Y_{BlPitchMom_1}}{\partial u_{BlPRate_1}}  & \frac{\partial Y_{BlPitchMom_1}}{\partial u_{BlPRate_2}}  & \frac{\partial Y_{BlPitchMom_1}}{\partial u_{BlPRate_3}}  & \frac{\partial Y_{BlPitchMom_1}}{\partial u_{Yaw}}   & \frac{\partial Y_{BlPitchMom_1}}{\partial u_{YawRate}}   & \frac{\partial Y_{BlPitchMom_1}}{\partial u_{HSS\_Spd}}  \\
+      !! \frac{\partial Y_{BlPitchMom_2}}{\partial u_{BlPitch_1}}  & \frac{\partial Y_{BlPitchMom_2}}{\partial u_{BlPitch_2}}  & \frac{\partial Y_{BlPitchMom_2}}{\partial u_{BlPitch_3}}  & \frac{\partial Y_{BlPitchMom_2}}{\partial u_{BlPRate_1}}  & \frac{\partial Y_{BlPitchMom_2}}{\partial u_{BlPRate_2}}  & \frac{\partial Y_{BlPitchMom_2}}{\partial u_{BlPRate_3}}  & \frac{\partial Y_{BlPitchMom_2}}{\partial u_{Yaw}}   & \frac{\partial Y_{BlPitchMom_2}}{\partial u_{YawRate}}   & \frac{\partial Y_{BlPitchMom_2}}{\partial u_{HSS\_Spd}}  \\
+      !! \frac{\partial Y_{BlPitchMom_3}}{\partial u_{BlPitch_1}}  & \frac{\partial Y_{BlPitchMom_3}}{\partial u_{BlPitch_2}}  & \frac{\partial Y_{BlPitchMom_3}}{\partial u_{BlPitch_3}}  & \frac{\partial Y_{BlPitchMom_3}}{\partial u_{BlPRate_1}}  & \frac{\partial Y_{BlPitchMom_3}}{\partial u_{BlPRate_2}}  & \frac{\partial Y_{BlPitchMom_3}}{\partial u_{BlPRate_3}}  & \frac{\partial Y_{BlPitchMom_3}}{\partial u_{Yaw}}   & \frac{\partial Y_{BlPitchMom_3}}{\partial u_{YawRate}}   & \frac{\partial Y_{BlPitchMom_3}}{\partial u_{HSS\_Spd}}  \\
+      !! \frac{\partial Y_{YawMom}}{\partial u_{BlPitch_1}}        & \frac{\partial Y_{YawMom}}{\partial u_{BlPitch_2}}        & \frac{\partial Y_{YawMom}}{\partial u_{BlPitch_3}}        & \frac{\partial Y_{YawMom}}{\partial u_{BlPRate_1}}        & \frac{\partial Y_{YawMom}}{\partial u_{BlPRate_2}}        & \frac{\partial Y_{YawMom}}{\partial u_{BlPRate_3}}        & \frac{\partial Y_{YawMom}}{\partial u_{Yaw}}         & \frac{\partial Y_{YawMom}}{\partial u_{YawRate}}         & \frac{\partial Y_{YawMom}}{\partial u_{HSS\_Spd}}        \\
+      !! \frac{\partial Y_{GenTrq}}{\partial u_{BlPitch_1}}        & \frac{\partial Y_{GenTrq}}{\partial u_{BlPitch_2}}        & \frac{\partial Y_{GenTrq}}{\partial u_{BlPitch_3}}        & \frac{\partial Y_{GenTrq}}{\partial u_{BlPRate_1}}        & \frac{\partial Y_{GenTrq}}{\partial u_{BlPRate_2}}        & \frac{\partial Y_{GenTrq}}{\partial u_{BlPRate_3}}        & \frac{\partial Y_{GenTrq}}{\partial u_{Yaw}}         & \frac{\partial Y_{GenTrq}}{\partial u_{YawRate}}         & \frac{\partial Y_{GenTrq}}{\partial u_{HSS\_Spd}}        \\
+      !! \frac{\partial Y_{ElecPwr}}{\partial u_{BlPitch_1}}       & \frac{\partial Y_{ElecPwr}}{\partial u_{BlPitch_2}}       & \frac{\partial Y_{ElecPwr}}{\partial u_{BlPitch_3}}       & \frac{\partial Y_{ElecPwr}}{\partial u_{BlPRate_1}}       & \frac{\partial Y_{ElecPwr}}{\partial u_{BlPRate_2}}       & \frac{\partial Y_{ElecPwr}}{\partial u_{BlPRate_3}}       & \frac{\partial Y_{ElecPwr}}{\partial u_{Yaw}}        & \frac{\partial Y_{ElecPwr}}{\partial u_{YawRate}}        & \frac{\partial Y_{ElecPwr}}{\partial u_{HSS\_Spd}}       \\
+      !! \frac{\partial Y_{WriteOutput_i}}{\partial u_{BlPitch_1}} & \frac{\partial Y_{WriteOutput_i}}{\partial u_{BlPitch_2}} & \frac{\partial Y_{WriteOutput_i}}{\partial u_{BlPitch_3}} & \frac{\partial Y_{WriteOutput_i}}{\partial u_{BlPRate_1}} & \frac{\partial Y_{WriteOutput_i}}{\partial u_{BlPRate_2}} & \frac{\partial Y_{WriteOutput_i}}{\partial u_{BlPRate_3}} & \frac{\partial Y_{WriteOutput_i}}{\partial u_{Yaw}}  & \frac{\partial Y_{WriteOutput_i}}{\partial u_{YawRate}}  & \frac{\partial Y_{WriteOutput_i}}{\partial u_{HSS\_Spd}} \\
       !! = \begin{bmatrix}
-      !! 0 & 0 & 0 \\
-      !! 0 & 0 & 0 \\
-      !! 0 & 0 & 0 \\
-      !! \frac{\partial Y_{YawMom}}{\partial u_{Yaw}} & \frac{\partial Y_{YawMom}}{\partial u_{YawRate}} & 0 \\
-      !! 0 & 0 & \frac{\partial Y_{GenTrq}}{\partial u_{HSS\_Spd}} \\
-      !! 0 & 0 & \frac{\partial Y_{ElecPwr}}{\partial u_{HSS\_Spd}} \\
-      !! \frac{\partial Y_{WriteOutput_i}}{\partial u_{Yaw}} & \frac{\partial Y_{WriteOutput_i}}{\partial u_{YawRate}} & \frac{\partial Y_{WriteOutput_i}}{\partial u_{HSS\_Spd}} \end{bmatrix}
+      !! 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\  ! \frac{\partial Y_{BlPitchCom_1}}{\partial u_{*}}
+      !! 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\  ! \frac{\partial Y_{BlPitchCom_2}}{\partial u_{*}}
+      !! 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\  ! \frac{\partial Y_{BlPitchCom_3}}{\partial u_{*}}
+      !! 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\  ! \frac{\partial Y_{BlPRateCom_1}}{\partial u_{*}}
+      !! 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\  ! \frac{\partial Y_{BlPRateCom_2}}{\partial u_{*}}
+      !! 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\  ! \frac{\partial Y_{BlPRateCom_3}}{\partial u_{*}}
+      !! \frac{\partial Y_{BlPitchMom_1}}{\partial u_{BlPitch_1}} & 0 & 0 & \frac{\partial Y_{BlPitchMom_1}}{\partial u_{BlPRate_1}} & 0 & 0 & 0 & 0 & 0 \\  ! \frac{\partial Y_{BlPitchMom_1}}{\partial u_{*}}
+      !! 0 & \frac{\partial Y_{BlPitchMom_2}}{\partial u_{BlPitch_2}} & 0 & 0 & \frac{\partial Y_{BlPitchMom_2}}{\partial u_{BlPRate_2}} & 0 & 0 & 0 & 0 \\  ! \frac{\partial Y_{BlPitchMom_2}}{\partial u_{*}}
+      !! 0 & 0 & \frac{\partial Y_{BlPitchMom_3}}{\partial u_{BlPitch_3}} & 0 & 0 & \frac{\partial Y_{BlPitchMom_3}}{\partial u_{BlPRate_3}} & 0 & 0 & 0 \\  ! \frac{\partial Y_{BlPitchMom_3}}{\partial u_{*}}
+      !! 0 & 0 & 0 & 0 & 0 & 0 & \frac{\partial Y_{YawMom}}{\partial u_{Yaw}} & \frac{\partial Y_{YawMom}}{\partial u_{YawRate}} & 0 \\
+      !! 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & \frac{\partial Y_{GenTrq}}{\partial u_{HSS\_Spd}} \\
+      !! 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & \frac{\partial Y_{ElecPwr}}{\partial u_{HSS\_Spd}} \\
+      !! \frac{\partial Y_{WriteOutput_i}}{\partial u_{BlPitch_1}} & \frac{\partial Y_{WriteOutput_i}}{\partial u_{BlPitch_2}} & \frac{\partial Y_{WriteOutput_i}}{\partial u_{BlPitch_3}} & \frac{\partial Y_{WriteOutput_i}}{\partial u_{BlPRate_1}} & \frac{\partial Y_{WriteOutput_i}}{\partial u_{BlPRate_2}} & \frac{\partial Y_{WriteOutput_i}}{\partial u_{BlPRate_3}} & \frac{\partial Y_{WriteOutput_i}}{\partial u_{Yaw}}  & \frac{\partial Y_{WriteOutput_i}}{\partial u_{YawRate}}  & \frac{\partial Y_{WriteOutput_i}}{\partial u_{HSS\_Spd}} \\
       !!\f}
 
       !   ! Torque control:
@@ -3105,9 +3132,12 @@ contains
       !     These terms are analytically calculated
       !...............................................................................
       AllOuts = 0.0_R8Ki ! all variables not specified below are zeros (either constant or disabled):
-      AllOuts(1:3, GenTq)     =  0.001_R8Ki*dYdu(SrvD_Indx_Y_GenTrq, (/Indx_u_Yaw,Indx_u_YawRate,Indx_u_HSS_Spd/))
-      AllOuts(1:3, GenPwr)    =  0.001_R8Ki*dYdu(SrvD_Indx_Y_ElecPwr,(/Indx_u_Yaw,Indx_u_YawRate,Indx_u_HSS_Spd/))
-      AllOuts(1:3, YawMomCom) = -0.001_R8Ki*dYdu(SrvD_Indx_Y_YawMom, (/Indx_u_Yaw,Indx_u_YawRate,Indx_u_HSS_Spd/))
+      do I = 1,p%NumBl
+         AllOuts((/Indx_u_BlPitch(I),Indx_u_BlPRate(I)/), BlPitchM(I)) =  0.001_R8Ki*dYdu(SrvD_Indx_Y_BlPitchMom(I), (/Indx_u_BlPitch(I),Indx_u_BlPRate(I)/))
+      enddo
+      AllOuts(  Indx_u_HSS_Spd,                  GenTq) =  0.001_R8Ki*dYdu(SrvD_Indx_Y_GenTrq,              Indx_u_HSS_Spd  )
+      AllOuts(  Indx_u_HSS_Spd,                 GenPwr) =  0.001_R8Ki*dYdu(SrvD_Indx_Y_ElecPwr,             Indx_u_HSS_Spd  )
+      AllOuts((/Indx_u_Yaw,Indx_u_YawRate/), YawMomCom) = -0.001_R8Ki*dYdu(SrvD_Indx_Y_YawMom, (/Indx_u_Yaw,Indx_u_YawRate/))
 
       !...............................................................................
       ! Place the selected output channels into the WriteOutput(:) portion of the
@@ -3115,9 +3145,9 @@ contains
       !...............................................................................
       do I = 1,p%NumOuts  ! Loop through all selected output channels
          if (p%OutParam(I)%Indx > 0_IntKi) then
-            dYdu(I+SrvD_Indx_Y_WrOutput,(/Indx_u_Yaw,Indx_u_YawRate,Indx_u_HSS_Spd/)) = p%OutParam(I)%SignM * AllOuts( 1:3, p%OutParam(I)%Indx )
+            dYdu(I+SrvD_Indx_Y_WrOutput,1:9) = p%OutParam(I)%SignM * AllOuts( 1:9, p%OutParam(I)%Indx )
          else
-            dYdu(I+SrvD_Indx_Y_WrOutput,(/Indx_u_Yaw,Indx_u_YawRate,Indx_u_HSS_Spd/)) = 0.0_R8Ki
+            dYdu(I+SrvD_Indx_Y_WrOutput,1:9) = 0.0_R8Ki
          endif
       enddo             ! I - All selected output channels
    end subroutine dYdu_PitYawGen
