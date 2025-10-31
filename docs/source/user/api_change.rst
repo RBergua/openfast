@@ -54,6 +54,22 @@ AeroDyn driver                                25       SeaStFile            "MHK
 AeroDyn                                       \*       TwrCp                1.0         [additional column in *Tower Influence and Aerodynamics* table]
 AeroDyn                                       \*       TwrCa                1.0         [additional column in *Tower Influence and Aerodynamics* table]
 SeaState                                      18       WvCrntMod            0     WvCrntMod     - Combined wave-current modeling option {0: simple superposition, 1: include Doppler effect, 2: include both Doppler effect and wave amplitude/spectrum scaling} (switch)
+ElastoDyn                                     11       PitchDOF             False         PitchDOF    - Blade pitch DOF (flag)
+ElastoDyn                                     77       PBrIner(1)           200           PBrIner(1)  - Pitch bearing/actuator inertia, blade 1 (kg m^2)
+ElastoDyn                                     78       PBrIner(2)           200           PBrIner(2)  - Pitch bearing/actuator inertia, blade 2 (kg m^2)
+ElastoDyn                                     79       PBrIner(3)           200           PBrIner(3)  - Pitch bearing/actuator inertia, blade 3 (kg m^2) [unused for 2 blades]
+ElastoDyn                                     80       BlPIner(1)           28578         BlPIner(1)  - Pitch inertia of an undeflected blade, blade 1 (kg m^2)
+ElastoDyn                                     81       BlPIner(2)           28578         BlPIner(1)  - Pitch inertia of an undeflected blade, blade 1 (kg m^2)
+ElastoDyn                                     82       BlPIner(3)           28578         BlPIner(1)  - Pitch inertia of an undeflected blade, blade 1 (kg m^2) [unused for 2 blades]
+ServoDyn                                      9        PitNeut(1)           0             PitNeut(1)  - Blade 1 neutral pitch position--pitch spring moment is zero at this position *[unused when* **PCMode>0** and **t>=TPCOn** *]*
+ServoDyn                                      10       PitNeut(2)           0             PitNeut(2)  - Blade 2 neutral pitch position--pitch spring moment is zero at this position *[unused when* **PCMode>0** and **t>=TPCOn** *]*
+ServoDyn                                      11       PitNeut(3)           0             PitNeut(3)  - Blade 3 neutral pitch position--pitch spring moment is zero at this position *[unused when* **PCMode>0** and **t>=TPCOn** *]* *[unused for 2 blades]*
+ServoDyn                                      12       PitSpr(1)            3.6E7         PitSpr(1)   - Blade 1 pitch spring constant
+ServoDyn                                      13       PitSpr(2)            3.6E7         PitSpr(2)   - Blade 2 pitch spring constant
+ServoDyn                                      14       PitSpr(3)            3.6E7         PitSpr(3)   - Blade 3 pitch spring constant *[unused for 2 blades]*
+ServoDyn                                      15       PitDamp(1)           1.4E6         PitDamp(1)  - Blade 1 pitch damping constant
+ServoDyn                                      16       PitDamp(2)           1.4E6         PitDamp(2)  - Blade 2 pitch damping constant
+ServoDyn                                      17       PitDamp(3)           1.4E6         PitDamp(3)  - Blade 3 pitch damping constant *[unused for 2 blades]*
 ============================================= ======== ==================== ========================================================================================================================================================================================================
 
 
