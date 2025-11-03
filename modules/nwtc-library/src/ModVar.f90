@@ -285,24 +285,63 @@ subroutine ModVarType_Init(Var, Index, Linearize, ErrStat, ErrMsg)
          UnitDesc = ''
          if (MV_HasFlagsAll(Var, VF_Line)) UnitDesc = "/m"
 
+         ! Allocate linearization names array
+         allocate(Var%LinNames(3*Var%Nodes), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, "error allocating LinNames for "//Var%Name, ErrStat, ErrMsg, RoutineName)
+            return
+         end if 
+
          ! Switch based on field number
          select case (Var%Field)
          case (FieldForce)
-            Var%LinNames = [character(LinChanLen) ::((trim(Var%Name)//" "//Comp(j)//" force, node "//trim(num2lstr(i))//', N'//UnitDesc, j=1, 3), i=1, Var%Nodes)]
+            do i = 1, Var%Nodes
+               do j = 1, 3
+                  Var%LinNames(3*(i - 1) + j) = trim(Var%Name)//" "//Comp(j)//" force, node "//trim(num2lstr(i))//', N'//UnitDesc
+               end do
+            end do
          case (FieldMoment)
-            Var%LinNames = [character(LinChanLen) ::((trim(Var%Name)//" "//Comp(j)//" moment, node "//trim(num2lstr(i))//', Nm'//UnitDesc, j=1, 3), i=1, Var%Nodes)]
+            do i = 1, Var%Nodes
+               do j = 1, 3
+                  Var%LinNames(3*(i - 1) + j) = trim(Var%Name)//" "//Comp(j)//" moment, node "//trim(num2lstr(i))//', Nm'//UnitDesc
+               end do
+            end do
          case (FieldTransDisp)
-            Var%LinNames = [character(LinChanLen) ::((trim(Var%Name)//" "//Comp(j)//" translation displacement, node "//trim(num2lstr(i))//', m', j=1, 3), i=1, Var%Nodes)]
+            do i = 1, Var%Nodes
+               do j = 1, 3
+                  Var%LinNames(3*(i - 1) + j) = trim(Var%Name)//" "//Comp(j)//" translation displacement, node "//trim(num2lstr(i))//', m'
+               end do
+            end do
          case (FieldOrientation)
-            Var%LinNames = [character(LinChanLen) ::((trim(Var%Name)//" "//Comp(j)//" orientation angle, node "//trim(num2lstr(i))//', rad', j=1, 3), i=1, Var%Nodes)]
+            do i = 1, Var%Nodes
+               do j = 1, 3
+                  Var%LinNames(3*(i - 1) + j) = trim(Var%Name)//" "//Comp(j)//" orientation angle, node "//trim(num2lstr(i))//', rad'
+               end do
+            end do
          case (FieldTransVel)
-            Var%LinNames = [character(LinChanLen) ::((trim(Var%Name)//" "//Comp(j)//" translation velocity, node "//trim(num2lstr(i))//', m/s', j=1, 3), i=1, Var%Nodes)]
+            do i = 1, Var%Nodes
+               do j = 1, 3
+                  Var%LinNames(3*(i - 1) + j) = trim(Var%Name)//" "//Comp(j)//" translation velocity, node "//trim(num2lstr(i))//', m/s'
+               end do
+            end do
          case (FieldAngularVel)
-            Var%LinNames = [character(LinChanLen) ::((trim(Var%Name)//" "//Comp(j)//" rotation velocity, node "//trim(num2lstr(i))//', rad/s', j=1, 3), i=1, Var%Nodes)]
+            do i = 1, Var%Nodes
+               do j = 1, 3
+                  Var%LinNames(3*(i - 1) + j) = trim(Var%Name)//" "//Comp(j)//" rotation velocity, node "//trim(num2lstr(i))//', rad/s'
+               end do
+            end do
          case (FieldTransAcc)
-            Var%LinNames = [character(LinChanLen) ::((trim(Var%Name)//" "//Comp(j)//" translation acceleration, node "//trim(num2lstr(i))//', m/s^2', j=1, 3), i=1, Var%Nodes)]
+            do i = 1, Var%Nodes
+               do j = 1, 3
+                  Var%LinNames(3*(i - 1) + j) = trim(Var%Name)//" "//Comp(j)//" translation acceleration, node "//trim(num2lstr(i))//', m/s^2'
+               end do
+            end do
          case (FieldAngularAcc)
-            Var%LinNames = [character(LinChanLen) ::((trim(Var%Name)//" "//Comp(j)//" rotation acceleration, node "//trim(num2lstr(i))//', rad/s^2', j=1, 3), i=1, Var%Nodes)]
+            do i = 1, Var%Nodes
+               do j = 1, 3
+                  Var%LinNames(3*(i - 1) + j) = trim(Var%Name)//" "//Comp(j)//" rotation acceleration, node "//trim(num2lstr(i))//', rad/s^2'
+               end do
+            end do
          case default
             call SetErrStat(ErrID_Fatal, "Invalid mesh field type", ErrStat, ErrMsg, RoutineName)
             return
