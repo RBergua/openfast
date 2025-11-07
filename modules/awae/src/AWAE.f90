@@ -28,6 +28,8 @@ module AWAE
    use AWAE_Types
    use AWAE_IO
    use InflowWind
+   use IfW_FlowField
+   use KdTree
 
 #ifdef _OPENMP
    use OMP_LIB
@@ -54,6 +56,10 @@ module AWAE
    public :: AWAE_TEST_CalcOutput
    public :: AWAE_TEST_Interp2D
 
+   real(ReKi), parameter, private :: I33(3,3) = &
+      reshape([1.0_ReKi, 0.0_ReKi, 0.0_ReKi, &
+               0.0_ReKi, 1.0_ReKi, 0.0_ReKi, &
+               0.0_ReKi, 0.0_ReKi, 1.0_ReKi], [3,3])
 
    contains
 
@@ -111,8 +117,7 @@ subroutine ComputeLocals(n, u, p, y, m, errStat, errMsg)
    integer(IntKi),                 intent(in   )  :: n           !< Current simulation time increment (zero-based)
    type(AWAE_InputType),           intent(in   )  :: u           !< Inputs at Time t
    type(AWAE_ParameterType),       intent(in   )  :: p           !< Parameters
-   type(AWAE_OutputType),          intent(inout)  :: y           !< Outputs computed at t (Input only so that mesh con-
-                                                               !!   nectivity information does not have to be recalculated)
+   type(AWAE_OutputType),          intent(inout)  :: y           !< Outputs computed at t (Input only so that mesh connectivity information does not have to be recalculated)
    type(AWAE_MiscVarType),         intent(inout)  :: m           !< Misc/optimization variables
    integer(IntKi),                 intent(  out)  :: errStat     !< Error status of the operation
    character(*),                   intent(  out)  :: errMsg      !< Error message if errStat /= ErrID_None
@@ -175,35 +180,49 @@ end function jinc
 !! Orientations from plane to inertial for each wake, shape: 3x3xnWake
 !!  R_p2i = [xphat|i^t  yphat|i^t  zphat|i^t]
 subroutine interp_planes_2_point(u, p, m, GridP, iWT, maxPln, & 
-   iw, wk_R_p2i, wk_V, wk_WAT_k)
+   iw, wk_R_p2i, wk_V, wk_WAT_k, start_plane, end_plane)
    type(AWAE_InputType),     intent(in   ) :: u           !< Inputs at Time t
    type(AWAE_ParameterType), intent(in   ) :: p           !< Parameters
    type(AWAE_MiscVarType),   intent(in   ) :: m           !< Misc/optimization variables
    integer(IntKi),           intent(in   ) :: iWT
    integer(IntKi),           intent(in   ) :: maxPln 
    real(ReKi),               intent(in   ) :: GridP(3)       !< grid point, 3 x nFlat
-   integer(IntKi),           intent(inout) :: iw             !< Cumulative index on numbre of wakes intersecting at that point
+   integer(IntKi),           intent(inout) :: iw             !< Cumulative index on number of wakes intersecting at that point
    real(ReKi),               intent(inout) :: wk_R_p2i(:,:,:)!< Orientations from plane to inertial for each wake, shape: 3x3xnWake
    real(ReKi),               intent(inout) :: wk_V(:,:)      !< Wake velocity from each overlapping wake,  shape: 3xnWake
    real(ReKi),               intent(inout) :: wk_WAT_k(:)   !< WAT scaling factors for all wakes (for overlap),  shape: nWake
+   integer(IntKi), optional, intent(in)    :: start_plane    !< Start plane index for interpolation
+   integer(IntKi), optional, intent(in)    :: end_plane      !< End plane index for interpolation
+
    ! Local
    real(ReKi)     :: x_end_plane
    real(ReKi)     :: x_start_plane
    real(ReKi)     :: p_tmp_plane(3)
    real(ReKi)     :: r_vec_plane(3)
-   integer(IntKi) :: np, np1
+   integer(IntKi) :: np, np1, sp, ep
    real(ReKi)     :: delta, deltad
    real(ReKi)     :: tmp_vec(3)
    real(ReKi)     :: xHat_plane(3), yHat_plane(3), zHat_plane(3)
    real(ReKi)     :: y_tmp_plane
    real(ReKi)     :: z_tmp_plane
 
-   !x_end_plane = dot_product(u%xhat_plane(:,0,iWT), (GridP(:) - u%p_plane(:,0,iWT)) )
-   x_end_plane =  u%xhat_plane(1,0,iWT) * (GridP(1) - u%p_plane(1,0,iWT)) &
-              &+  u%xhat_plane(2,0,iWT) * (GridP(2) - u%p_plane(2,0,iWT)) &
-              &+  u%xhat_plane(3,0,iWT) * (GridP(3) - u%p_plane(3,0,iWT)) 
+   if (present(start_plane)) then
+      sp = start_plane
+   else
+      sp = 0
+   end if
+   if (present(end_plane)) then
+      ep = end_plane - 1
+   else
+      ep = maxPln
+   end if
 
-   do np = 0, maxPln !p%NumPlanes-2
+   !x_end_plane = dot_product(u%xhat_plane(:,0,iWT), (GridP(:) - u%p_plane(:,0,iWT)) )
+   x_end_plane =  u%xhat_plane(1,sp,iWT) * (GridP(1) - u%p_plane(1,sp,iWT)) &
+              &+  u%xhat_plane(2,sp,iWT) * (GridP(2) - u%p_plane(2,sp,iWT)) &
+              &+  u%xhat_plane(3,sp,iWT) * (GridP(3) - u%p_plane(3,sp,iWT)) 
+
+   do np = sp, ep
       np1 = np + 1
       ! Construct the endcaps of the current wake plane volume
       x_start_plane = x_end_plane
@@ -213,8 +232,7 @@ subroutine interp_planes_2_point(u, p, m, GridP, iWT, maxPln, &
                  &+ u%xhat_plane(3,np1,iWT) * (GridP(3) - u%p_plane(3,np1,iWT)) 
 
       ! test if the point is within the endcaps of the wake volume
-      if ( ( ( x_start_plane >= 0.0_ReKi ) .and. ( x_end_plane < 0.0_ReKi ) ) .or. &
-           ( ( x_start_plane <= 0.0_ReKi ) .and. ( x_end_plane > 0.0_ReKi ) )        ) then
+      if ((x_start_plane * x_end_plane) < 0.0_ReKi) then
 
          ! Plane interpolation factor
          if ( EqualRealNos( x_start_plane, x_end_plane ) ) then
@@ -648,24 +666,22 @@ subroutine HighResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
    integer(IntKi),                 intent(  out)  :: errStat     !< Error status of the operation
    character(*),                   intent(  out)  :: errMsg      !< Error message if errStat /= ErrID_None
 
-   integer(IntKi)      :: nt, nt2, np, ix, iy, iz, i_hl !< loop counters
+   integer(IntKi)      :: i_turb, nt2, np, i_hl !< loop counters
    integer(IntKi)      :: n_wake       !< accumulating counters
    real(SiKi)          :: V_qs(3)            ! Quasi-steady wake deficit  , after wake-intersection averaging (without WAT)
    real(ReKi)          :: WAT_k              ! WAT scaling factor (averaged from overlapping wakes)
-   real(SiKi)          :: WAT_V(3)           ! WAT velocity contribution
-   real(ReKi)          :: Pos_global(3)      ! global position
    real(ReKi), allocatable :: WAT_B_BoxHi(:,:) ! position of WAT box (global) for each intermediate steps, shape: 3 x n_high_low
    real(ReKi), allocatable :: wk_R_p2i(:,:,:)!< Orientations from plane to inertial for each wake, shape: 3x3xnWake
    real(ReKi), allocatable :: wk_V(:,:)      !< Wake velocity from each overlapping wake,  shape: 3xnWake
    real(ReKi), allocatable :: wk_WAT_k(:)    !< WAT scaling factors for all wakes (for overlap)
+   real(ReKi)          :: max_wake_radius    ! maximum wake radius
    integer(IntKi)      :: np1
-   integer(IntKi)      :: iXYZ !< Flat counter on X,Y,Z high res grid
    integer(IntKi)      :: maxPln
    integer(IntKi)      :: maxN_wake
    integer(IntKi)      :: NumGrid_high !< number of points in high res grid grid
    integer(IntKi)      :: n_high_low
-   integer(IntKi)      :: WAT_iT,WAT_iY,WAT_iZ  !< indexes for WAT point (Time interchangeable with X)
-   integer(IntKi)      :: errStat2
+   integer(IntKi)      :: ErrStat2
+   character(ErrMsgLen):: ErrMsg2
    character(*), parameter   :: RoutineName = 'HighResGridCalcOutput'
    errStat = ErrID_None
    errMsg  = ""
@@ -679,20 +695,28 @@ subroutine HighResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
       n_high_low = p%n_high_low
    end if
 
+   ! Maximum number of wake points
    maxN_wake = p%NumTurbines*( p%NumPlanes-1 )
+
+   ! Maximum wake radius
+   max_wake_radius = maxval(u%D_wake)/2.0_ReKi
+
    ! Variables stored for each wake crossing at a given point
-   allocate ( wk_R_p2i    (3, 3, 1:maxN_wake ), STAT=errStat2 ); if (errStat2 /= 0) call SetErrStat ( ErrID_Fatal, 'Could not allocate memory for wk_R_p2i.', errStat, errMsg, RoutineName )
-   allocate ( wk_V        (   3, 1:maxN_wake ), STAT=errStat2 ); if (errStat2 /= 0) call SetErrStat ( ErrID_Fatal, 'Could not allocate memory for wk_V.', errStat, errMsg, RoutineName )
-   allocate ( wk_WAT_k    (      1:maxN_wake ), STAT=errStat2 ); if (errStat2 /= 0) call SetErrStat ( ErrID_Fatal, 'Could not allocate memory for wk_WAT_k.', errStat, errMsg, RoutineName )
+   call AllocAry(wk_R_p2i, 3, 3, maxN_wake, "wk_R_p2i", errStat2, errMsg2); if (Failed()) return
+   call AllocAry(wk_V, 3, maxN_wake, "wk_V", errStat2, errMsg2); if (Failed()) return
+   call AllocAry(wk_WAT_k, maxN_wake, "wk_WAT_k", errStat2, errMsg2); if (Failed()) return
    if (ErrStat >= AbortErrLev) return
 
    ! Convect WAT Box tracer for each intermediate step
    ! Note: we substract because the high-res points are "before" current low res point
    if (p%WAT_Enabled) then
-      allocate ( WAT_B_BoxHi    ( 3, 0:n_high_low), STAT=errStat2 ); if (errStat2 /= 0) call SetErrStat ( ErrID_Fatal, 'Could not allocate memory for WAT_B_BoxHi.', errStat, errMsg, RoutineName )
-      if (ErrStat >= AbortErrLev) return
-      do i_hl=0, n_high_low
-         WAT_B_BoxHi(1:3, i_hl) = xd%WAT_B_Box(1:3) - (n_high_low-i_hl) * xd%Ufarm(1:3) * real(p%DT_high,ReKi)
+      allocate(WAT_B_BoxHi(3, 0:n_high_low), STAT=errStat2)
+      if (errStat2 /= 0) then
+         call SetErrStat(ErrID_Fatal, 'Could not allocate memory for WAT_B_BoxHi.', errStat, errMsg, RoutineName)
+         return
+      endif
+      do i_hl = 0, n_high_low
+         WAT_B_BoxHi(:, i_hl) = xd%WAT_B_Box - (n_high_low-i_hl) * xd%Ufarm * real(p%DT_high,ReKi)
       enddo
    endif
 
@@ -708,21 +732,113 @@ subroutine HighResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
    !           maxN_wake * 13 * OMP_NUM_THREADS * <precision> = size in bytes
    !     HOWEVER, real world testing shows that for 103 threads with 114 turbines and maxN_wake=101346 is more like
    !           maxN_wake * 40 * <precision> = size in bytes
-   NumGrid_high  = p%nX_high*p%nY_high*p%nZ_high
+   NumGrid_high = p%nX_high*p%nY_high*p%nZ_high
 
-   do nt = 1,p%NumTurbines
-      ! set the disturbed flow equal to the ambient flow for this time step
-      y%Vdist_high(nt)%data = m%Vamb_high(nt)%data
+   ! Loop through all turbines
+   do i_turb = 1,p%NumTurbines
+      call calc_turbine_grid(i_turb, m%Vamb_High(i_turb)%data, y%Vdist_high(i_turb)%data)      
+   end do
 
-      !$OMP PARALLEL DO DEFAULT(NONE) &
-      !$OMP PRIVATE (iXYZ, ix, iy, iz, n_wake, nt2, np,&
-      !$OMP&         wk_R_p2i, wk_V, &
-      !$OMP&         V_qs, &
-      !$OMP&         i_hl, Pos_global,&
-      !$OMP&         wk_WAT_k, WAT_k, WAT_iT, WAT_iY, WAT_iZ, WAT_V)& 
-      !$OMP SHARED(NumGrid_High, m, u, p, y, xd, nt, maxPln, n_high_low, WAT_B_BoxHi, errStat, errMsg)
+   if (allocated(wk_R_p2i)) deallocate(wk_R_p2i)
+   if (allocated(wk_V))     deallocate(wk_V)
+   if (allocated(wk_WAT_k)) deallocate(wk_WAT_k)
+   if (allocated(WAT_B_BoxHi))    deallocate(WAT_B_BoxHi)
+
+contains
+
+   subroutine calc_turbine_grid(iturb, Vamb_high, Vdist_high)
+      integer(IntKi), intent(in) :: iturb
+      real(SiKi), intent(in)     :: Vamb_high(:,:,:,:,:)
+      real(SiKi), intent(inout)  :: Vdist_high(:,:,:,:,:)
+      
+      real(ReKi)     :: grid_size(3)       ! grid dimensions
+      real(ReKi)     :: grid_center(3)     ! global position of turbine grid center
+      real(ReKi)     :: grid_radius        ! radius of sphere containting grid
+      real(ReKi)     :: search_radius      ! radius to search for wakes interacting with grid
+      real(ReKi)     :: Pos_global(3)      ! global position
+      real(SiKi)     :: WAT_V(3)           ! WAT velocity contribution
+      integer(IntKi) :: iXYZ               !< Flat counter on X,Y,Z high res grid
+      integer(IntKi) :: WAT_iT,WAT_iY,WAT_iZ  !< indexes for WAT point (Time interchangeable with X)
+      integer(IntKi) :: ii, ix, iy, iz
+      integer(IntKi) :: ip, it
+      integer(IntKi) :: n_wake_found
+      integer(IntKi), allocatable :: indices(:)
+      integer(IntKi), allocatable :: planes_by_turbine(:, :)
+
+      ! Initialize the high resolution grid output to the ambient flow for this time step
+      Vdist_high = Vamb_high
+
+      ! Get the size of the current turbine's high-res grid
+      grid_size = [p%dX_high(iturb)*p%nX_high, &
+                   p%dY_high(iturb)*p%nY_high, &
+                   p%dZ_high(iturb)*p%nZ_high]
+
+      ! Get the center of the current turbine's high-res grid
+      grid_center = [p%X0_high(iturb) + grid_size(1) / 2.0_ReKi, &
+                     p%Y0_high(iturb) + grid_size(2) / 2.0_ReKi, &
+                     p%Z0_high(iturb) + grid_size(3) / 2.0_ReKi]
+
+      ! Calculate the radius of a sphere that will contain the entire high-res grid
+      grid_radius = sqrt(dot_product(grid_size, grid_size))/2.0_ReKi
+
+      ! Radius to search for wakes interacting with grid
+      search_radius = 1.0_ReKi * (grid_radius + max_wake_radius)
+
+      ! Get indices of wake centers within search radius
+      call AllocAry(indices, m%KdT%NNodes, "indices", ErrStat2, ErrMsg2)
+      if (Failed()) return
+      call kdtree_points_in_radius(m%KdT, grid_center, search_radius, indices, n_wake_found)
+
+      ! If no wake points found within search radius, return
+      if (n_wake_found == 0) return
+
+      ! Allocate array to hold start and end planes for each turbine
+      call AllocAry(planes_by_turbine, 2, p%NumTurbines, "start_end_planes", ErrStat2, ErrMsg2)
+      if (Failed()) return
+      planes_by_turbine = -1
+
+      ! Sort the indices and filter out any that belong to this turbine
+      do ii = 1, n_wake_found
+
+         ! Get the turbine number for this plane
+         it = m%PlaneIdx(2, indices(ii))
+
+         ! If this plane belongs to the current turbine, skip it
+         if (it == iturb) cycle
+
+         ! Get the plane index
+         ip = m%PlaneIdx(1, indices(ii))
+
+         ! If no start or end plane previously set for this turbine, set for both
+         if (planes_by_turbine(1, it) == -1) then
+            planes_by_turbine(:, it) = ip
+         else
+            ! Otherwise, if plane index is above or below current bounds, update bounds
+            if (ip < planes_by_turbine(1, it)) planes_by_turbine(1, it) = ip
+            if (ip > planes_by_turbine(2, it)) planes_by_turbine(2, it) = ip
+         end if
+      end do
+
+      ! Loop through start and end planes by turbine and expand by one plane if applicable
+      do it = 1, p%NumTurbines
+
+         ! Skip turbines with no planes in this grid
+         if (planes_by_turbine(1, it) == -1) cycle
+
+         ! Include the plane before the first or clamp to first plane
+         planes_by_turbine(1, it) = max(0, planes_by_turbine(1, it) - 1)
+
+         ! Include the plane after the last or clamp to last plane
+         planes_by_turbine(2, it) = min(p%NumPlanes - 1, planes_by_turbine(2, it) + 1)
+
+      end do
+
+      ! If no planes in this grid, return
+      if (all(planes_by_turbine(1, :) == -1)) return
+
       ! Loop over all points of the high resolution ambient wind
-      do iXYZ=1, NumGrid_high
+      do iXYZ = 1, NumGrid_high
+
          ! From flat index iXYZ to grid indices
          ix = mod(     (iXYZ-1)                          ,p%nX_high)
          iy = mod(int( (iXYZ-1) / (p%nX_high          ) ),p%nY_high)
@@ -730,48 +846,55 @@ subroutine HighResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
 
          ! --- Compute variables wk_* (e.g. velocity) from each wakes reaching the current grid point 
          n_wake = 0 ! cumulative index, increases if point is at intersection of multiple wakes
-         do nt2 = 1,p%NumTurbines
-            if (nt /= nt2) then
-               call interp_planes_2_point(u, p, m, p%Grid_high(:,iXYZ,nt), nt2, maxPln, &  ! In
-                  n_wake, wk_R_p2i, wk_V, wk_WAT_k )                                       ! InOut
-            end if    ! nt /= nt2
-         end do        ! nt2 = 1,p%NumTurbines
-         if (n_wake > 0) then
-            ! --- Compute merged wake velocity V_qs
-            call mergeWakeVel(n_wake, wk_V, wk_R_p2i, V_qs)
+         do it = 1, p%NumTurbines
+            if (planes_by_turbine(1, it) == -1) cycle
+            call interp_planes_2_point(u, p, m, p%Grid_high(:,iXYZ,i_turb), it, maxPln, &  ! In
+               n_wake, wk_R_p2i, wk_V, wk_WAT_k, &                                         ! InOut
+               start_plane=planes_by_turbine(1, it), end_plane=planes_by_turbine(2, it))  ! Plane range
+         end do        ! it = 1,p%NumTurbines
 
-            ! --- Compute average WAT scaling factor and WAT velocity
-            if (p%WAT_Enabled) then
-               call mergeWakeWAT_k(n_wake, wk_WAT_k, WAT_k)
-               ! Position of current grid point
-               Pos_global(1) = real(ix,ReKi) * p%dX_high(nt) + p%X0_high(nt)
-               Pos_global(2) = real(iy,ReKi) * p%dY_high(nt) + p%Y0_high(nt)
-               Pos_global(3) = real(iz,ReKi) * p%dZ_high(nt) + p%Z0_high(nt)
-            else
-               WAT_V = 0.0_SiKi
-            endif
+         ! If no wake found, go to next grid point
+         if (n_wake > 0) cycle
+      
+         ! --- Compute merged wake velocity V_qs
+         call mergeWakeVel(n_wake, wk_V, wk_R_p2i, V_qs)
 
-            ! --- Store full velocity (Ambient + Wake QS + WAT) in grid
-            do i_hl=0, n_high_low
-               ! Compute WAT velocity
-               if (p%WAT_Enabled) then
-                  ! find location of grid point in the turbulent box, accounting for the convection of the box in between high res and low res
-                  WAT_iT = modulo( nint( (Pos_global(1) - WAT_B_BoxHi(1, i_hl)) * p%WAT_FlowField%Grid3D%Rate  ), p%WAT_FlowField%Grid3D%NSteps ) + 1    ! eq 23
-                  WAT_iY = modulo( nint( (Pos_global(2) + WAT_B_BoxHi(2, i_hl)) * p%WAT_FlowField%Grid3D%InvDY ), p%WAT_FlowField%Grid3D%NYGrids) + 1    ! eq 24
-                  WAT_iZ = modulo( nint( (Pos_global(3) + WAT_B_BoxHi(3, i_hl)) * p%WAT_FlowField%Grid3D%InvDZ ), p%WAT_FlowField%Grid3D%NZGrids) + 1    ! eq 25
-                  WAT_V(1:3) = p%WAT_FlowField%Grid3D%Vel(1:3,WAT_iY,WAT_iZ,WAT_iT) * WAT_k
-               endif
-               y%Vdist_high(nt)%data(:,ix,iy,iz,i_hl) = y%Vdist_high(nt)%data(:,ix,iy,iz,i_hl) + V_qs + WAT_V
+         ! If wake added turbulence is enabled
+         if (p%WAT_Enabled) then
+
+            ! Compute average WAT scaling factor and WAT velocity
+            call mergeWakeWAT_k(n_wake, wk_WAT_k, WAT_k)
+
+            ! Position of current grid point
+            Pos_global(1) = real(ix,ReKi) * p%dX_high(i_turb) + p%X0_high(i_turb)
+            Pos_global(2) = real(iy,ReKi) * p%dY_high(i_turb) + p%Y0_high(i_turb)
+            Pos_global(3) = real(iz,ReKi) * p%dZ_high(i_turb) + p%Z0_high(i_turb)
+
+            do i_hl = 0, n_high_low
+               ! find location of grid point in the turbulent box, accounting for the convection of the box in between high res and low res
+               WAT_iT = modulo(nint((Pos_global(1) - WAT_B_BoxHi(1, i_hl)) * p%WAT_FlowField%Grid3D%Rate  ), p%WAT_FlowField%Grid3D%NSteps ) + 1    ! eq 23
+               WAT_iY = modulo(nint((Pos_global(2) + WAT_B_BoxHi(2, i_hl)) * p%WAT_FlowField%Grid3D%InvDY ), p%WAT_FlowField%Grid3D%NYGrids) + 1    ! eq 24
+               WAT_iZ = modulo(nint((Pos_global(3) + WAT_B_BoxHi(3, i_hl)) * p%WAT_FlowField%Grid3D%InvDZ ), p%WAT_FlowField%Grid3D%NZGrids) + 1    ! eq 25
+
+               ! Calculate the wake added turbulence velocity
+               WAT_V = p%WAT_FlowField%Grid3D%Vel(1:3,WAT_iY,WAT_iZ,WAT_iT) * WAT_k
+
+               ! Store full velocity (Ambient + Wake QS + WAT) in grid
+               y%Vdist_high(iturb)%data(:,ix,iy,iz,i_hl) = y%Vdist_high(iturb)%data(:,ix,iy,iz,i_hl) + V_qs + WAT_V
             end do
-         end if  ! (n_wake > 0)
+         else
+            ! Store full velocity (Ambient + Wake QS) in grid
+            do i_hl = 0, n_high_low
+               y%Vdist_high(iturb)%data(:,ix,iy,iz,i_hl) = y%Vdist_high(iturb)%data(:,ix,iy,iz,i_hl) + V_qs
+            end do
+         endif            
       end do       ! iXYZ=0,NumGrid_high-1
-      !$OMP END PARALLEL DO
-   end do          ! nt = 1,p%NumTurbines
+   end subroutine
 
-   if (allocated(wk_R_p2i)) deallocate(wk_R_p2i)
-   if (allocated(wk_V))     deallocate(wk_V)
-   if (allocated(wk_WAT_k)) deallocate(wk_WAT_k)
-   if (allocated(WAT_B_BoxHi))    deallocate(WAT_B_BoxHi)
+   logical function Failed()
+      call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+      Failed =  ErrStat >= AbortErrLev
+   end function Failed
 
 end subroutine HighResGridCalcOutput
 
@@ -822,9 +945,10 @@ subroutine AWAE_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitO
       ! Validate the initialization inputs
    call ValidateInitInputData( InitInp%InputFileData, ErrStat2, ErrMsg2 ); if(Failed()) return;
 
-   ! --------------------------------------------------------------------------------
-   ! --- Initialize parameters
-   ! --------------------------------------------------------------------------------
+   !----------------------------------------------------------------------------
+   ! Initialize parameters
+   !----------------------------------------------------------------------------
+
    p%Mod_AmbWind      = InitInp%InputFileData%Mod_AmbWind
    p%dt_high          = InitInp%InputFileData%dt_high
    p%dt_low           = InitInp%InputFileData%dt_low
@@ -969,13 +1093,16 @@ subroutine AWAE_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitO
 
       end if
 
-         ! Set the position inputs once for the low-resolution grid
+      ! Set the position inputs once for the low-resolution grid
       m%u_IfW_Low%PositionXYZ = p%Grid_low
-         ! Set the hub position and orientation to pass to IfW (FIXME: IfW always calculates hub and disk avg vel. Change this after IfW pointers fully enabled.)
-      m%u_IfW_Low%HubPosition =  (/ p%X0_low + 0.5*p%nX_low*p%dX_low, p%Y0_low + 0.5*p%nY_low*p%dY_low, p%Z0_low + 0.5*p%nZ_low*p%dZ_low /)
-      call Eye(m%u_IfW_Low%HubOrientation,ErrStat2,ErrMsg2)
+      
+      ! Set the hub position and orientation to pass to IfW (FIXME: IfW always calculates hub and disk avg vel. Change this after IfW pointers fully enabled.)
+      m%u_IfW_Low%HubPosition = [p%X0_low + 0.5*p%nX_low*p%dX_low, &
+                                 p%Y0_low + 0.5*p%nY_low*p%dY_low, &
+                                 p%Z0_low + 0.5*p%nZ_low*p%dZ_low]
+      m%u_IfW_Low%HubOrientation = I33
 
-         ! Initialize the high-resolution grid inputs and outputs
+      ! Initialize the high-resolution grid inputs and outputs
       IF ( .NOT. ALLOCATED( m%u_IfW_High%PositionXYZ ) ) THEN
          call AllocAry(m%u_IfW_High%PositionXYZ, 3, p%nX_high*p%nY_high*p%nZ_high, 'm%u_IfW_High%PositionXYZ', ErrStat2, ErrMsg2); if(Failed()) return;
          call AllocAry(m%y_IfW_High%VelocityUVW, 3, p%nX_high*p%nY_high*p%nZ_high, 'm%y_IfW_High%VelocityUVW', ErrStat2, ErrMsg2); if(Failed()) return;
@@ -992,11 +1119,7 @@ subroutine AWAE_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitO
          if (allocated(m%y_IfW_High%lidar%MsrPositionsZ)) then
             call AllocAry(m%y_IfW_High%lidar%MsrPositionsZ, size(m%y_IfW_High%lidar%MsrPositionsZ), 'm%y_IfW_High%lidar%MsrPositionsZ', ErrStat2, ErrMsg2); if(Failed()) return;
          endif
-
       END IF
-      if (ErrStat >= AbortErrLev) then
-            return
-      end if
 
    end if
 
@@ -1038,29 +1161,32 @@ subroutine AWAE_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitO
    if (errStat >= AbortErrLev) return
 
 
-   ! --------------------------------------------------------------------------------
-   ! --- Initialize inputs 
-   ! --------------------------------------------------------------------------------
-   allocate ( u%xhat_plane(     3,                                                 0:p%NumPlanes-1,1:p%NumTurbines), STAT=ErrStat2 );  if (Failed0('u%xhat_plane.')) return;
-   allocate ( u%p_plane   (     3,                                                 0:p%NumPlanes-1,1:p%NumTurbines), STAT=ErrStat2 );  if (Failed0('u%p_plane.'   )) return;
-   allocate ( u%Vx_wake   (-p%NumRadii+1:p%NumRadii-1, -p%NumRadii+1:p%NumRadii-1, 0:p%NumPlanes-1,1:p%NumTurbines), STAT=ErrStat2 );  if (Failed0('u%Vx_wake.'   )) return;
-   allocate ( u%Vy_wake   (-p%NumRadii+1:p%NumRadii-1, -p%NumRadii+1:p%NumRadii-1, 0:p%NumPlanes-1,1:p%NumTurbines), STAT=ErrStat2 );  if (Failed0('u%Vy_wake.'   )) return;
-   allocate ( u%Vz_wake   (-p%NumRadii+1:p%NumRadii-1, -p%NumRadii+1:p%NumRadii-1, 0:p%NumPlanes-1,1:p%NumTurbines), STAT=ErrStat2 );  if (Failed0('u%Vz_wake.'   )) return;
-   allocate ( u%D_wake    (                                                        0:p%NumPlanes-1,1:p%NumTurbines), STAT=ErrStat2 );  if (Failed0('u%D_wake.'    )) return;
-   allocate ( u%WAT_k     (-p%NumRadii+1:p%NumRadii-1, -p%NumRadii+1:p%NumRadii-1, 0:p%NumPlanes-1,1:p%NumTurbines), STAT=ErrStat2 );  if (Failed0('u%WAT_k.'     )) return;
+   !----------------------------------------------------------------------------
+   ! Initialize inputs 
+   !----------------------------------------------------------------------------
+
+   allocate ( u%xhat_plane(                        3,                            0:p%NumPlanes-1,1:p%NumTurbines), STAT=ErrStat2 );  if (Failed0('u%xhat_plane.')) return;
+   allocate ( u%p_plane   (                        3,                            0:p%NumPlanes-1,1:p%NumTurbines), STAT=ErrStat2 );  if (Failed0('u%p_plane.'   )) return;
+   allocate ( u%Vx_wake   (1-p%NumRadii:p%NumRadii-1, 1-p%NumRadii:p%NumRadii-1, 0:p%NumPlanes-1,1:p%NumTurbines), STAT=ErrStat2 );  if (Failed0('u%Vx_wake.'   )) return;
+   allocate ( u%Vy_wake   (1-p%NumRadii:p%NumRadii-1, 1-p%NumRadii:p%NumRadii-1, 0:p%NumPlanes-1,1:p%NumTurbines), STAT=ErrStat2 );  if (Failed0('u%Vy_wake.'   )) return;
+   allocate ( u%Vz_wake   (1-p%NumRadii:p%NumRadii-1, 1-p%NumRadii:p%NumRadii-1, 0:p%NumPlanes-1,1:p%NumTurbines), STAT=ErrStat2 );  if (Failed0('u%Vz_wake.'   )) return;
+   allocate ( u%D_wake    (                                                      0:p%NumPlanes-1,1:p%NumTurbines), STAT=ErrStat2 );  if (Failed0('u%D_wake.'    )) return;
+   allocate ( u%WAT_k     (1-p%NumRadii:p%NumRadii-1, 1-p%NumRadii:p%NumRadii-1, 0:p%NumPlanes-1,1:p%NumTurbines), STAT=ErrStat2 );  if (Failed0('u%WAT_k.'     )) return;
 
    u%Vx_wake=0.0_ReKi
    u%Vy_wake=0.0_ReKi
    u%Vz_wake=0.0_ReKi
 
 
-   !----------------
-   ! initialize outputs
+   !----------------------------------------------------------------------------
+   ! Initialize outputs
+   !----------------------------------------------------------------------------
+
    allocate ( y%V_plane(3,0:p%NumPlanes-1,1:p%NumTurbines), STAT=ErrStat2 );  if (Failed0('y%V_plane.'   )) return;
    allocate ( y%Vdist_High(1:p%NumTurbines),                STAT=ErrStat2 );  if (Failed0('y%Vdist_High.')) return;
    do i = 1, p%NumTurbines
-      allocate ( y%Vdist_High(i)%data(3,0:p%nX_high-1,0:p%nY_high-1,0:p%nZ_high-1,0:p%n_high_low), STAT=ErrStat2 );  if (Failed0('y%Vdist_High%data.')) return;
-      y%Vdist_High(i)%data    = 0.0_Siki
+      allocate (y%Vdist_High(i)%data(3, 0:p%nX_high-1, 0:p%nY_high-1, 0:p%nZ_high-1, 0:p%n_high_low), STAT=ErrStat2);  if (Failed0('y%Vdist_High%data.')) return;
+      y%Vdist_High(i)%data = 0.0_Siki
    end do
 
    allocate ( y%Vx_wind_disk   (1:p%NumTurbines), STAT=ErrStat2 );  if (Failed0('y%Vx_rel_disk.')) return;
@@ -1078,9 +1204,9 @@ subroutine AWAE_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitO
    y%Vx_wind_disk  = 0.0_Reki
    y%TI_amb        = 0.0_Reki
 
-   ! --------------------------------------------------------------------------------
-   ! --- Initialize misc 
-   ! --------------------------------------------------------------------------------
+   !----------------------------------------------------------------------------
+   ! Initialize misc 
+   !----------------------------------------------------------------------------
    ! Initialize misc vars : Note these are not the correct initializations because
    ! that would require valid input data, which we do not have here.  Instead we will check for
    ! an firstPass flag on the miscVars and if it is false we will properly initialize these state
@@ -1116,6 +1242,10 @@ subroutine AWAE_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitO
    ! WAT - store array of disk average velocities for all turbines
    call AllocAry(m%V_amb_low_disk,3,p%NumTurbines,'m%V_amb_low_disk', ErrStat2, ErrMsg2); if(Failed()) return;
    m%V_amb_low_disk=0.0_ReKi ! IMPORTANT ALLOCATION. This misc var is not set before a low res calcoutput
+
+   ! Initialize the KdTree with no active points
+   call kdtree_build(m%KdT, u%p_plane(:,0:1,1), n_max=p%NumPlanes*p%NumTurbines)
+   call AllocAry(m%PlaneIdx, 2, p%NumPlanes*p%NumTurbines, 'm%PlaneIdx', ErrStat2, ErrMsg2); if(Failed()) return;
 
    ! Read-in the ambient wind data for the initial calculate output
    call AWAE_UpdateStates( 0.0_DbKi, -1, u, p, x, xd, z, OtherState, m, errStat2, errMsg2 ); if(Failed()) return;
@@ -1273,6 +1403,7 @@ end subroutine AWAE_End
 !----------------------------------------------------------------------------------------------------------------------------------
 !> Loose coupling routine for solving for constraint states, integrating continuous states, and updating discrete and other states.
 !! Continuous, constraint, discrete, and other states are updated for t + Interval
+!! Populates the ambient wind data in low and high resolution grids that is needed for t+dt, i.e., n+1
 subroutine AWAE_UpdateStates( t, n, u, p, x, xd, z, OtherState, m, errStat, errMsg )
    real(DbKi),                       intent(in   ) :: t          !< Current simulation time in seconds
    integer(IntKi),                   intent(in   ) :: n          !< Current simulation time step n = 0,1,...
@@ -1286,35 +1417,73 @@ subroutine AWAE_UpdateStates( t, n, u, p, x, xd, z, OtherState, m, errStat, errM
                                                                  !!   Output: Constraint states at t+dt
    type(AWAE_OtherStateType),        intent(inout) :: OtherState !< Input: Other states at t;
                                                                  !!   Output: Other states at t+dt
-   type(AWAE_MiscVarType),           intent(inout) :: m          !< Misc/optimization variables
+   type(AWAE_MiscVarType), target,   intent(inout) :: m          !< Misc/optimization variables
    integer(IntKi),                   intent(  out) :: errStat    !< Error status of the operation
    character(*),                     intent(  out) :: errMsg     !< Error message if errStat /= ErrID_None
 
-   type(AWAE_InputType)                            :: uInterp           ! Interpolated/Extrapolated input
-   integer(intKi)                                  :: errStat2          ! temporary Error status
-   character(ErrMsgLen)                            :: errMsg2           ! temporary Error message
-   character(*), parameter                         :: RoutineName = 'AWAE_UpdateStates'
-   integer(IntKi)                                  :: n_high_low, nt, i_hl, i,j,k,c
+   character(*), parameter    :: RoutineName = 'AWAE_UpdateStates'
+   integer(intKi)             :: errStat2          ! temporary Error status
+   character(ErrMsgLen)       :: errMsg2           ! temporary Error message
+   type(AWAE_InputType)       :: uInterp           ! Interpolated/Extrapolated input
+   integer(IntKi)             :: n_high_low, nt, i_hl
+   integer(IntKi)             :: i,j,k,c
+   real(ReKi), pointer        :: V_Grid(:,:,:,:)
+   real(SiKi), pointer        :: VelUVW(:,:)
+   real(ReKi), allocatable    :: AccUVW(:,:)
    
    errStat = ErrID_None
    errMsg  = ""
    
-   ! Read the ambient wind data that is needed for t+dt, i.e., n+1
-   
-   if ( (n+1) == (p%NumDT-1) ) then
+   ! If last time step, don't populate high-resolution grid
+   if ((n + 1) == (p%NumDT - 1)) then
       n_high_low = 0
    else
       n_high_low = p%n_high_low
    end if
 
-   if ( p%Mod_AmbWind == 1 ) then
-         ! read from file the ambient flow for the n+1 time step
+   !----------------------------------------------------------------------------
+   ! Populate low resolution grids based on ambient wind source
+   !----------------------------------------------------------------------------
+
+   select case (p%Mod_AmbWind)
+
+   ! File-based ambient wind
+   case (1)
+   
+      ! Read from file the ambient flow for the n+1 time step
       call ReadLowResWindFile(n+1, p, m%Vamb_Low, errStat2, errMsg2);   if (Failed()) return;
       
+   ! InflowWind-based ambient wind (single or multiple instances)
+   case (2, 3)
+
+      ! Set the hub position and orientation to pass to IfW (IfW always calculates hub and disk avg vel)
+      ! Set low-resolution inflow wind velocities
+      call IfW_FlowField_GetVelAcc(p%IfW(0)%FlowField, 1, t+p%dt_low, m%u_IfW_Low%PositionXYZ, m%y_IfW_Low%VelocityUVW, AccUVW, errStat2, errMsg2)
+      if (Failed()) return
+      
+      ! Transfer velocities to low resolution grid
+      V_Grid(lbound(m%Vamb_low,1):ubound(m%Vamb_low,1),&
+             lbound(m%Vamb_low,2):ubound(m%Vamb_low,2),&
+             lbound(m%Vamb_low,3):ubound(m%Vamb_low,3),&
+             lbound(m%Vamb_low,4):ubound(m%Vamb_low,4)) => m%y_IfW_Low%VelocityUVW
+      m%Vamb_Low = V_Grid
+      
+   end select
+
+   !----------------------------------------------------------------------------
+   ! Populate high-resolution grid based on ambient wind source
+   !----------------------------------------------------------------------------
+
+   select case (p%Mod_AmbWind)
+
+   ! File-based ambient wind
+   case (1)
+
       !$OMP PARALLEL DO DEFAULT(Shared) PRIVATE(nt, i_hl, errStat2, errMsg2) !Private(nt,tm2,tm3)
       do nt = 1,p%NumTurbines
          do i_hl=0, n_high_low
-               ! read from file the ambient flow for the current time step
+            
+            ! read from file the ambient flow for the current time step
             call ReadHighResWindFile(nt, (n+1)*p%n_high_low + i_hl, p, m%Vamb_high(nt)%data(:,:,:,:,i_hl), errStat2, errMsg2)
             if (ErrStat2 >= AbortErrLev) then
                !$OMP CRITICAL  ! Needed to avoid data race on ErrStat and ErrMsg
@@ -1324,91 +1493,81 @@ subroutine AWAE_UpdateStates( t, n, u, p, x, xd, z, OtherState, m, errStat, errM
          end do
       end do
       !$OMP END PARALLEL DO  
+
       if (errStat >= AbortErrLev) return 
 
-   else ! p%Mod_AmbWind == 2 .or. 3
+   ! Single InflowWind instance
+   case (2)
 
-         ! Set the hub position and orientation to pass to IfW (IfW always calculates hub and disk avg vel)
-      m%u_IfW_Low%HubPosition =  (/ p%X0_low + 0.5*p%nX_low*p%dX_low, p%Y0_low + 0.5*p%nY_low*p%dY_low, p%Z0_low + 0.5*p%nZ_low*p%dZ_low /)
-      call Eye(m%u_IfW_Low%HubOrientation,ErrStat2,ErrMsg2);   if (Failed()) return;
-      ! Set low-resolution inflow wind velocities
-      call InflowWind_CalcOutput(t+p%dt_low, m%u_IfW_Low, p%IfW(0), x%IfW(0), xd%IfW(0), z%IfW(0), OtherState%IfW(0), m%y_IfW_Low, m%IfW(0), errStat2, errMsg2);   if (Failed()) return;
-      c = 1
-      do k = 0,p%nZ_low-1
-         do j = 0,p%nY_low-1
-            do i = 0,p%nX_low-1
-               m%Vamb_Low(:,i,j,k) = m%y_IfW_Low%VelocityUVW(:,c)
-               c = c+1
-            end do
+      ! Loop through turbines
+      do nt = 1, p%NumTurbines
+
+         ! Loop through high resolution grids
+         do i_hl = 0, n_high_low
+
+            ! Calculate wind velocities at grid locations from InflowWind
+            call IfW_FlowField_GetVelAcc(p%IfW(0)%FlowField, 1, t+p%dt_low+i_hl*p%DT_high, p%Grid_high(:,:,nt), m%y_IfW_High%VelocityUVW, AccUVW, errStat2, errMsg2)
+            if (Failed()) return
+
+            ! Transfer velocities to high resolution grid
+            V_Grid(1:size(m%Vamb_high(nt)%data,1),&
+                   1:size(m%Vamb_high(nt)%data,2),&
+                   1:size(m%Vamb_high(nt)%data,3),&
+                   1:size(m%Vamb_high(nt)%data,4)) => m%y_IfW_High%VelocityUVW
+            m%Vamb_high(nt)%data(:,:,:,:,i_hl) = V_Grid
          end do
       end do
-      ! Set the high-resoultion inflow wind velocities for each turbine
-      if (  p%Mod_AmbWind == 2 ) then
-         do nt = 1,p%NumTurbines
-            m%u_IfW_High%PositionXYZ = p%Grid_high(:,:,nt)
-               ! Set the hub position and orientation to pass to IfW (IfW always calculates hub and disk avg vel)
-            m%u_IfW_High%HubPosition =  (/ p%X0_high(nt) + 0.5*p%nX_high*p%dX_high(nt), p%Y0_high(nt) + 0.5*p%nY_high*p%dY_high(nt), p%Z0_high(nt) + 0.5*p%nZ_high*p%dZ_high(nt) /)
-            call Eye(m%u_IfW_High%HubOrientation,ErrStat2,ErrMsg2)
-            do i_hl=0, n_high_low
-               call InflowWind_CalcOutput(t+p%dt_low+i_hl*p%DT_high, m%u_IfW_High, p%IfW(0), x%IfW(0), xd%IfW(0), z%IfW(0), OtherState%IfW(0), m%y_IfW_High, m%IfW(0), errStat2, errMsg2);   if (Failed()) return;
-               c = 1
-               do k = 0,p%nZ_high-1
-                  do j = 0,p%nY_high-1
-                     do i = 0,p%nX_high-1
-                        m%Vamb_high(nt)%data(:,i,j,k,i_hl) = m%y_IfW_High%VelocityUVW(:,c)
-                        c = c+1
-                     end do
-                  end do
-               end do
-            end do
+
+   ! Multiple InflowWind instances (one per turbine)
+   case (3)
+
+      ! Loop through turbines
+      do nt = 1,p%NumTurbines
+
+         ! Calculate high resolution grid position relative to turbine position
+         do c = 1, p%nZ_high * p%nY_high * p%nX_high
+            m%u_IfW_High%PositionXYZ(:,c) = p%Grid_high(:,c,nt) - p%WT_Position(:,nt)
          end do
 
-      else !p%Mod_AmbWind == 3
-         do nt = 1,p%NumTurbines
-            c = 1
-            do k = 0,p%nZ_high-1
-               do j = 0,p%nY_high-1
-                  do i = 0,p%nX_high-1
-                     m%u_IfW_High%PositionXYZ(:,c) = p%Grid_high(:,c,nt) - p%WT_Position(:,nt)
-                     c = c+1
-                  end do
-               end do
-            end do
-            do i_hl=0, n_high_low
-                  ! Set the hub position and orientation to pass to IfW (IfW always calculates hub and disk avg vel)
-               m%u_IfW_High%HubPosition =  (/ p%X0_high(nt) + 0.5*p%nX_high*p%dX_high(nt), p%Y0_high(nt) + 0.5*p%nY_high*p%dY_high(nt), p%Z0_high(nt) + 0.5*p%nZ_high*p%dZ_high(nt) /) - p%WT_Position(:,nt)
-               call Eye(m%u_IfW_High%HubOrientation,ErrStat2,ErrMsg2)
-               call InflowWind_CalcOutput(t+p%dt_low+i_hl*p%DT_high, m%u_IfW_High, p%IfW(nt), x%IfW(nt), xd%IfW(nt), z%IfW(nt), OtherState%IfW(nt), m%y_IfW_High, m%IfW(nt), errStat2, errMsg2);   if (Failed()) return;
-               c = 1
-               do k = 0,p%nZ_high-1
-                  do j = 0,p%nY_high-1
-                     do i = 0,p%nX_high-1
-                        m%Vamb_high(nt)%data(:,i,j,k,i_hl) = m%y_IfW_High%VelocityUVW(:,c)
-                        c = c+1
-                     end do
-                  end do
-               end do
-            end do
-         end do
-      end if
-   end if
+         ! Loop through high resolution grids
+         do i_hl = 0, n_high_low
 
-   ! WAT tracer propagation
+            ! Calculate wind velocities at grid locations from InflowWind
+            call IfW_FlowField_GetVelAcc(p%IfW(nt)%FlowField, 1, t+p%dt_low+i_hl*p%DT_high, m%u_IfW_High%PositionXYZ, m%y_IfW_High%VelocityUVW, AccUVW, errStat2, errMsg2)
+            if (Failed()) return
+
+            ! Transfer velocities to high resolution grid
+            V_Grid(1:size(m%Vamb_high(nt)%data,1),&
+                   1:size(m%Vamb_high(nt)%data,2),&
+                   1:size(m%Vamb_high(nt)%data,3),&
+                   1:size(m%Vamb_high(nt)%data,4)) => m%y_IfW_High%VelocityUVW
+            m%Vamb_high(nt)%data(:,:,:,:,i_hl) = V_Grid
+         end do
+      end do
+
+   end select
+
+   !----------------------------------------------------------------------------
+   ! Propagate WAT tracer
+   !----------------------------------------------------------------------------
+
    if (p%WAT_Enabled) then
-      ! find mean velocity of all turbine disks
+
+      ! Find mean velocity of all turbine disks
       xd%Ufarm = 0.0_ReKi
       do nt=1,p%NumTurbines
-         xd%Ufarm(1:3) = xd%Ufarm(1:3) + m%V_amb_low_disk(1:3,nt)
+         xd%Ufarm = xd%Ufarm + m%V_amb_low_disk(:,nt)
       enddo
-      xd%Ufarm(1:3) = xd%Ufarm(1:3) / real(p%NumTurbines,ReKi)
+      xd%Ufarm = xd%Ufarm / real(p%NumTurbines,ReKi)
+
       ! add mean velocity * dt to the tracer for the position of the WAT box
-      xd%WAT_B_Box(1:3) = xd%WAT_B_Box(1:3) + xd%Ufarm(1:3)*real(p%dt_low,ReKi)
+      xd%WAT_B_Box = xd%WAT_B_Box + xd%Ufarm*real(p%dt_low,ReKi)
    endif
 
 contains
    logical function Failed()
-      call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-      Failed =  ErrStat >= AbortErrLev
+      call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+      Failed = ErrStat >= AbortErrLev
    end function Failed
 end subroutine AWAE_UpdateStates
 
@@ -1424,7 +1583,7 @@ subroutine AWAE_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, errStat, errMsg
 ! placed in the y%WriteOutput(:) array.
    use VTK
    real(DbKi),                     intent(in   )  :: t           !< Current simulation time in seconds
-   type(AWAE_InputType),           intent(in   )  :: u           !< Inputs at Time t
+   type(AWAE_InputType), target,   intent(in   )  :: u           !< Inputs at Time t
    type(AWAE_ParameterType),       intent(in   )  :: p           !< Parameters
    type(AWAE_ContinuousStateType), intent(in   )  :: x           !< Continuous states at t
    type(AWAE_DiscreteStateType),   intent(in   )  :: xd          !< Discrete states at t
@@ -1446,6 +1605,8 @@ subroutine AWAE_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, errStat, errMsg
    character(3)                                   :: PlaneNumStr ! 2 digit number of the output plane
    CHARACTER(1024)                                :: FileName
    INTEGER(IntKi)                                 :: Un          ! unit number of opened file
+   integer(IntKi)                                 :: n_planes
+   real(ReKi), allocatable                        :: p_plane(:,:)
 
    errStat = ErrID_None
    errMsg  = ""
@@ -1454,6 +1615,27 @@ subroutine AWAE_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, errStat, errMsg
    n = nint(t / p%dt_low)
    n_high =  n*p%n_high_low
    call ComputeLocals(n, u, p, y, m, errStat2, errMsg2);                if (Failed()) return;
+
+   ! Update K-d Tree with all wake points
+   if (norm2(u%xhat_plane(:,1,1)) > 0) then
+      n_planes = min(n + 2, p%NumPlanes)
+   else
+      n_planes = 0
+   end if
+   allocate (p_plane(3, n_planes*p%NumTurbines))
+   k = 1
+   do i = 1, p%NumTurbines
+      do j = 0, n_planes - 1
+         ! Copy point location into array of points
+         p_plane(:, k) = u%p_plane(:, j, i)
+
+         ! Copy plane and turbine indices into array
+         m%PlaneIdx(:, k) = [j, i] 
+
+         k = k + 1
+      end do
+   end do
+   call kdtree_update(m%KdT, p_plane)
 
    ! high-res
    call HighResGridCalcOutput(n_high, u, p, xd, y, m, errStat2, errMsg2);   if (Failed()) return;
