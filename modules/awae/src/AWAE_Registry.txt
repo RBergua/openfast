@@ -130,8 +130,6 @@ typedef   ^ MiscVarType    ReKi     Vamb_lowpol     {:}{:} - -  "UVW components 
 typedef   ^ MiscVarType    SiKi     Vdist_low    {:}{:}{:}{:} - -  "UVW components of disturbed wind (ambient + deficits) across the low-resolution domain throughout the farm" m/s
 typedef   ^ MiscVarType    SiKi     Vdist_low_full    {:}{:}{:}{:} - -  "UVW components of disturbed wind (ambient + deficits) across the low-resolution domain throughout the farm, for outputs" m/s
 typedef   ^ MiscVarType    AWAE_HighWindGrid Vamb_High   {:} - -  "UVW components of ambient wind across each high-resolution domain around a turbine (one for each turbine) for each high-resolution time step within a low-resolution time step" m/s
-typedef   ^ MiscVarType    KdTreeType  KdT                -  - -  "K-d Tree structure for fast lookup of wake points" -
-typedef   ^ MiscVarType    IntKi       PlaneIdx          {:}{:}  - -  "Plane and turbine index for points in K-d tree" -
 typedef   ^ MiscVarType    Logical  parallelFlag   {:}{:}    - -  "" -
 typedef   ^ MiscVarType    ReKi     r_s   {:}{:}    - -  "" -
 typedef   ^ MiscVarType    ReKi     r_e   {:}{:}    - -  "" -
