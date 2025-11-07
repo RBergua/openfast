@@ -157,8 +157,6 @@ IMPLICIT NONE
     REAL(SiKi) , DIMENSION(:,:,:,:), ALLOCATABLE  :: Vdist_low      !< UVW components of disturbed wind (ambient + deficits) across the low-resolution domain throughout the farm [m/s]
     REAL(SiKi) , DIMENSION(:,:,:,:), ALLOCATABLE  :: Vdist_low_full      !< UVW components of disturbed wind (ambient + deficits) across the low-resolution domain throughout the farm, for outputs [m/s]
     TYPE(AWAE_HighWindGrid) , DIMENSION(:), ALLOCATABLE  :: Vamb_High      !< UVW components of ambient wind across each high-resolution domain around a turbine (one for each turbine) for each high-resolution time step within a low-resolution time step [m/s]
-    TYPE(KdTreeType)  :: KdT      !< K-d Tree structure for fast lookup of wake points [-]
-    INTEGER(IntKi) , DIMENSION(:,:), ALLOCATABLE  :: PlaneIdx      !< Plane and turbine index for points in K-d tree [-]
     LOGICAL , DIMENSION(:,:), ALLOCATABLE  :: parallelFlag      !<  [-]
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: r_s      !<  [-]
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: r_e      !<  [-]
@@ -1480,21 +1478,6 @@ subroutine AWAE_CopyMisc(SrcMiscData, DstMiscData, CtrlCode, ErrStat, ErrMsg)
          if (ErrStat >= AbortErrLev) return
       end do
    end if
-   call NWTC_Library_CopyKdTreeType(SrcMiscData%KdT, DstMiscData%KdT, CtrlCode, ErrStat2, ErrMsg2)
-   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-   if (ErrStat >= AbortErrLev) return
-   if (allocated(SrcMiscData%PlaneIdx)) then
-      LB(1:2) = lbound(SrcMiscData%PlaneIdx)
-      UB(1:2) = ubound(SrcMiscData%PlaneIdx)
-      if (.not. allocated(DstMiscData%PlaneIdx)) then
-         allocate(DstMiscData%PlaneIdx(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstMiscData%PlaneIdx.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstMiscData%PlaneIdx = SrcMiscData%PlaneIdx
-   end if
    if (allocated(SrcMiscData%parallelFlag)) then
       LB(1:2) = lbound(SrcMiscData%parallelFlag)
       UB(1:2) = ubound(SrcMiscData%parallelFlag)
@@ -1689,11 +1672,6 @@ subroutine AWAE_DestroyMisc(MiscData, ErrStat, ErrMsg)
       end do
       deallocate(MiscData%Vamb_High)
    end if
-   call NWTC_Library_DestroyKdTreeType(MiscData%KdT, ErrStat2, ErrMsg2)
-   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-   if (allocated(MiscData%PlaneIdx)) then
-      deallocate(MiscData%PlaneIdx)
-   end if
    if (allocated(MiscData%parallelFlag)) then
       deallocate(MiscData%parallelFlag)
    end if
@@ -1766,8 +1744,6 @@ subroutine AWAE_PackMisc(RF, Indata)
          call AWAE_PackHighWindGrid(RF, InData%Vamb_High(i1)) 
       end do
    end if
-   call NWTC_Library_PackKdTreeType(RF, InData%KdT) 
-   call RegPackAlloc(RF, InData%PlaneIdx)
    call RegPackAlloc(RF, InData%parallelFlag)
    call RegPackAlloc(RF, InData%r_s)
    call RegPackAlloc(RF, InData%r_e)
@@ -1821,8 +1797,6 @@ subroutine AWAE_UnPackMisc(RF, OutData)
          call AWAE_UnpackHighWindGrid(RF, OutData%Vamb_High(i1)) ! Vamb_High 
       end do
    end if
-   call NWTC_Library_UnpackKdTreeType(RF, OutData%KdT) ! KdT 
-   call RegUnpackAlloc(RF, OutData%PlaneIdx); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%parallelFlag); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%r_s); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%r_e); if (RegCheckErr(RF, RoutineName)) return
