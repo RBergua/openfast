@@ -85,6 +85,7 @@ set(NWTCLIBS_SOURCES
   src/VTK.f90
   src/YAML.f90
   src/JSON.f90
+  src/KdTree.f90
 
   # RanLux sources
   src/ranlux/RANLUX.f90
