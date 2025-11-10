@@ -161,6 +161,7 @@ IMPLICIT NONE
     INTEGER(IntKi) , DIMENSION(:,:), ALLOCATABLE  :: KdTreePointData      !< Plane and turbine index for points in K-d tree [-]
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: AllPlanePoints      !< X,Y plane coordinates for points (all planes/turbines) in K-d tree [-]
     INTEGER(IntKi) , DIMENSION(:,:,:), ALLOCATABLE  :: PlaneTurbineIdx      !< First and Last plane index by source and destination turbine index [-]
+    REAL(ReKi)  :: MaxWakePointSep = 0.0_ReKi      !< Maximum separation between wake points [-]
     LOGICAL , DIMENSION(:,:), ALLOCATABLE  :: parallelFlag      !<  [-]
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: r_s      !<  [-]
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: r_e      !<  [-]
@@ -1521,6 +1522,7 @@ subroutine AWAE_CopyMisc(SrcMiscData, DstMiscData, CtrlCode, ErrStat, ErrMsg)
       end if
       DstMiscData%PlaneTurbineIdx = SrcMiscData%PlaneTurbineIdx
    end if
+   DstMiscData%MaxWakePointSep = SrcMiscData%MaxWakePointSep
    if (allocated(SrcMiscData%parallelFlag)) then
       LB(1:2) = lbound(SrcMiscData%parallelFlag)
       UB(1:2) = ubound(SrcMiscData%parallelFlag)
@@ -1802,6 +1804,7 @@ subroutine AWAE_PackMisc(RF, Indata)
    call RegPackAlloc(RF, InData%KdTreePointData)
    call RegPackAlloc(RF, InData%AllPlanePoints)
    call RegPackAlloc(RF, InData%PlaneTurbineIdx)
+   call RegPack(RF, InData%MaxWakePointSep)
    call RegPackAlloc(RF, InData%parallelFlag)
    call RegPackAlloc(RF, InData%r_s)
    call RegPackAlloc(RF, InData%r_e)
@@ -1859,6 +1862,7 @@ subroutine AWAE_UnPackMisc(RF, OutData)
    call RegUnpackAlloc(RF, OutData%KdTreePointData); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%AllPlanePoints); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%PlaneTurbineIdx); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%MaxWakePointSep); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%parallelFlag); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%r_s); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%r_e); if (RegCheckErr(RF, RoutineName)) return

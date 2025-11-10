@@ -134,6 +134,7 @@ typedef   ^ MiscVarType    KdTreeType  KdT                -  - -  "K-d Tree stru
 typedef   ^ MiscVarType    IntKi       KdTreePointData          {:}{:}  - -  "Plane and turbine index for points in K-d tree" -
 typedef   ^ MiscVarType    ReKi        AllPlanePoints           {:}{:}  - -  "X,Y plane coordinates for points (all planes/turbines) in K-d tree" -
 typedef   ^ MiscVarType    IntKi       PlaneTurbineIdx          {:}{:}{:}  - -  "First and Last plane index by source and destination turbine index" -
+typedef   ^ MiscVarType    ReKi        MaxWakePointSep          - - -  "Maximum separation between wake points" -
 typedef   ^ MiscVarType    Logical  parallelFlag   {:}{:}    - -  "" -
 typedef   ^ MiscVarType    ReKi     r_s   {:}{:}    - -  "" -
 typedef   ^ MiscVarType    ReKi     r_e   {:}{:}    - -  "" -
