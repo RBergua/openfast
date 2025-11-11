@@ -1541,12 +1541,12 @@ subroutine AWAE_UpdateStates( t, n, u, p, x, xd, z, OtherState, m, errStat, errM
    case (3)
 
       ! Loop through turbines
-         do nt = 1,p%NumTurbines
+      do nt = 1, p%NumTurbines
 
          ! Calculate high resolution grid position relative to turbine position
          do c = 1, p%nZ_high * p%nY_high * p%nX_high
-                     m%u_IfW_High%PositionXYZ(:,c) = p%Grid_high(:,c,nt) - p%WT_Position(:,nt)
-                  end do
+            m%u_IfW_High%PositionXYZ(:,c) = p%Grid_high(:,c,nt) - p%WT_Position(:,nt)
+         end do
 
          ! Loop through high resolution grids
          do i_hl = 0, n_high_low
@@ -1561,8 +1561,8 @@ subroutine AWAE_UpdateStates( t, n, u, p, x, xd, z, OtherState, m, errStat, errM
                    1:size(m%Vamb_high(nt)%data,3),&
                    1:size(m%Vamb_high(nt)%data,4)) => m%y_IfW_High%VelocityUVW
             m%Vamb_high(nt)%data(:,:,:,:,i_hl) = V_Grid
-            end do
          end do
+      end do
 
    end select
 
