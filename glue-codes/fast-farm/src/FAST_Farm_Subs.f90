@@ -236,6 +236,7 @@ SUBROUTINE Farm_Initialize( farm, InputFile, ErrStat, ErrMsg )
    AWAE_InitInput%n_high_low                 = farm%p%n_high_low
    AWAE_InitInput%NumDT                      = farm%p%n_TMax
    AWAE_InitInput%OutFileRoot                = farm%p%OutFileRoot
+   AWAE_InitInput%RotorDiamRef               = farm%p%RotorDiamRef
    if (farm%p%WAT /= Mod_WAT_None .and. associated(farm%WAT_IfW%p%FlowField)) then
       AWAE_InitInput%WAT_FlowField => farm%WAT_IfW%p%FlowField
    endif
@@ -245,15 +246,15 @@ SUBROUTINE Farm_Initialize( farm, InputFile, ErrStat, ErrMsg )
       
    farm%AWAE%IsInitialized = .true.
 
-   farm%p%X0_Low = AWAE_InitOutput%X0_Low
-   farm%p%Y0_low = AWAE_InitOutput%Y0_low
-   farm%p%Z0_low = AWAE_InitOutput%Z0_low
-   farm%p%nX_Low = AWAE_InitOutput%nX_Low
-   farm%p%nY_low = AWAE_InitOutput%nY_low
-   farm%p%nZ_low = AWAE_InitOutput%nZ_low
-   farm%p%dX_low = AWAE_InitOutput%dX_low
-   farm%p%dY_low = AWAE_InitOutput%dY_low
-   farm%p%dZ_low = AWAE_InitOutput%dZ_low
+   farm%p%X0_Low = AWAE_InitOutput%oXYZ_Low(1)
+   farm%p%Y0_low = AWAE_InitOutput%oXYZ_Low(2)
+   farm%p%Z0_low = AWAE_InitOutput%oXYZ_Low(3)
+   farm%p%nX_Low = AWAE_InitOutput%nXYZ_Low(1)
+   farm%p%nY_low = AWAE_InitOutput%nXYZ_Low(2)
+   farm%p%nZ_low = AWAE_InitOutput%nXYZ_Low(3)
+   farm%p%dX_low = AWAE_InitOutput%dXYZ_Low(1)
+   farm%p%dY_low = AWAE_InitOutput%dXYZ_Low(2)
+   farm%p%dZ_low = AWAE_InitOutput%dXYZ_Low(3)
    farm%p%Module_Ver( ModuleFF_AWAE  ) = AWAE_InitOutput%Ver
    
       !-------------------
@@ -653,10 +654,6 @@ SUBROUTINE Farm_InitFAST( farm, WD_InitInp, AWAE_InitOutput, ErrStat, ErrMsg )
       FWrap_InitInp%tmax          = farm%p%TMax
       FWrap_InitInp%n_high_low    = farm%p%n_high_low + 1   ! Add 1 because the FAST wrapper uses an index that starts at 1
       FWrap_InitInp%dt_high       = farm%p%dt_high
-     
-      FWrap_InitInp%nX_high       = AWAE_InitOutput%nX_high
-      FWrap_InitInp%nY_high       = AWAE_InitOutput%nY_high
-      FWrap_InitInp%nZ_high       = AWAE_InitOutput%nZ_high
       
       if (farm%p%MooringMod > 0) then
          FWrap_Interval = farm%p%dt_mooring    ! when there is a farm-level mooring model, FASTWrapper will be called at the mooring coupling time step
@@ -676,14 +673,17 @@ SUBROUTINE Farm_InitFAST( farm, WD_InitInp, AWAE_InitOutput, ErrStat, ErrMsg )
          FWrap_InitInp%TurbNum       = nt
          FWrap_InitInp%RootName      = trim(farm%p%OutFileRoot)//'.T'//num2lstr(nt)
          
-         
-         FWrap_InitInp%p_ref_high(1) = AWAE_InitOutput%X0_high(nt)
-         FWrap_InitInp%p_ref_high(2) = AWAE_InitOutput%Y0_high(nt)
-         FWrap_InitInp%p_ref_high(3) = AWAE_InitOutput%Z0_high(nt)
+         FWrap_InitInp%nX_high       = AWAE_InitOutput%nXYZ_high(1,nt)
+         FWrap_InitInp%nY_high       = AWAE_InitOutput%nXYZ_high(2,nt)
+         FWrap_InitInp%nZ_high       = AWAE_InitOutput%nXYZ_high(3,nt)
 
-         FWrap_InitInp%dX_high       = AWAE_InitOutput%dX_high(nt)
-         FWrap_InitInp%dY_high       = AWAE_InitOutput%dY_high(nt)
-         FWrap_InitInp%dZ_high       = AWAE_InitOutput%dZ_high(nt)
+         FWrap_InitInp%p_ref_high(1) = AWAE_InitOutput%oXYZ_high(1,nt)
+         FWrap_InitInp%p_ref_high(2) = AWAE_InitOutput%oXYZ_high(2,nt)
+         FWrap_InitInp%p_ref_high(3) = AWAE_InitOutput%oXYZ_high(3,nt)
+
+         FWrap_InitInp%dX_high       = AWAE_InitOutput%dXYZ_high(1,nt)
+         FWrap_InitInp%dY_high       = AWAE_InitOutput%dXYZ_high(2,nt)
+         FWrap_InitInp%dZ_high       = AWAE_InitOutput%dXYZ_high(3,nt)
 
          FWrap_InitInp%Vdist_High   => AWAE_InitOutput%Vdist_High(nt)%data
 
