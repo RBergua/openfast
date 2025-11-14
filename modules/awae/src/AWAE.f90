@@ -294,6 +294,10 @@ subroutine interp_planes_2_point(u, p, m, GridP, iWT, maxPln, &
             endif
 
          end if  ! if the point is within radial finite-difference grid
+
+         ! Return from function because bounding planes were found
+         return
+
       end if  ! if the point is within the endcaps of the wake volume
    end do     ! np = 0, p%NumPlanes-2
 
