@@ -606,16 +606,12 @@ subroutine LowResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
                   Vdist_low_full = Vdist_low_full +               V_qs + WAT_V
                end if
             end select
+
+            ! Update disturbed velocity fields from local values
+            m%Vdist_low(:,ix,iy,iz) = Vdist_low
+            m%Vdist_low_full(:,ix,iy,iz) = Vdist_low_full
             
          end if  ! (n_wake > 0)
-
-         ! Update disturbed velocity fields from local values
-         m%Vdist_low(:,ix,iy,iz) = Vdist_low
-         m%Vdist_low_full(:,ix,iy,iz) = Vdist_low_full
-
-         ! Set chunk as updated
-         ! m%LowResChunkHasWake(c_dst) = .true.
-
       end do ! iXYZ, loop NumGrid_low points
    end do
    
