@@ -504,6 +504,10 @@ subroutine LowResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
    m%Vdist_low_full = m%Vamb_low
 
    ! Loop through chunks in the low-res grid
+   !$OMP parallel do default(none) &
+   !$OMP shared(p, m, u, xd, maxPln, maxN_wake) &
+   !$OMP private(c_dst, C_rot, c_rot_norm, i, ix, iy, iz, iXYZ, Pos_global, Vamb_low, Vdist_low, Vdist_low_full, &
+   !$OMP         t_src, n_wake, WAT_k, WAT_V, wk_R_p2i, wk_V, wk_WAT_k, V_qs, WAT_iT, WAT_iY, WAT_iZ)
    do c_dst = 1, size(p%LowRes%WakeChunks)
 
       ! If no wake planes interact with the destination chunk's grid, continue
@@ -923,6 +927,10 @@ subroutine HighResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
    !----------------------------------------------------------------------------
 
    ! Loop through turbines where wake interaction is possible
+   !$OMP parallel do default(none) &
+   !$OMP shared(p, m, u, y, maxPln, n_high_low, WAT_B_BoxHi) &
+   !$OMP private(t_dst, iXYZ, ix, iy, iz, t_src, n_wake, V_qs, WAT_k, WAT_V, &
+   !$OMP         wk_R_p2i, wk_V, wk_WAT_k, i_hl, Pos_global, wat_iT, WAT_iY, WAT_iZ)
    do t_dst = 1, p%NumTurbines
 
       ! set the disturbed flow equal to the ambient flow for this time step
