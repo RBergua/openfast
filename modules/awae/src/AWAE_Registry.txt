@@ -77,7 +77,6 @@ typedef   ^ InitInputType  AWAE_InputFileType InputFileData    -  - -   "FAST.Fa
 typedef   ^ InitInputType  IntKi              n_high_low       -  - -   "Number of high-resolution time steps per low" -
 typedef   ^ InitInputType  IntKi              NumDT            -  - -   "Number of low-resolution (FAST.Farm driver/glue code) time steps" -
 typedef  ^  InitInputType  CHARACTER(1024)    OutFileRoot      -  - -   "The root name derived from the primary FAST.Farm input file" -
-typedef  ^  InitInputType  ReKi               RotorDiamRef     -  - -   "Reference rotor diameter" meters
 #wake added turbulence (WAT)
 typedef  ^            ^    Logical            WAT_Enabled      - .false. - "Is WAT enabled?" -
 typedef  ^  InitInputType  FlowFieldType     *WAT_FlowField    -  - -   "Pointer to the InflowWinds flow field data type" -

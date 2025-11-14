@@ -219,8 +219,8 @@ subroutine interp_planes_2_point(u, p, m, GridP, iWT, maxPln, &
 
    !x_end_plane = dot_product(u%xhat_plane(:,0,iWT), (GridP(:) - u%p_plane(:,0,iWT)) )
    x_end_plane =  u%xhat_plane(1,sp,iWT) * (GridP(1) - u%p_plane(1,sp,iWT)) &
-              &+  u%xhat_plane(2,sp,iWT) * (GridP(2) - u%p_plane(2,sp,iWT)) &
-              &+  u%xhat_plane(3,sp,iWT) * (GridP(3) - u%p_plane(3,sp,iWT)) 
+               +  u%xhat_plane(2,sp,iWT) * (GridP(2) - u%p_plane(2,sp,iWT)) &
+               +  u%xhat_plane(3,sp,iWT) * (GridP(3) - u%p_plane(3,sp,iWT)) 
 
    do np = sp, ep
       np1 = np + 1
@@ -228,10 +228,10 @@ subroutine interp_planes_2_point(u, p, m, GridP, iWT, maxPln, &
       x_start_plane = x_end_plane
       !x_end_plane = dot_product(u%xhat_plane(:,np1,iWT), (GridP(:) - u%p_plane(:,np1,iWT)) )
       x_end_plane = u%xhat_plane(1,np1,iWT) * (GridP(1) - u%p_plane(1,np1,iWT)) &
-                 &+ u%xhat_plane(2,np1,iWT) * (GridP(2) - u%p_plane(2,np1,iWT)) &
-                 &+ u%xhat_plane(3,np1,iWT) * (GridP(3) - u%p_plane(3,np1,iWT)) 
+                  + u%xhat_plane(2,np1,iWT) * (GridP(2) - u%p_plane(2,np1,iWT)) &
+                  + u%xhat_plane(3,np1,iWT) * (GridP(3) - u%p_plane(3,np1,iWT)) 
 
-      ! test if the point is within the endcaps of the wake volume
+      ! test if the point is within the end caps of the wake volume
       if ((x_start_plane * x_end_plane) < 0.0_ReKi) then
 
          ! Plane interpolation factor
@@ -407,14 +407,15 @@ subroutine LowResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
    real(SiKi)              :: C_rot(3,3)
    real(SiKi)              :: C_rot_norm
    integer(IntKi)          :: t_src, c_dst, iwp
-   real(ReKi)              :: max_wake_radius    ! maximum wake radius
+   real(ReKi)              :: MaxWakeRadius    ! maximum wake radius
    real(ReKi)              :: search_radius      ! radius to search for wakes interacting with grid
    integer(IntKi)          :: n_wake_found
+   real(ReKi)              :: dist
 
    errStat = ErrID_None
    errMsg  = ""
 
-   maxPln =  min(n,p%MaxPlanes-2)
+   maxPln =  min(n, p%MaxPlanes-2)
    tmpPln =  min(p%MaxPlanes-1, n+1)
 
    maxN_wake = p%NumTurbines*(p%MaxPlanes-1)
@@ -429,18 +430,21 @@ subroutine LowResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
    ! interact with each destination chunk
    !----------------------------------------------------------------------------
 
-   ! Maximum wake radius
-   max_wake_radius = maxval(u%D_wake)/2.0_ReKi
+   ! Maximum wake radius for interaction
+   MaxWakeRadius = p%y(p%NumRadii-1)
 
    ! Initialize start/end plane indices by turbine and chunk to invalid value
    m%iPlaneTurbChunk = -1
+
+   ! Initialize flag that indicates if a chunk has any wake influence
+   m%LowResChunkHasWake = .false.
 
    ! Loop through destination chunks
    do c_dst = 1, size(p%LowRes%WakeChunks)
 
       ! Radius to search for wakes interacting with grid
       ! max of (grid radius + max wake radius) or half of max wake point separation
-      search_radius = max(p%LowRes%WakeChunks(c_dst)%Radius + max_wake_radius, &
+      search_radius = max(p%LowRes%WakeChunks(c_dst)%Radius + MaxWakeRadius, &
                           m%MaxWakePointSep/2.0_ReKi)
 
       ! Get indices of wake centers within search radius
@@ -448,6 +452,9 @@ subroutine LowResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
 
       ! If no wake points found within search radius, continue to next turbine
       if (n_wake_found == 0) cycle
+
+      ! Set flag that wake was found in chunk
+      m%LowResChunkHasWake(c_dst) = .true.
 
       ! Loop through the wake points found, and group first/last point by turbine
       do i = 1, n_wake_found
@@ -482,9 +489,6 @@ subroutine LowResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
 
       end do
 
-      ! Set flag for if chunk is influenced by wake
-      m%LowResChunkHasWake(c_dst) = any(m%iPlaneTurbChunk(1, :, c_dst) /= -1)
-
    end do
 
    !----------------------------------------------------------------------------
@@ -495,19 +499,17 @@ subroutine LowResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
    m%Vdist_low = m%Vamb_low
    m%Vdist_low_full = m%Vamb_low
 
-   ! ! Loop through chunks in the low-res grid
-   ! do c_dst = 1, size(p%LowRes%WakeChunks)
+   ! Loop through chunks in the low-res grid
+   do c_dst = 1, size(p%LowRes%WakeChunks)
 
-   !    ! If no wake planes interact with the destination chunk's grid, continue
-   !    if (.not. m%LowResChunkHasWake(c_dst)) cycle
+      ! If no wake planes interact with the destination chunk's grid, continue
+      if (.not. m%LowResChunkHasWake(c_dst)) cycle
 
-   !    ! Loop through the grid point indices in the chunk
-   !    do i = 1, size(p%LowRes%WakeChunks(c_dst)%iGridPoints)
+      ! Loop through the grid point indices in the chunk
+      do i = 1, size(p%LowRes%WakeChunks(c_dst)%iGridPoints)
 
-   !       ! Set the grid point index
-   !       iXYZ = p%LowRes%WakeChunks(c_dst)%iGridPoints(i)
-
-   do iXYZ = 1, size(p%LowRes%GridPoints, 2)
+         ! Set the grid point index
+         iXYZ = p%LowRes%WakeChunks(c_dst)%iGridPoints(i)
 
          ! Get the position of the current grid point
          Pos_global = p%LowRes%GridPoints(:,iXYZ)
@@ -528,13 +530,13 @@ subroutine LowResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
          do t_src = 1, p%NumTurbines
             
             ! Skip turbines with no planes in this chunk
-            ! if (m%iPlaneTurbChunk(1, t_src, c_dst) < 0) cycle
+            if (m%iPlaneTurbChunk(1, t_src, c_dst) < 0) cycle
 
             ! Interpolate applied wake effects from source turbine to the current point
             call interp_planes_2_point(u, p, m, Pos_global, t_src, &                      ! In
-                                       maxPln, n_wake, wk_R_p2i, wk_V, wk_WAT_k)!, &        ! InOut
-                                       ! start_plane=m%iPlaneTurbChunk(1, t_src, c_dst), &  ! Start plane index
-                                       ! end_plane=m%iPlaneTurbChunk(2, t_src, c_dst))      ! End plane index
+                                       maxPln, n_wake, wk_R_p2i, wk_V, wk_WAT_k, &        ! InOut
+                                       start_plane=m%iPlaneTurbChunk(1, t_src, c_dst), &  ! Start plane index
+                                       end_plane=m%iPlaneTurbChunk(2, t_src, c_dst))      ! End plane index
          end do      
 
          if (n_wake > 0) then
@@ -607,7 +609,7 @@ subroutine LowResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
          ! m%LowResChunkHasWake(c_dst) = .true.
 
       end do ! iXYZ, loop NumGrid_low points
-   ! end do
+   end do
    
    !----------------------------------------------------------------------------
    ! What is this?
@@ -792,7 +794,7 @@ subroutine HighResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
    real(ReKi), allocatable :: wk_R_p2i(:,:,:)!< Orientations from plane to inertial for each wake, shape: 3x3xnWake
    real(ReKi), allocatable :: wk_V(:,:)      !< Wake velocity from each overlapping wake,  shape: 3xnWake
    real(ReKi), allocatable :: wk_WAT_k(:)    !< WAT scaling factors for all wakes (for overlap)
-   real(ReKi)          :: max_wake_radius    ! maximum wake radius
+   real(ReKi)          :: MaxWakeRadius    ! maximum wake radius
    integer(IntKi)      :: np1
    integer(IntKi)      :: iXYZ !< Flat counter on X,Y,Z high res grid
    integer(IntKi)      :: maxPln
@@ -817,9 +819,6 @@ subroutine HighResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
 
    ! Maximum number of wake points
    maxN_wake = p%NumTurbines*( p%MaxPlanes-1 )
-
-   ! Maximum wake radius
-   max_wake_radius = maxval(u%D_wake)/2.0_ReKi
 
    ! Variables stored for each wake crossing at a given point
    call AllocAry(wk_R_p2i, 3, 3, maxN_wake, "wk_R_p2i", errStat2, errMsg2); if (Failed()) return
@@ -858,6 +857,9 @@ subroutine HighResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
    ! interact with each destination turbine
    !----------------------------------------------------------------------------
 
+   ! Maximum wake radius for interaction
+   MaxWakeRadius = p%y(p%NumRadii-1)
+
    ! Initialize start/end plane indices by turbine to invalid value
    m%iPlaneTurbTurb = -1
 
@@ -866,7 +868,7 @@ subroutine HighResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
 
       ! Radius to search for wakes interacting with grid
       ! max of (grid radius + max wake radius) or half of max wake point separation
-      search_radius = max((p%HighRes(t_dst)%Radius + max_wake_radius), &
+      search_radius = max((p%HighRes(t_dst)%Radius + MaxWakeRadius), &
                            m%MaxWakePointSep/2.0_ReKi)
 
       ! Get indices of wake centers within search radius

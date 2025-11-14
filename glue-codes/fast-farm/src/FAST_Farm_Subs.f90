@@ -236,7 +236,6 @@ SUBROUTINE Farm_Initialize( farm, InputFile, ErrStat, ErrMsg )
    AWAE_InitInput%n_high_low                 = farm%p%n_high_low
    AWAE_InitInput%NumDT                      = farm%p%n_TMax
    AWAE_InitInput%OutFileRoot                = farm%p%OutFileRoot
-   AWAE_InitInput%RotorDiamRef               = farm%p%RotorDiamRef
    if (farm%p%WAT /= Mod_WAT_None .and. associated(farm%WAT_IfW%p%FlowField)) then
       AWAE_InitInput%WAT_FlowField => farm%WAT_IfW%p%FlowField
    endif

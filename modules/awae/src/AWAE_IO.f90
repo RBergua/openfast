@@ -328,8 +328,8 @@ subroutine AWAE_IO_InitGridInfo(InitInp, p, InitOut, errStat, errMsg)
 
    else
 
-      ! Approximate a chunk size based on the reference rotor diameter
-      TargetChunkSize = 1.5_ReKi * InitInp%RotorDiamRef
+      ! Approximate a chunk size based on the max wake diameter
+      TargetChunkSize = p%y(p%NumRadii-1) / 2.0_ReKi
 
       ! Target number of points in each chunk
       nChunkPointsX = nint(TargetChunkSize/p%LowRes%dXYZ(1), IntKi)

@@ -100,7 +100,6 @@ IMPLICIT NONE
     INTEGER(IntKi)  :: n_high_low = 0_IntKi      !< Number of high-resolution time steps per low [-]
     INTEGER(IntKi)  :: NumDT = 0_IntKi      !< Number of low-resolution (FAST.Farm driver/glue code) time steps [-]
     CHARACTER(1024)  :: OutFileRoot      !< The root name derived from the primary FAST.Farm input file [-]
-    REAL(ReKi)  :: RotorDiamRef = 0.0_ReKi      !< Reference rotor diameter [meters]
     LOGICAL  :: WAT_Enabled = .false.      !< Is WAT enabled? [-]
     TYPE(FlowFieldType) , POINTER :: WAT_FlowField => NULL()      !< Pointer to the InflowWinds flow field data type [-]
   END TYPE AWAE_InitInputType
@@ -711,7 +710,6 @@ subroutine AWAE_CopyInitInput(SrcInitInputData, DstInitInputData, CtrlCode, ErrS
    DstInitInputData%n_high_low = SrcInitInputData%n_high_low
    DstInitInputData%NumDT = SrcInitInputData%NumDT
    DstInitInputData%OutFileRoot = SrcInitInputData%OutFileRoot
-   DstInitInputData%RotorDiamRef = SrcInitInputData%RotorDiamRef
    DstInitInputData%WAT_Enabled = SrcInitInputData%WAT_Enabled
    DstInitInputData%WAT_FlowField => SrcInitInputData%WAT_FlowField
 end subroutine
@@ -740,7 +738,6 @@ subroutine AWAE_PackInitInput(RF, Indata)
    call RegPack(RF, InData%n_high_low)
    call RegPack(RF, InData%NumDT)
    call RegPack(RF, InData%OutFileRoot)
-   call RegPack(RF, InData%RotorDiamRef)
    call RegPack(RF, InData%WAT_Enabled)
    call RegPack(RF, associated(InData%WAT_FlowField))
    if (associated(InData%WAT_FlowField)) then
@@ -766,7 +763,6 @@ subroutine AWAE_UnPackInitInput(RF, OutData)
    call RegUnpack(RF, OutData%n_high_low); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%NumDT); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%OutFileRoot); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%RotorDiamRef); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%WAT_Enabled); if (RegCheckErr(RF, RoutineName)) return
    if (associated(OutData%WAT_FlowField)) deallocate(OutData%WAT_FlowField)
    call RegUnpack(RF, IsAllocAssoc); if (RegCheckErr(RF, RoutineName)) return
