@@ -106,7 +106,7 @@ SUBROUTINE Farm_PrintSum( farm, WD_InputFileData, ErrStat, ErrMsg )
                                                                       
    end do
    
-   WRITE (UnSum,'(/,A)'   )  'Wake Dynamics Finite-Difference Grid: '//trim(Num2LStr(farm%WD(1)%p%NumRadii))//' Radii, '//trim(Num2LStr(farm%WD(1)%p%NumPlanes))//' Planes'
+   WRITE (UnSum,'(/,A)'   )  'Wake Dynamics Finite-Difference Grid: '//trim(Num2LStr(farm%WD(1)%p%NumRadii))//' Radii'
    WRITE (UnSum,'(2X,A)')      'Radial Node Number  Output Node Number    Radius'
    WRITE (UnSum,'(2X,A)')      '       (-)                (-)              (m) '  
    do I = 0, farm%WD(1)%p%NumRadii-1
@@ -268,7 +268,7 @@ SUBROUTINE Farm_InitOutput( farm, ErrStat, ErrMsg )
 !============================================================
 ! DEBUG OUTPUTS HERE
 !
-!      DO I = 0,farm%WD(1)%p%NumPlanes-1  ! Loop through all selected output channels
+!      DO I = 0,NINT(farm%WD(1)%y%NumPlanes)-1  ! Loop through all selected output channels
 !
 !         WRITE( farm%p%UnOu,'(A14)',ADVANCE='NO')   'PPLANEX'//trim(num2lstr(I))
 !         WRITE( farm%p%UnOu,'(A14)',ADVANCE='NO')   'PPLANEY'//trim(num2lstr(I))
@@ -301,7 +301,7 @@ SUBROUTINE Farm_InitOutput( farm, ErrStat, ErrMsg )
 !============================================================
 ! DEBUG OUTPUTS HERE
 !
-!      DO I = 0,farm%WD(1)%p%NumPlanes-1  ! Loop through all selected output channels
+!      DO I = 0,NINT(farm%WD(1)%y%NumPlanes)-1  ! Loop through all selected output channels
 !
 !         WRITE( farm%p%UnOu,'(A14)',ADVANCE='NO')   '      (m)     '
 !         WRITE( farm%p%UnOu,'(A14)',ADVANCE='NO')   '      (m)     '
@@ -313,7 +313,7 @@ SUBROUTINE Farm_InitOutput( farm, ErrStat, ErrMsg )
 !         WRITE( farm%p%UnOu,'(A14)',ADVANCE='NO' )  '    (m/s)     '
 !         WRITE( farm%p%UnOu,'(A14)',ADVANCE='NO' )  '    (m/s)     '
 !
-!         IF ( I < farm%WD(1)%p%NumPlanes-1 ) THEN
+!         IF ( I < NINT(farm%WD(1)%y%NumPlanes)-1 ) THEN
 !            WRITE( farm%p%UnOu,'(A14)',ADVANCE='NO' )  '      (-)     '
 !         END IF
 !
@@ -481,7 +481,7 @@ SUBROUTINE WriteFarmOutputToFile( t_global, farm, ErrStat, ErrMsg )
 !============================================================
 ! DEBUG OUTPUTS HERE
 !
-!      DO I = 0,farm%WD(1)%p%NumPlanes-1  ! Loop through all selected output channels
+!      DO I = 0,NINT(farm%WD(1)%y%NumPlanes)-1  ! Loop through all selected output channels
 !
 !         DO J = 1,3
 !            WRITE( TmpStr2, '('//trim(farm%p%OutFmt)//')' )  farm%WD(1)%y%p_plane(J,I)
@@ -722,7 +722,16 @@ SUBROUTINE Farm_ReadPrimaryFile( InputFile, p, WD_InitInp, AWAE_InitInp, OutList
    CALL ReadVar( UnIn, InputFile, p%RotorDiamRef     , "RotorDiamRef", "Reference turbine rotor diameter for wake calculations (m) [>0.0]", ErrStat2, ErrMsg2, UnEc); if(failed()) return
    CALL ReadVar( UnIn, InputFile, WD_InitInp%dr      , "dr"      ,  "Radial increment of radial finite-difference grid (m) [>0.0]", ErrStat2, ErrMsg2, UnEc); if(failed()) return
    CALL ReadVar( UnIn, InputFile, WD_InitInp%NumRadii, "NumRadii",  "Number of radii in the radial finite-difference grid (-) [>=2]", ErrStat2, ErrMsg2, UnEc); if(failed()) return
-   CALL ReadVar( UnIn, InputFile, WD_InitInp%NumPlanes,"NumPlanes", "Number of wake planes (-) [>=2]", ErrStat2, ErrMsg2, UnEc); if(failed()) return
+
+   CALL ReadVarWDefault( UnIn, InputFile, WD_InitInp%NumDFull, "NumDFull", &
+      "Distance of full wake propagation, expressed as a multiple of RotorDiamRef [>0.0] or DEFAULT [DEFAULT=15]", &
+      15_IntKi, ErrStat2, ErrMsg2, UnEc); if (Failed()) return
+
+   CALL ReadVarWDefault( UnIn, InputFile, WD_InitInp%NumDBuff, "NumDBuff", &
+      "Length of wake propagation buffer region, expressed as a multiple of RotorDiamRef [>=0.0] or DEFAULT [DEFAULT=5]", &
+       5_IntKi, ErrStat2, ErrMsg2, UnEc); if (Failed()) return
+
+   WD_InitInp%RotorDiamRef = p%RotorDiamRef
 
    ! f_c - Cut-off (corner) frequency of the low-pass time-filter for the wake advection, deflection, and meandering model (Hz) [>0.0] or DEFAULT [DEFAULT=0.0007]:
    DefaultReVal = 12.5_ReKi/(p%RotorDiamRef/2._ReKi) ! Eq. (32) of https://doi.org/10.1002/we.2785, with U=10, a=1/3
@@ -1024,7 +1033,8 @@ SUBROUTINE Farm_ValidateInput( p, WD_InitInp, AWAE_InitInp, ErrStat, ErrMsg )
    IF (WD_InitInp%Mod_Wake < 1 .or. WD_InitInp%Mod_Wake >3 ) CALL SetErrStat(ErrID_Fatal,'Mod_Wake needs to be 1,2 or 3',ErrStat,ErrMsg,RoutineName)
    IF (WD_InitInp%dr <= 0.0_ReKi) CALL SetErrStat(ErrID_Fatal,'dr (radial increment) must be larger than 0.',ErrStat,ErrMsg,RoutineName)
    IF (WD_InitInp%NumRadii < 2) CALL SetErrStat(ErrID_Fatal,'NumRadii (number of radii) must be at least 2.',ErrStat,ErrMsg,RoutineName)
-   IF (WD_InitInp%NumPlanes < 2) CALL SetErrStat(ErrID_Fatal,'NumPlanes (number of wake planes) must be at least 2.',ErrStat,ErrMsg,RoutineName)
+   IF (WD_InitInp%NumDFull <= 0.0_ReKi) CALL SetErrStat(ErrID_Fatal,'NumDFull (distance of full wake propagation as a multiple of RotorDiamRef) must be positive.',ErrStat,ErrMsg,RoutineName)
+   IF (WD_InitInp%NumDBuff <  0.0_ReKi) CALL SetErrStat(ErrID_Fatal,'NumDBuff (length of wake propagation buffer region as a multiple of RotorDiamRef) must be nonnegative.',ErrStat,ErrMsg,RoutineName)
 
    IF (WD_InitInp%k_VortexDecay < 0.0_ReKi) CALL SetErrStat(ErrID_Fatal,'k_VortexDecay must be >= 0',ErrStat,ErrMsg,RoutineName)
    IF (WD_InitInp%NumVortices < 2) CALL SetErrStat(ErrID_Fatal,'NumVorticies must be greater than 1',ErrStat,ErrMsg,RoutineName)

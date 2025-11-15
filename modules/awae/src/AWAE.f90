@@ -127,9 +127,9 @@ subroutine ComputeLocals(n, u, p, y, m, errStat, errMsg)
 
    errStat = 0
    errMsg  = ""
-   maxPln =   min(n,p%NumPlanes-2)
    rmax = p%y(p%NumRadii-1) 
    do nt = 1,p%NumTurbines
+      maxPln = NINT(u%NumPlanes(nt))-2
       do np = 0, maxPln
          cosTerm = dot_product(u%xhat_plane(:,np+1,nt),u%xhat_plane(:,np,nt))
          if (EqualRealNos(cosTerm, 1.0_ReKi)) then
@@ -388,7 +388,6 @@ subroutine LowResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
    real(ReKi)          :: WAT_k              ! WAT scaling factor (averaged from overlapping wakes)
    real(ReKi)          :: WAT_V(3)           ! WAT velocity contribution
    real(ReKi)          :: Pos_global(3)      ! global position
-   integer(IntKi)      :: tmpPln
    real(ReKi), allocatable :: wk_R_p2i(:,:,:)!< Orientations from plane to inertial for each wake, shape: 3x3xnWake
    real(ReKi), allocatable :: wk_V(:,:)      !< Wake velocity from each overlapping wake,  shape: 3xnWake
    real(ReKi), allocatable :: wk_WAT_k(:)    !< WAT scaling factors for all wakes (for overlap)
@@ -407,9 +406,6 @@ subroutine LowResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
    errStat = ErrID_None
    errMsg  = ""
 
-   maxPln =  min(n,p%NumPlanes-2)
-   tmpPln =  min(p%NumPlanes-1, n+1)
-
    maxN_wake = p%NumTurbines*( p%NumPlanes-1 )
    ! Variables stored for each wake crossing at a given point
    allocate ( wk_R_p2i    (3, 3, 1:maxN_wake ), STAT=errStat2 ); if (errStat2 /= 0) call SetErrStat ( ErrID_Fatal, 'Could not allocate memory for wk_R_p2i.', errStat, errMsg, RoutineName )
@@ -420,12 +416,12 @@ subroutine LowResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
    ! --- Loop over the entire grid of low resolution ambient wind data to compute:
    !    1) the disturbed flow at each point and 2) the averaged disturbed velocity of each wake plane
    !$OMP PARALLEL DO &
-   !$OMP PRIVATE(iXYZ, ix, iy, iz, n_wake,  nt, np, &
+   !$OMP PRIVATE(iXYZ, ix, iy, iz, n_wake,  nt, np, maxPln, &
    !$OMP&        wk_R_p2i, wk_V,&
    !$OMP&        V_qs, &   
    !$OMP&        C_rot, C_rot_norm, Pos_global,&
    !$OMP&        wk_WAT_k, WAT_k, WAT_iT, WAT_iY, WAT_iZ, WAT_V)&
-   !$OMP SHARED(m, u, p, xd, maxPln, errStat, errMsg) DEFAULT(NONE)
+   !$OMP SHARED(m, u, p, xd, errStat, errMsg) DEFAULT(NONE)
    do iXYZ = 1 , p%NumGrid_low
       ! From flat index iXYZ to grid indices
       ix = mod(     (iXYZ-1)                        ,p%nX_low)
@@ -439,6 +435,7 @@ subroutine LowResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
       ! --- Compute variables wk_* (e.g. velocity) from each wakes reaching the current grid point 
       n_wake = 0 ! cumulative index, increases if point is at intersection of multiple wakes
       do nt = 1,p%NumTurbines
+         maxPln = NINT(u%NumPlanes(nt))-2
          call interp_planes_2_point(u, p, m, p%Grid_low(:,iXYZ), nt, maxPln, &  ! In
             n_wake,  wk_R_p2i,  wk_V, wk_WAT_k )                                ! InOut
       end do      ! do nt = 1,p%NumTurbines
@@ -506,8 +503,10 @@ subroutine LowResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
    !$OMP END PARALLEL DO
 
    do nt = 1,p%NumTurbines
-         
-      do np = 0,tmpPln 
+
+      maxPln = NINT(u%NumPlanes(nt))-1
+
+      do np = 0,maxPln
       
       !!Defining yhat and zhat
          xxplane = (/u%xhat_plane(1,np,nt), 0.0_ReKi, 0.0_ReKi/)
@@ -697,8 +696,6 @@ subroutine HighResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
    errStat = ErrID_None
    errMsg  = ""
 
-   maxPln =  min(n,p%NumPlanes-2)
-
       ! We only need one high res file for that last simulation time
    if ( (n/p%n_high_low) == (p%NumDT-1) ) then
       n_high_low = 0
@@ -816,7 +813,7 @@ subroutine HighResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
          m%PlaneTurbineIdx(1, t_src, t_dst) = max(0, m%PlaneTurbineIdx(1, t_src, t_dst) - 1)
 
          ! Include the plane after the last or clamp to last plane
-         m%PlaneTurbineIdx(2, t_src, t_dst) = min(p%NumPlanes - 1, m%PlaneTurbineIdx(2, t_src, t_dst) + 1)
+         m%PlaneTurbineIdx(2, t_src, t_dst) = min(NINT(u%NumPlanes(t_src)) - 1, m%PlaneTurbineIdx(2, t_src, t_dst) + 1)
 
       end do
    end do 
@@ -850,6 +847,8 @@ subroutine HighResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
 
             ! If source turbine doesn't have any interacting planes, skip
             if (m%PlaneTurbineIdx(1, t_src, t_dst) == -1) cycle
+
+            maxPln = NINT(u%NumPlanes(t_src)) - 2
 
             ! Sum wake interactions from turbine at this point
             call interp_planes_2_point(u, p, m, p%Grid_high(:,iXYZ,t_dst), t_src, maxPln, &  ! In
@@ -1174,6 +1173,7 @@ subroutine AWAE_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitO
    ! Initialize inputs 
    !----------------------------------------------------------------------------
 
+   allocate ( u%NumPlanes (                                                                      1:p%NumTurbines), STAT=ErrStat2 );  if (Failed0('u%NumPlanes.' )) return;
    allocate ( u%xhat_plane(                        3,                            0:p%NumPlanes-1,1:p%NumTurbines), STAT=ErrStat2 );  if (Failed0('u%xhat_plane.')) return;
    allocate ( u%p_plane   (                        3,                            0:p%NumPlanes-1,1:p%NumTurbines), STAT=ErrStat2 );  if (Failed0('u%p_plane.'   )) return;
    allocate ( u%Vx_wake   (1-p%NumRadii:p%NumRadii-1, 1-p%NumRadii:p%NumRadii-1, 0:p%NumPlanes-1,1:p%NumTurbines), STAT=ErrStat2 );  if (Failed0('u%Vx_wake.'   )) return;
@@ -1182,6 +1182,7 @@ subroutine AWAE_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitO
    allocate ( u%D_wake    (                                                      0:p%NumPlanes-1,1:p%NumTurbines), STAT=ErrStat2 );  if (Failed0('u%D_wake.'    )) return;
    allocate ( u%WAT_k     (1-p%NumRadii:p%NumRadii-1, 1-p%NumRadii:p%NumRadii-1, 0:p%NumPlanes-1,1:p%NumTurbines), STAT=ErrStat2 );  if (Failed0('u%WAT_k.'     )) return;
 
+   u%NumPlanes = 2.0_ReKi
    u%Vx_wake=0.0_ReKi
    u%Vy_wake=0.0_ReKi
    u%Vz_wake=0.0_ReKi
@@ -1639,10 +1640,8 @@ subroutine AWAE_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, errStat, errMsg
    m%MaxWakePointSep = 0.0_ReKi
    do i = 1, p%NumTurbines
       PrevPoint = -1
-      do j = 0, p%NumPlanes - 1
+      do j = 0, NINT(u%NumPlanes(i)) - 1
          
-         ! If inactive plane found, exit loop
-         if (all(u%xhat_plane(:, j, i) == 0)) exit    
          k = k + 1
          
          ! Copy point location (X,Y only) into array of points
@@ -1943,7 +1942,7 @@ subroutine AWAE_TEST_CalcOutput(errStat, errMsg)
 
       ! Set up the inputs
    do nt = 1,p%NumTurbines
-      do np = 0,p%NumPlanes-1
+      do np = 0,NINT(u%NumPlanes(nt))-1
          do nz = -p%NumRadii+1,p%NumRadii-1
             do ny = -p%NumRadii+1,p%NumRadii-1
                   u%Vx_wake(ny,nz,np,nt) = -1.0_ReKi
@@ -1959,7 +1958,7 @@ subroutine AWAE_TEST_CalcOutput(errStat, errMsg)
    u%xhat_plane(3,:,:) = 0.0_ReKi
 
    do nt = 1,p%NumTurbines
-      do np = 0,p%NumPlanes-1
+      do np = 0,NINT(u%NumPlanes(nt))-1
          u%p_plane(1,np,nt)    = 0.0_ReKi + 8.0*np*interval + 250.0_ReKi*(nt-1)
          u%p_Plane(2,np,nt)    = 0.0_ReKi
          u%p_Plane(3,np,nt)    = 90.0_ReKi

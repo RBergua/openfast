@@ -232,6 +232,7 @@ typedef   ^ OutputType     ReKi       Vx_wind_disk {:}                    -     
 
 # ..... Inputs ...........................................................................................................
 # Define inputs that are contained on the mesh here:
+typedef   ^ InputType      ReKi       NumPlanes    {:}                    -      -      "Number of active wake planes for each turbine"      -
 typedef   ^ InputType      ReKi       xhat_plane   {:}{:}{:}              -      -      "Orientations of wake planes, normal to wake planes, for each turbine"      -
 typedef   ^ InputType      ReKi       p_plane      {:}{:}{:}              -      -      "Center positions of wake planes for each turbine"      m
 typedef   ^ InputType      ReKi       Vx_wake      {:}{:}{:}{:}           -      -      "Axial wake velocity deficit at wake planes, distributed across the plane, for each turbine (ny,nz,np,nWT)"      m/s
