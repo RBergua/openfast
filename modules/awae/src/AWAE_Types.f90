@@ -56,7 +56,6 @@ IMPLICIT NONE
     REAL(DbKi)  :: dt_low = 0.0_R8Ki      !< Low-resolution (FAST.Farm driver/glue code) time step [s]
     INTEGER(IntKi)  :: NumTurbines = 0_IntKi      !< Number of wind turbines in the farm [>=1] [-]
     INTEGER(IntKi)  :: NumRadii = 0_IntKi      !< Number of radii in the radial finite-difference grid  [>=2] [-]
-    INTEGER(IntKi)  :: NumPlanes = 0_IntKi      !< Number of wake planes downwind of the rotor where the wake is propagated [>=2] [-]
     CHARACTER(1024)  :: WindFilePath      !< Path name to the Root folder containing the wind data files from ABLSolver precursor [-]
     LOGICAL  :: WrDisWind = .false.      !< Write disturbed wind data to <WindFilePath>/Low/Dis.t<n>.vtk etc.? [-]
     INTEGER(IntKi)  :: NOutDisWindXY = 0_IntKi      !< Number of XY planes for output of disturbed wind data across the low-resolution domain to <WindFilePath>/Low/DisXY.<n_out>.t<n>.vtk [0 to 9] [-]
@@ -99,6 +98,7 @@ IMPLICIT NONE
     TYPE(AWAE_InputFileType)  :: InputFileData      !< FAST.Farm input-file data for AWAE module [-]
     INTEGER(IntKi)  :: n_high_low = 0_IntKi      !< Number of high-resolution time steps per low [-]
     INTEGER(IntKi)  :: NumDT = 0_IntKi      !< Number of low-resolution (FAST.Farm driver/glue code) time steps [-]
+    INTEGER(IntKi)  :: MaxPlanes = 0_IntKi      !< Maximum number of wake planes downwind of the rotor where the wake is propagated [>=2] [-]
     CHARACTER(1024)  :: OutFileRoot      !< The root name derived from the primary FAST.Farm input file [-]
     LOGICAL  :: WAT_Enabled = .false.      !< Is WAT enabled? [-]
     TYPE(FlowFieldType) , POINTER :: WAT_FlowField => NULL()      !< Pointer to the InflowWinds flow field data type [-]
@@ -107,24 +107,12 @@ IMPLICIT NONE
 ! =========  AWAE_InitOutputType  =======
   TYPE, PUBLIC :: AWAE_InitOutputType
     TYPE(ProgDesc)  :: Ver      !< This module's name, version, and date [-]
-    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: X0_high      !< X-component of the origin of the high-resolution spatial domain for each turbine [m]
-    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: Y0_high      !< Y-component of the origin of the high-resolution spatial domain for each turbine [m]
-    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: Z0_high      !< Z-component of the origin of the high-resolution spatial domain for each turbine [m]
-    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: dX_high      !< X-component of the spatial increment of the high-resolution spatial domain for each turbine [m]
-    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: dY_high      !< Y-component of the spatial increment of the high-resolution spatial domain for each turbine [m]
-    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: dZ_high      !< Z-component of the spatial increment of the high-resolution spatial domain for each turbine [m]
-    INTEGER(IntKi)  :: nX_high = 0_IntKi      !< Number of high-resolution spatial nodes in X direction  [-]
-    INTEGER(IntKi)  :: nY_high = 0_IntKi      !< Number of high-resolution spatial nodes in Y direction [-]
-    INTEGER(IntKi)  :: nZ_high = 0_IntKi      !< Number of high-resolution spatial nodes in Z direction [-]
-    REAL(ReKi)  :: dX_low = 0.0_ReKi      !< The spacing of the low-resolution nodes in X direction [m]
-    REAL(ReKi)  :: dY_low = 0.0_ReKi      !< The spacing of the low-resolution nodes in Y direction [m]
-    REAL(ReKi)  :: dZ_low = 0.0_ReKi      !< The spacing of the low-resolution nodes in Z direction [m]
-    INTEGER(IntKi)  :: nX_low = 0_IntKi      !< Number of low-resolution spatial nodes in X direction [-]
-    INTEGER(IntKi)  :: nY_low = 0_IntKi      !< Number of low-resolution spatial nodes in Y direction [-]
-    INTEGER(IntKi)  :: nZ_low = 0_IntKi      !< Number of low-resolution spatial nodes in Z direction [-]
-    REAL(ReKi)  :: X0_low = 0.0_ReKi      !< X-component of the origin of the low-resolution spatial domain [m]
-    REAL(ReKi)  :: Y0_low = 0.0_ReKi      !< Y-component of the origin of the low-resolution spatial domain [m]
-    REAL(ReKi)  :: Z0_low = 0.0_ReKi      !< Z-component of the origin of the low-resolution spatial domain [m]
+    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: oXYZ_high      !< XYZ components of the origin of the high-resolution spatial domain for each turbine [m]
+    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: dXYZ_high      !< XYZ components of the spatial increment of the high-resolution spatial domain for each turbine [m]
+    INTEGER(IntKi) , DIMENSION(:,:), ALLOCATABLE  :: nXYZ_high      !< Number of high-resolution spatial nodes in XYZ directions [-]
+    REAL(ReKi) , DIMENSION(1:3)  :: dXYZ_low = 0.0_ReKi      !< The spacing of the low-resolution nodes in XYZ directions [m]
+    INTEGER(IntKi) , DIMENSION(1:3)  :: nXYZ_low = 0_IntKi      !< Number of low-resolution spatial nodes in XYZ directions [-]
+    REAL(ReKi) , DIMENSION(1:3)  :: oXYZ_low = 0.0_ReKi      !< XYZ components of the origin of the low-resolution spatial domain [m]
     TYPE(AWAE_HighWindGridPtr) , DIMENSION(:), ALLOCATABLE  :: Vdist_High      !< Pointers to Wind velocity of disturbed wind (ambient + wakes) across each high-resolution domain around a turbine for each high-resolution step within a low-resolution step [m/s]
   END TYPE AWAE_InitOutputType
 ! =======================
@@ -158,9 +146,12 @@ IMPLICIT NONE
     REAL(SiKi) , DIMENSION(:,:,:,:), ALLOCATABLE  :: Vdist_low_full      !< UVW components of disturbed wind (ambient + deficits) across the low-resolution domain throughout the farm, for outputs [m/s]
     TYPE(AWAE_HighWindGrid) , DIMENSION(:), ALLOCATABLE  :: Vamb_High      !< UVW components of ambient wind across each high-resolution domain around a turbine (one for each turbine) for each high-resolution time step within a low-resolution time step [m/s]
     TYPE(KdTreeType)  :: KdT      !< K-d Tree structure for fast lookup of wake points [-]
-    INTEGER(IntKi) , DIMENSION(:,:), ALLOCATABLE  :: KdTreePointData      !< Plane and turbine index for points in K-d tree [-]
+    INTEGER(IntKi) , DIMENSION(:,:), ALLOCATABLE  :: KdTPointData      !< Plane and turbine index for points in K-d tree [-]
+    INTEGER(IntKi) , DIMENSION(:), ALLOCATABLE  :: KdTResults      !< KdTree search result indices [-]
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: AllPlanePoints      !< X,Y plane coordinates for points (all planes/turbines) in K-d tree [-]
-    INTEGER(IntKi) , DIMENSION(:,:,:), ALLOCATABLE  :: PlaneTurbineIdx      !< First and Last plane index by source and destination turbine index [-]
+    INTEGER(IntKi) , DIMENSION(:,:,:), ALLOCATABLE  :: iPlaneTurbTurb      !< First and Last plane index by source turbine and destination turbine index [-]
+    INTEGER(IntKi) , DIMENSION(:,:,:), ALLOCATABLE  :: iPlaneTurbChunk      !< First and Last plane index by source turbine and destination chunk index [-]
+    LOGICAL , DIMENSION(:), ALLOCATABLE  :: LowResChunkHasWake      !< Low-res gridFirst and Last plane index by source turbine and destination chunk index [-]
     REAL(ReKi)  :: MaxWakePointSep = 0.0_ReKi      !< Maximum separation between wake points [-]
     LOGICAL , DIMENSION(:,:), ALLOCATABLE  :: parallelFlag      !<  [-]
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: r_s      !<  [-]
@@ -180,40 +171,58 @@ IMPLICIT NONE
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: V_amb_low_disk      !< Rotor averaged ambiend wind speed for each wind turbine (3 x nWT) [m/s]
   END TYPE AWAE_MiscVarType
 ! =======================
+! =========  LRGChunkType  =======
+  TYPE, PUBLIC :: LRGChunkType
+    INTEGER(IntKi) , DIMENSION(1:3)  :: iChunk = 0_IntKi      !< XYZ index of chunk [-]
+    INTEGER(IntKi) , DIMENSION(1:2)  :: iSubGridX = 0_IntKi      !< start and end grid indices in X direction [-]
+    INTEGER(IntKi) , DIMENSION(1:2)  :: iSubGridY = 0_IntKi      !< start and end grid indices in Y direction [-]
+    INTEGER(IntKi) , DIMENSION(1:2)  :: iSubGridZ = 0_IntKi      !< start and end grid indices in Z direction [-]
+    INTEGER(IntKi) , DIMENSION(:), ALLOCATABLE  :: iGridPoints      !< Indices into GridPoints array to get locations [-]
+    INTEGER(IntKi)  :: nPoints = 0_IntKi      !< Number of points in sub-grid [-]
+    REAL(ReKi) , DIMENSION(1:3)  :: oXYZ = 0.0_ReKi      !< XYZ components of the origin of the resolution spatial domain [m]
+    REAL(ReKi) , DIMENSION(1:3)  :: Size = 0.0_ReKi      !< size of the grid chunk [m]
+    REAL(ReKi) , DIMENSION(1:3)  :: Center = 0.0_ReKi      !< center coordinates of the grid chunk [m]
+    REAL(ReKi)  :: Radius = 0.0_ReKi      !< Radius of cylinder encompassing grid [m]
+  END TYPE LRGChunkType
+! =======================
+! =========  LRGParamType  =======
+  TYPE, PUBLIC :: LRGParamType
+    REAL(ReKi) , DIMENSION(1:3)  :: oXYZ = 0.0_ReKi      !< XYZ components of the origin of the resolution spatial domain [m]
+    REAL(ReKi) , DIMENSION(1:3)  :: dXYZ = 0.0_ReKi      !< XYZ components of the spatial increment of the spatial domain [m]
+    INTEGER(IntKi) , DIMENSION(1:3)  :: nXYZ = 0_IntKi      !< Number of spatial nodes in XYZ directions [-]
+    INTEGER(IntKi)  :: nPoints = 0_IntKi      !< Number of spatial nodes [-]
+    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: GridPoints      !< XYZ components (global positions) of the spatial discretization of the grid [m]
+    REAL(ReKi) , DIMENSION(1:3)  :: Size = 0.0_ReKi      !< XYZ size of the grid [m]
+    REAL(ReKi) , DIMENSION(1:3)  :: Center = 0.0_ReKi      !< XYZ coordinates of the grid center [m]
+    TYPE(LRGChunkType) , DIMENSION(:), ALLOCATABLE  :: WakeChunks      !< Chunks for updating grid from wake [-]
+  END TYPE LRGParamType
+! =======================
+! =========  HRGParamType  =======
+  TYPE, PUBLIC :: HRGParamType
+    REAL(ReKi) , DIMENSION(1:3)  :: WT_Position = 0.0_ReKi      !< Turbine position [m]
+    REAL(ReKi) , DIMENSION(1:3)  :: oXYZ = 0.0_ReKi      !< XYZ components of the origin of the resolution spatial domain [m]
+    REAL(ReKi) , DIMENSION(1:3)  :: dXYZ = 0.0_ReKi      !< XYZ components of the spatial increment of the spatial domain [m]
+    INTEGER(IntKi) , DIMENSION(1:3)  :: nXYZ = 0_IntKi      !< Number of spatial nodes in XYZ directions [-]
+    INTEGER(IntKi)  :: nPoints = 0_IntKi      !< Number of spatial nodes [-]
+    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: GridPoints      !< XYZ components (global positions) of the spatial discretization of the grid [m]
+    REAL(ReKi) , DIMENSION(1:3)  :: Size = 0.0_ReKi      !< XYZ size of the grid [m]
+    REAL(ReKi) , DIMENSION(1:3)  :: Center = 0.0_ReKi      !< XYZ coordinates of the grid center [m]
+    REAL(ReKi)  :: Radius = 0.0_ReKi      !< Radius of cylinder encompassing grid [m]
+  END TYPE HRGParamType
+! =======================
 ! =========  AWAE_ParameterType  =======
   TYPE, PUBLIC :: AWAE_ParameterType
     CHARACTER(1024)  :: WindFilePath      !< Path name to the Root folder containing the wind data files from ABLSolver precursor [-]
     INTEGER(IntKi)  :: NumTurbines = 0_IntKi      !< Number of wind turbines in the farm [>=1] [-]
     INTEGER(IntKi)  :: NumRadii = 0_IntKi      !< Number of radii in the radial finite-difference grid  [>=2] [-]
-    INTEGER(IntKi)  :: NumPlanes = 0_IntKi      !< Number of wake planes downwind of the rotor where the wake is propagated [>=2] [-]
+    INTEGER(IntKi)  :: MaxPlanes = 0_IntKi      !< Maximum number of wake planes downwind of the rotor where the wake is propagated [>=2] [-]
+    TYPE(LRGParamType)  :: LowRes      !< Low-resolution grid data [-]
+    TYPE(HRGParamType) , DIMENSION(:), ALLOCATABLE  :: HighRes      !< High-resolution grid data [-]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: y      !< Horizontal discretization of the wake planes [m]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: z      !< Vertical discretization of the wake planes [m]
+    REAL(ReKi)  :: dPol = 0.0_ReKi      !< Spatial resolution of the polar grid for each wake plane of each turbine [m]
     INTEGER(IntKi)  :: Mod_AmbWind = 0_IntKi      !< Ambient wind model {1: high-fidelity precursor in VTK format, 2: InflowWind module} [-]
-    INTEGER(IntKi)  :: nX_low = 0_IntKi      !< Number of low-resolution spatial nodes in X direction [-]
-    INTEGER(IntKi)  :: nY_low = 0_IntKi      !< Number of low-resolution spatial nodes in Y direction [-]
-    INTEGER(IntKi)  :: nZ_low = 0_IntKi      !< Number of low-resolution spatial nodes in Z direction [-]
-    INTEGER(IntKi)  :: NumGrid_low = 0_IntKi      !< Total number of low-resolution spatial nodes [-]
     INTEGER(IntKi)  :: n_rp_max = 0_IntKi      !< Maximum possible number of points in the polar grid for the wake plane at each rotor [-]
-    REAL(ReKi)  :: dpol = 0.0_ReKi      !< Spatial resolution of the polar grid for each wake plane of each turbine [m]
-    REAL(ReKi) , DIMENSION(1:3)  :: dXYZ_low = 0.0_ReKi      !< XYZ-components of the spatial increment of the low-resolution domain [m]
-    REAL(ReKi)  :: dX_low = 0.0_ReKi      !< The spacing of the low-resolution nodes in X direction [m]
-    REAL(ReKi)  :: dY_low = 0.0_ReKi      !< The spacing of the low-resolution nodes in Y direction [m]
-    REAL(ReKi)  :: dZ_low = 0.0_ReKi      !< The spacing of the low-resolution nodes in Z direction [m]
-    REAL(ReKi)  :: X0_low = 0.0_ReKi      !< X-component of the origin of the low-resolution spatial domain [m]
-    REAL(ReKi)  :: Y0_low = 0.0_ReKi      !< Y-component of the origin of the low-resolution spatial domain [m]
-    REAL(ReKi)  :: Z0_low = 0.0_ReKi      !< Z-component of the origin of the low-resolution spatial domain [m]
-    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: X0_high      !< X-component of the origin of the high-resolution spatial domain for each turbine [m]
-    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: Y0_high      !< Y-component of the origin of the high-resolution spatial domain for each turbine [m]
-    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: Z0_high      !< Z-component of the origin of the high-resolution spatial domain for each turbine [m]
-    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: dX_high      !< X-component of the spatial increment of the high-resolution spatial domain for each turbine [m]
-    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: dY_high      !< Y-component of the spatial increment of the high-resolution spatial domain for each turbine [m]
-    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: dZ_high      !< Z-component of the spatial increment of the high-resolution spatial domain for each turbine [m]
-    INTEGER(IntKi)  :: nX_high = 0_IntKi      !< Number of high-resolution spatial nodes in X direction  [-]
-    INTEGER(IntKi)  :: nY_high = 0_IntKi      !< Number of high-resolution spatial nodes in Y direction [-]
-    INTEGER(IntKi)  :: nZ_high = 0_IntKi      !< Number of high-resolution spatial nodes in Z direction [-]
-    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: Grid_low      !< XYZ components (global positions) of the spatial discretization of the low-resolution spatial domain [m]
-    REAL(ReKi) , DIMENSION(:,:,:), ALLOCATABLE  :: Grid_high      !< XYZ components (global positions) of the spatial discretization of the high-resolution spatial domain for each turbine  [m]
-    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: WT_Position      !< X-Y-Z position of each wind turbine; index 1 = XYZ; index 2 = turbine number [meters]
     INTEGER(IntKi)  :: n_high_low = 0_IntKi      !< Number of high-resolution time steps per low [-]
     REAL(DbKi)  :: dt_low = 0.0_R8Ki      !< Low-resolution (FAST.Farm driver/glue code) time step [s]
     REAL(DbKi)  :: dt_high = 0.0_R8Ki      !< High-resolution (FAST) time step [s]
@@ -400,7 +409,6 @@ subroutine AWAE_CopyInputFileType(SrcInputFileTypeData, DstInputFileTypeData, Ct
    DstInputFileTypeData%dt_low = SrcInputFileTypeData%dt_low
    DstInputFileTypeData%NumTurbines = SrcInputFileTypeData%NumTurbines
    DstInputFileTypeData%NumRadii = SrcInputFileTypeData%NumRadii
-   DstInputFileTypeData%NumPlanes = SrcInputFileTypeData%NumPlanes
    DstInputFileTypeData%WindFilePath = SrcInputFileTypeData%WindFilePath
    DstInputFileTypeData%WrDisWind = SrcInputFileTypeData%WrDisWind
    DstInputFileTypeData%NOutDisWindXY = SrcInputFileTypeData%NOutDisWindXY
@@ -596,7 +604,6 @@ subroutine AWAE_PackInputFileType(RF, Indata)
    call RegPack(RF, InData%dt_low)
    call RegPack(RF, InData%NumTurbines)
    call RegPack(RF, InData%NumRadii)
-   call RegPack(RF, InData%NumPlanes)
    call RegPack(RF, InData%WindFilePath)
    call RegPack(RF, InData%WrDisWind)
    call RegPack(RF, InData%NOutDisWindXY)
@@ -647,7 +654,6 @@ subroutine AWAE_UnPackInputFileType(RF, OutData)
    call RegUnpack(RF, OutData%dt_low); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%NumTurbines); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%NumRadii); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%NumPlanes); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%WindFilePath); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%WrDisWind); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%NOutDisWindXY); if (RegCheckErr(RF, RoutineName)) return
@@ -702,6 +708,7 @@ subroutine AWAE_CopyInitInput(SrcInitInputData, DstInitInputData, CtrlCode, ErrS
    if (ErrStat >= AbortErrLev) return
    DstInitInputData%n_high_low = SrcInitInputData%n_high_low
    DstInitInputData%NumDT = SrcInitInputData%NumDT
+   DstInitInputData%MaxPlanes = SrcInitInputData%MaxPlanes
    DstInitInputData%OutFileRoot = SrcInitInputData%OutFileRoot
    DstInitInputData%WAT_Enabled = SrcInitInputData%WAT_Enabled
    DstInitInputData%WAT_FlowField => SrcInitInputData%WAT_FlowField
@@ -730,6 +737,7 @@ subroutine AWAE_PackInitInput(RF, Indata)
    call AWAE_PackInputFileType(RF, InData%InputFileData) 
    call RegPack(RF, InData%n_high_low)
    call RegPack(RF, InData%NumDT)
+   call RegPack(RF, InData%MaxPlanes)
    call RegPack(RF, InData%OutFileRoot)
    call RegPack(RF, InData%WAT_Enabled)
    call RegPack(RF, associated(InData%WAT_FlowField))
@@ -755,6 +763,7 @@ subroutine AWAE_UnPackInitInput(RF, OutData)
    call AWAE_UnpackInputFileType(RF, OutData%InputFileData) ! InputFileData 
    call RegUnpack(RF, OutData%n_high_low); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%NumDT); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%MaxPlanes); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%OutFileRoot); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%WAT_Enabled); if (RegCheckErr(RF, RoutineName)) return
    if (associated(OutData%WAT_FlowField)) deallocate(OutData%WAT_FlowField)
@@ -783,8 +792,8 @@ subroutine AWAE_CopyInitOutput(SrcInitOutputData, DstInitOutputData, CtrlCode, E
    integer(IntKi),  intent(in   ) :: CtrlCode
    integer(IntKi),  intent(  out) :: ErrStat
    character(*),    intent(  out) :: ErrMsg
-   integer(B4Ki)   :: i1
-   integer(B4Ki)                  :: LB(1), UB(1)
+   integer(B4Ki)   :: i1, i2
+   integer(B4Ki)                  :: LB(2), UB(2)
    integer(IntKi)                 :: ErrStat2
    character(ErrMsgLen)           :: ErrMsg2
    character(*), parameter        :: RoutineName = 'AWAE_CopyInitOutput'
@@ -793,90 +802,45 @@ subroutine AWAE_CopyInitOutput(SrcInitOutputData, DstInitOutputData, CtrlCode, E
    call NWTC_Library_CopyProgDesc(SrcInitOutputData%Ver, DstInitOutputData%Ver, CtrlCode, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (ErrStat >= AbortErrLev) return
-   if (allocated(SrcInitOutputData%X0_high)) then
-      LB(1:1) = lbound(SrcInitOutputData%X0_high)
-      UB(1:1) = ubound(SrcInitOutputData%X0_high)
-      if (.not. allocated(DstInitOutputData%X0_high)) then
-         allocate(DstInitOutputData%X0_high(LB(1):UB(1)), stat=ErrStat2)
+   if (allocated(SrcInitOutputData%oXYZ_high)) then
+      LB(1:2) = lbound(SrcInitOutputData%oXYZ_high)
+      UB(1:2) = ubound(SrcInitOutputData%oXYZ_high)
+      if (.not. allocated(DstInitOutputData%oXYZ_high)) then
+         allocate(DstInitOutputData%oXYZ_high(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstInitOutputData%X0_high.', ErrStat, ErrMsg, RoutineName)
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstInitOutputData%oXYZ_high.', ErrStat, ErrMsg, RoutineName)
             return
          end if
       end if
-      DstInitOutputData%X0_high = SrcInitOutputData%X0_high
+      DstInitOutputData%oXYZ_high = SrcInitOutputData%oXYZ_high
    end if
-   if (allocated(SrcInitOutputData%Y0_high)) then
-      LB(1:1) = lbound(SrcInitOutputData%Y0_high)
-      UB(1:1) = ubound(SrcInitOutputData%Y0_high)
-      if (.not. allocated(DstInitOutputData%Y0_high)) then
-         allocate(DstInitOutputData%Y0_high(LB(1):UB(1)), stat=ErrStat2)
+   if (allocated(SrcInitOutputData%dXYZ_high)) then
+      LB(1:2) = lbound(SrcInitOutputData%dXYZ_high)
+      UB(1:2) = ubound(SrcInitOutputData%dXYZ_high)
+      if (.not. allocated(DstInitOutputData%dXYZ_high)) then
+         allocate(DstInitOutputData%dXYZ_high(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstInitOutputData%Y0_high.', ErrStat, ErrMsg, RoutineName)
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstInitOutputData%dXYZ_high.', ErrStat, ErrMsg, RoutineName)
             return
          end if
       end if
-      DstInitOutputData%Y0_high = SrcInitOutputData%Y0_high
+      DstInitOutputData%dXYZ_high = SrcInitOutputData%dXYZ_high
    end if
-   if (allocated(SrcInitOutputData%Z0_high)) then
-      LB(1:1) = lbound(SrcInitOutputData%Z0_high)
-      UB(1:1) = ubound(SrcInitOutputData%Z0_high)
-      if (.not. allocated(DstInitOutputData%Z0_high)) then
-         allocate(DstInitOutputData%Z0_high(LB(1):UB(1)), stat=ErrStat2)
+   if (allocated(SrcInitOutputData%nXYZ_high)) then
+      LB(1:2) = lbound(SrcInitOutputData%nXYZ_high)
+      UB(1:2) = ubound(SrcInitOutputData%nXYZ_high)
+      if (.not. allocated(DstInitOutputData%nXYZ_high)) then
+         allocate(DstInitOutputData%nXYZ_high(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstInitOutputData%Z0_high.', ErrStat, ErrMsg, RoutineName)
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstInitOutputData%nXYZ_high.', ErrStat, ErrMsg, RoutineName)
             return
          end if
       end if
-      DstInitOutputData%Z0_high = SrcInitOutputData%Z0_high
+      DstInitOutputData%nXYZ_high = SrcInitOutputData%nXYZ_high
    end if
-   if (allocated(SrcInitOutputData%dX_high)) then
-      LB(1:1) = lbound(SrcInitOutputData%dX_high)
-      UB(1:1) = ubound(SrcInitOutputData%dX_high)
-      if (.not. allocated(DstInitOutputData%dX_high)) then
-         allocate(DstInitOutputData%dX_high(LB(1):UB(1)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstInitOutputData%dX_high.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstInitOutputData%dX_high = SrcInitOutputData%dX_high
-   end if
-   if (allocated(SrcInitOutputData%dY_high)) then
-      LB(1:1) = lbound(SrcInitOutputData%dY_high)
-      UB(1:1) = ubound(SrcInitOutputData%dY_high)
-      if (.not. allocated(DstInitOutputData%dY_high)) then
-         allocate(DstInitOutputData%dY_high(LB(1):UB(1)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstInitOutputData%dY_high.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstInitOutputData%dY_high = SrcInitOutputData%dY_high
-   end if
-   if (allocated(SrcInitOutputData%dZ_high)) then
-      LB(1:1) = lbound(SrcInitOutputData%dZ_high)
-      UB(1:1) = ubound(SrcInitOutputData%dZ_high)
-      if (.not. allocated(DstInitOutputData%dZ_high)) then
-         allocate(DstInitOutputData%dZ_high(LB(1):UB(1)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstInitOutputData%dZ_high.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstInitOutputData%dZ_high = SrcInitOutputData%dZ_high
-   end if
-   DstInitOutputData%nX_high = SrcInitOutputData%nX_high
-   DstInitOutputData%nY_high = SrcInitOutputData%nY_high
-   DstInitOutputData%nZ_high = SrcInitOutputData%nZ_high
-   DstInitOutputData%dX_low = SrcInitOutputData%dX_low
-   DstInitOutputData%dY_low = SrcInitOutputData%dY_low
-   DstInitOutputData%dZ_low = SrcInitOutputData%dZ_low
-   DstInitOutputData%nX_low = SrcInitOutputData%nX_low
-   DstInitOutputData%nY_low = SrcInitOutputData%nY_low
-   DstInitOutputData%nZ_low = SrcInitOutputData%nZ_low
-   DstInitOutputData%X0_low = SrcInitOutputData%X0_low
-   DstInitOutputData%Y0_low = SrcInitOutputData%Y0_low
-   DstInitOutputData%Z0_low = SrcInitOutputData%Z0_low
+   DstInitOutputData%dXYZ_low = SrcInitOutputData%dXYZ_low
+   DstInitOutputData%nXYZ_low = SrcInitOutputData%nXYZ_low
+   DstInitOutputData%oXYZ_low = SrcInitOutputData%oXYZ_low
    if (allocated(SrcInitOutputData%Vdist_High)) then
       LB(1:1) = lbound(SrcInitOutputData%Vdist_High)
       UB(1:1) = ubound(SrcInitOutputData%Vdist_High)
@@ -899,8 +863,8 @@ subroutine AWAE_DestroyInitOutput(InitOutputData, ErrStat, ErrMsg)
    type(AWAE_InitOutputType), intent(inout) :: InitOutputData
    integer(IntKi),  intent(  out) :: ErrStat
    character(*),    intent(  out) :: ErrMsg
-   integer(B4Ki)   :: i1
-   integer(B4Ki)   :: LB(1), UB(1)
+   integer(B4Ki)   :: i1, i2
+   integer(B4Ki)   :: LB(2), UB(2)
    integer(IntKi)                 :: ErrStat2
    character(ErrMsgLen)           :: ErrMsg2
    character(*), parameter        :: RoutineName = 'AWAE_DestroyInitOutput'
@@ -908,23 +872,14 @@ subroutine AWAE_DestroyInitOutput(InitOutputData, ErrStat, ErrMsg)
    ErrMsg  = ''
    call NWTC_Library_DestroyProgDesc(InitOutputData%Ver, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-   if (allocated(InitOutputData%X0_high)) then
-      deallocate(InitOutputData%X0_high)
+   if (allocated(InitOutputData%oXYZ_high)) then
+      deallocate(InitOutputData%oXYZ_high)
    end if
-   if (allocated(InitOutputData%Y0_high)) then
-      deallocate(InitOutputData%Y0_high)
+   if (allocated(InitOutputData%dXYZ_high)) then
+      deallocate(InitOutputData%dXYZ_high)
    end if
-   if (allocated(InitOutputData%Z0_high)) then
-      deallocate(InitOutputData%Z0_high)
-   end if
-   if (allocated(InitOutputData%dX_high)) then
-      deallocate(InitOutputData%dX_high)
-   end if
-   if (allocated(InitOutputData%dY_high)) then
-      deallocate(InitOutputData%dY_high)
-   end if
-   if (allocated(InitOutputData%dZ_high)) then
-      deallocate(InitOutputData%dZ_high)
+   if (allocated(InitOutputData%nXYZ_high)) then
+      deallocate(InitOutputData%nXYZ_high)
    end if
    if (allocated(InitOutputData%Vdist_High)) then
       LB(1:1) = lbound(InitOutputData%Vdist_High)
@@ -941,28 +896,16 @@ subroutine AWAE_PackInitOutput(RF, Indata)
    type(RegFile), intent(inout) :: RF
    type(AWAE_InitOutputType), intent(in) :: InData
    character(*), parameter         :: RoutineName = 'AWAE_PackInitOutput'
-   integer(B4Ki)   :: i1
-   integer(B4Ki)   :: LB(1), UB(1)
+   integer(B4Ki)   :: i1, i2
+   integer(B4Ki)   :: LB(2), UB(2)
    if (RF%ErrStat >= AbortErrLev) return
    call NWTC_Library_PackProgDesc(RF, InData%Ver) 
-   call RegPackAlloc(RF, InData%X0_high)
-   call RegPackAlloc(RF, InData%Y0_high)
-   call RegPackAlloc(RF, InData%Z0_high)
-   call RegPackAlloc(RF, InData%dX_high)
-   call RegPackAlloc(RF, InData%dY_high)
-   call RegPackAlloc(RF, InData%dZ_high)
-   call RegPack(RF, InData%nX_high)
-   call RegPack(RF, InData%nY_high)
-   call RegPack(RF, InData%nZ_high)
-   call RegPack(RF, InData%dX_low)
-   call RegPack(RF, InData%dY_low)
-   call RegPack(RF, InData%dZ_low)
-   call RegPack(RF, InData%nX_low)
-   call RegPack(RF, InData%nY_low)
-   call RegPack(RF, InData%nZ_low)
-   call RegPack(RF, InData%X0_low)
-   call RegPack(RF, InData%Y0_low)
-   call RegPack(RF, InData%Z0_low)
+   call RegPackAlloc(RF, InData%oXYZ_high)
+   call RegPackAlloc(RF, InData%dXYZ_high)
+   call RegPackAlloc(RF, InData%nXYZ_high)
+   call RegPack(RF, InData%dXYZ_low)
+   call RegPack(RF, InData%nXYZ_low)
+   call RegPack(RF, InData%oXYZ_low)
    call RegPack(RF, allocated(InData%Vdist_High))
    if (allocated(InData%Vdist_High)) then
       call RegPackBounds(RF, 1, lbound(InData%Vdist_High), ubound(InData%Vdist_High))
@@ -979,30 +922,18 @@ subroutine AWAE_UnPackInitOutput(RF, OutData)
    type(RegFile), intent(inout)    :: RF
    type(AWAE_InitOutputType), intent(inout) :: OutData
    character(*), parameter            :: RoutineName = 'AWAE_UnPackInitOutput'
-   integer(B4Ki)   :: i1
-   integer(B4Ki)   :: LB(1), UB(1)
+   integer(B4Ki)   :: i1, i2
+   integer(B4Ki)   :: LB(2), UB(2)
    integer(IntKi)  :: stat
    logical         :: IsAllocAssoc
    if (RF%ErrStat /= ErrID_None) return
    call NWTC_Library_UnpackProgDesc(RF, OutData%Ver) ! Ver 
-   call RegUnpackAlloc(RF, OutData%X0_high); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%Y0_high); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%Z0_high); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%dX_high); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%dY_high); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%dZ_high); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%nX_high); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%nY_high); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%nZ_high); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%dX_low); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%dY_low); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%dZ_low); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%nX_low); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%nY_low); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%nZ_low); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%X0_low); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%Y0_low); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%Z0_low); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%oXYZ_high); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%dXYZ_high); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%nXYZ_high); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%dXYZ_low); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%nXYZ_low); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%oXYZ_low); if (RegCheckErr(RF, RoutineName)) return
    if (allocated(OutData%Vdist_High)) deallocate(OutData%Vdist_High)
    call RegUnpack(RF, IsAllocAssoc); if (RegCheckErr(RF, RoutineName)) return
    if (IsAllocAssoc) then
@@ -1488,17 +1419,29 @@ subroutine AWAE_CopyMisc(SrcMiscData, DstMiscData, CtrlCode, ErrStat, ErrMsg)
    call NWTC_Library_CopyKdTreeType(SrcMiscData%KdT, DstMiscData%KdT, CtrlCode, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (ErrStat >= AbortErrLev) return
-   if (allocated(SrcMiscData%KdTreePointData)) then
-      LB(1:2) = lbound(SrcMiscData%KdTreePointData)
-      UB(1:2) = ubound(SrcMiscData%KdTreePointData)
-      if (.not. allocated(DstMiscData%KdTreePointData)) then
-         allocate(DstMiscData%KdTreePointData(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
+   if (allocated(SrcMiscData%KdTPointData)) then
+      LB(1:2) = lbound(SrcMiscData%KdTPointData)
+      UB(1:2) = ubound(SrcMiscData%KdTPointData)
+      if (.not. allocated(DstMiscData%KdTPointData)) then
+         allocate(DstMiscData%KdTPointData(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstMiscData%KdTreePointData.', ErrStat, ErrMsg, RoutineName)
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstMiscData%KdTPointData.', ErrStat, ErrMsg, RoutineName)
             return
          end if
       end if
-      DstMiscData%KdTreePointData = SrcMiscData%KdTreePointData
+      DstMiscData%KdTPointData = SrcMiscData%KdTPointData
+   end if
+   if (allocated(SrcMiscData%KdTResults)) then
+      LB(1:1) = lbound(SrcMiscData%KdTResults)
+      UB(1:1) = ubound(SrcMiscData%KdTResults)
+      if (.not. allocated(DstMiscData%KdTResults)) then
+         allocate(DstMiscData%KdTResults(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstMiscData%KdTResults.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstMiscData%KdTResults = SrcMiscData%KdTResults
    end if
    if (allocated(SrcMiscData%AllPlanePoints)) then
       LB(1:2) = lbound(SrcMiscData%AllPlanePoints)
@@ -1512,17 +1455,41 @@ subroutine AWAE_CopyMisc(SrcMiscData, DstMiscData, CtrlCode, ErrStat, ErrMsg)
       end if
       DstMiscData%AllPlanePoints = SrcMiscData%AllPlanePoints
    end if
-   if (allocated(SrcMiscData%PlaneTurbineIdx)) then
-      LB(1:3) = lbound(SrcMiscData%PlaneTurbineIdx)
-      UB(1:3) = ubound(SrcMiscData%PlaneTurbineIdx)
-      if (.not. allocated(DstMiscData%PlaneTurbineIdx)) then
-         allocate(DstMiscData%PlaneTurbineIdx(LB(1):UB(1),LB(2):UB(2),LB(3):UB(3)), stat=ErrStat2)
+   if (allocated(SrcMiscData%iPlaneTurbTurb)) then
+      LB(1:3) = lbound(SrcMiscData%iPlaneTurbTurb)
+      UB(1:3) = ubound(SrcMiscData%iPlaneTurbTurb)
+      if (.not. allocated(DstMiscData%iPlaneTurbTurb)) then
+         allocate(DstMiscData%iPlaneTurbTurb(LB(1):UB(1),LB(2):UB(2),LB(3):UB(3)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstMiscData%PlaneTurbineIdx.', ErrStat, ErrMsg, RoutineName)
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstMiscData%iPlaneTurbTurb.', ErrStat, ErrMsg, RoutineName)
             return
          end if
       end if
-      DstMiscData%PlaneTurbineIdx = SrcMiscData%PlaneTurbineIdx
+      DstMiscData%iPlaneTurbTurb = SrcMiscData%iPlaneTurbTurb
+   end if
+   if (allocated(SrcMiscData%iPlaneTurbChunk)) then
+      LB(1:3) = lbound(SrcMiscData%iPlaneTurbChunk)
+      UB(1:3) = ubound(SrcMiscData%iPlaneTurbChunk)
+      if (.not. allocated(DstMiscData%iPlaneTurbChunk)) then
+         allocate(DstMiscData%iPlaneTurbChunk(LB(1):UB(1),LB(2):UB(2),LB(3):UB(3)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstMiscData%iPlaneTurbChunk.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstMiscData%iPlaneTurbChunk = SrcMiscData%iPlaneTurbChunk
+   end if
+   if (allocated(SrcMiscData%LowResChunkHasWake)) then
+      LB(1:1) = lbound(SrcMiscData%LowResChunkHasWake)
+      UB(1:1) = ubound(SrcMiscData%LowResChunkHasWake)
+      if (.not. allocated(DstMiscData%LowResChunkHasWake)) then
+         allocate(DstMiscData%LowResChunkHasWake(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstMiscData%LowResChunkHasWake.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstMiscData%LowResChunkHasWake = SrcMiscData%LowResChunkHasWake
    end if
    DstMiscData%MaxWakePointSep = SrcMiscData%MaxWakePointSep
    if (allocated(SrcMiscData%parallelFlag)) then
@@ -1721,14 +1688,23 @@ subroutine AWAE_DestroyMisc(MiscData, ErrStat, ErrMsg)
    end if
    call NWTC_Library_DestroyKdTreeType(MiscData%KdT, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-   if (allocated(MiscData%KdTreePointData)) then
-      deallocate(MiscData%KdTreePointData)
+   if (allocated(MiscData%KdTPointData)) then
+      deallocate(MiscData%KdTPointData)
+   end if
+   if (allocated(MiscData%KdTResults)) then
+      deallocate(MiscData%KdTResults)
    end if
    if (allocated(MiscData%AllPlanePoints)) then
       deallocate(MiscData%AllPlanePoints)
    end if
-   if (allocated(MiscData%PlaneTurbineIdx)) then
-      deallocate(MiscData%PlaneTurbineIdx)
+   if (allocated(MiscData%iPlaneTurbTurb)) then
+      deallocate(MiscData%iPlaneTurbTurb)
+   end if
+   if (allocated(MiscData%iPlaneTurbChunk)) then
+      deallocate(MiscData%iPlaneTurbChunk)
+   end if
+   if (allocated(MiscData%LowResChunkHasWake)) then
+      deallocate(MiscData%LowResChunkHasWake)
    end if
    if (allocated(MiscData%parallelFlag)) then
       deallocate(MiscData%parallelFlag)
@@ -1803,9 +1779,12 @@ subroutine AWAE_PackMisc(RF, Indata)
       end do
    end if
    call NWTC_Library_PackKdTreeType(RF, InData%KdT) 
-   call RegPackAlloc(RF, InData%KdTreePointData)
+   call RegPackAlloc(RF, InData%KdTPointData)
+   call RegPackAlloc(RF, InData%KdTResults)
    call RegPackAlloc(RF, InData%AllPlanePoints)
-   call RegPackAlloc(RF, InData%PlaneTurbineIdx)
+   call RegPackAlloc(RF, InData%iPlaneTurbTurb)
+   call RegPackAlloc(RF, InData%iPlaneTurbChunk)
+   call RegPackAlloc(RF, InData%LowResChunkHasWake)
    call RegPack(RF, InData%MaxWakePointSep)
    call RegPackAlloc(RF, InData%parallelFlag)
    call RegPackAlloc(RF, InData%r_s)
@@ -1861,9 +1840,12 @@ subroutine AWAE_UnPackMisc(RF, OutData)
       end do
    end if
    call NWTC_Library_UnpackKdTreeType(RF, OutData%KdT) ! KdT 
-   call RegUnpackAlloc(RF, OutData%KdTreePointData); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%KdTPointData); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%KdTResults); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%AllPlanePoints); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%PlaneTurbineIdx); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%iPlaneTurbTurb); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%iPlaneTurbChunk); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%LowResChunkHasWake); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%MaxWakePointSep); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%parallelFlag); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%r_s); if (RegCheckErr(RF, RoutineName)) return
@@ -1895,14 +1877,310 @@ subroutine AWAE_UnPackMisc(RF, OutData)
    call RegUnpackAlloc(RF, OutData%V_amb_low_disk); if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
+subroutine AWAE_CopyLRGChunkType(SrcLRGChunkTypeData, DstLRGChunkTypeData, CtrlCode, ErrStat, ErrMsg)
+   type(LRGChunkType), intent(in) :: SrcLRGChunkTypeData
+   type(LRGChunkType), intent(inout) :: DstLRGChunkTypeData
+   integer(IntKi),  intent(in   ) :: CtrlCode
+   integer(IntKi),  intent(  out) :: ErrStat
+   character(*),    intent(  out) :: ErrMsg
+   integer(B4Ki)                  :: LB(1), UB(1)
+   integer(IntKi)                 :: ErrStat2
+   character(*), parameter        :: RoutineName = 'AWAE_CopyLRGChunkType'
+   ErrStat = ErrID_None
+   ErrMsg  = ''
+   DstLRGChunkTypeData%iChunk = SrcLRGChunkTypeData%iChunk
+   DstLRGChunkTypeData%iSubGridX = SrcLRGChunkTypeData%iSubGridX
+   DstLRGChunkTypeData%iSubGridY = SrcLRGChunkTypeData%iSubGridY
+   DstLRGChunkTypeData%iSubGridZ = SrcLRGChunkTypeData%iSubGridZ
+   if (allocated(SrcLRGChunkTypeData%iGridPoints)) then
+      LB(1:1) = lbound(SrcLRGChunkTypeData%iGridPoints)
+      UB(1:1) = ubound(SrcLRGChunkTypeData%iGridPoints)
+      if (.not. allocated(DstLRGChunkTypeData%iGridPoints)) then
+         allocate(DstLRGChunkTypeData%iGridPoints(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstLRGChunkTypeData%iGridPoints.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstLRGChunkTypeData%iGridPoints = SrcLRGChunkTypeData%iGridPoints
+   end if
+   DstLRGChunkTypeData%nPoints = SrcLRGChunkTypeData%nPoints
+   DstLRGChunkTypeData%oXYZ = SrcLRGChunkTypeData%oXYZ
+   DstLRGChunkTypeData%Size = SrcLRGChunkTypeData%Size
+   DstLRGChunkTypeData%Center = SrcLRGChunkTypeData%Center
+   DstLRGChunkTypeData%Radius = SrcLRGChunkTypeData%Radius
+end subroutine
+
+subroutine AWAE_DestroyLRGChunkType(LRGChunkTypeData, ErrStat, ErrMsg)
+   type(LRGChunkType), intent(inout) :: LRGChunkTypeData
+   integer(IntKi),  intent(  out) :: ErrStat
+   character(*),    intent(  out) :: ErrMsg
+   character(*), parameter        :: RoutineName = 'AWAE_DestroyLRGChunkType'
+   ErrStat = ErrID_None
+   ErrMsg  = ''
+   if (allocated(LRGChunkTypeData%iGridPoints)) then
+      deallocate(LRGChunkTypeData%iGridPoints)
+   end if
+end subroutine
+
+subroutine AWAE_PackLRGChunkType(RF, Indata)
+   type(RegFile), intent(inout) :: RF
+   type(LRGChunkType), intent(in) :: InData
+   character(*), parameter         :: RoutineName = 'AWAE_PackLRGChunkType'
+   if (RF%ErrStat >= AbortErrLev) return
+   call RegPack(RF, InData%iChunk)
+   call RegPack(RF, InData%iSubGridX)
+   call RegPack(RF, InData%iSubGridY)
+   call RegPack(RF, InData%iSubGridZ)
+   call RegPackAlloc(RF, InData%iGridPoints)
+   call RegPack(RF, InData%nPoints)
+   call RegPack(RF, InData%oXYZ)
+   call RegPack(RF, InData%Size)
+   call RegPack(RF, InData%Center)
+   call RegPack(RF, InData%Radius)
+   if (RegCheckErr(RF, RoutineName)) return
+end subroutine
+
+subroutine AWAE_UnPackLRGChunkType(RF, OutData)
+   type(RegFile), intent(inout)    :: RF
+   type(LRGChunkType), intent(inout) :: OutData
+   character(*), parameter            :: RoutineName = 'AWAE_UnPackLRGChunkType'
+   integer(B4Ki)   :: LB(1), UB(1)
+   integer(IntKi)  :: stat
+   logical         :: IsAllocAssoc
+   if (RF%ErrStat /= ErrID_None) return
+   call RegUnpack(RF, OutData%iChunk); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%iSubGridX); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%iSubGridY); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%iSubGridZ); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%iGridPoints); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%nPoints); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%oXYZ); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%Size); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%Center); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%Radius); if (RegCheckErr(RF, RoutineName)) return
+end subroutine
+
+subroutine AWAE_CopyLRGParamType(SrcLRGParamTypeData, DstLRGParamTypeData, CtrlCode, ErrStat, ErrMsg)
+   type(LRGParamType), intent(in) :: SrcLRGParamTypeData
+   type(LRGParamType), intent(inout) :: DstLRGParamTypeData
+   integer(IntKi),  intent(in   ) :: CtrlCode
+   integer(IntKi),  intent(  out) :: ErrStat
+   character(*),    intent(  out) :: ErrMsg
+   integer(B4Ki)   :: i1, i2
+   integer(B4Ki)                  :: LB(2), UB(2)
+   integer(IntKi)                 :: ErrStat2
+   character(ErrMsgLen)           :: ErrMsg2
+   character(*), parameter        :: RoutineName = 'AWAE_CopyLRGParamType'
+   ErrStat = ErrID_None
+   ErrMsg  = ''
+   DstLRGParamTypeData%oXYZ = SrcLRGParamTypeData%oXYZ
+   DstLRGParamTypeData%dXYZ = SrcLRGParamTypeData%dXYZ
+   DstLRGParamTypeData%nXYZ = SrcLRGParamTypeData%nXYZ
+   DstLRGParamTypeData%nPoints = SrcLRGParamTypeData%nPoints
+   if (allocated(SrcLRGParamTypeData%GridPoints)) then
+      LB(1:2) = lbound(SrcLRGParamTypeData%GridPoints)
+      UB(1:2) = ubound(SrcLRGParamTypeData%GridPoints)
+      if (.not. allocated(DstLRGParamTypeData%GridPoints)) then
+         allocate(DstLRGParamTypeData%GridPoints(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstLRGParamTypeData%GridPoints.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstLRGParamTypeData%GridPoints = SrcLRGParamTypeData%GridPoints
+   end if
+   DstLRGParamTypeData%Size = SrcLRGParamTypeData%Size
+   DstLRGParamTypeData%Center = SrcLRGParamTypeData%Center
+   if (allocated(SrcLRGParamTypeData%WakeChunks)) then
+      LB(1:1) = lbound(SrcLRGParamTypeData%WakeChunks)
+      UB(1:1) = ubound(SrcLRGParamTypeData%WakeChunks)
+      if (.not. allocated(DstLRGParamTypeData%WakeChunks)) then
+         allocate(DstLRGParamTypeData%WakeChunks(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstLRGParamTypeData%WakeChunks.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      do i1 = LB(1), UB(1)
+         call AWAE_CopyLRGChunkType(SrcLRGParamTypeData%WakeChunks(i1), DstLRGParamTypeData%WakeChunks(i1), CtrlCode, ErrStat2, ErrMsg2)
+         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+         if (ErrStat >= AbortErrLev) return
+      end do
+   end if
+end subroutine
+
+subroutine AWAE_DestroyLRGParamType(LRGParamTypeData, ErrStat, ErrMsg)
+   type(LRGParamType), intent(inout) :: LRGParamTypeData
+   integer(IntKi),  intent(  out) :: ErrStat
+   character(*),    intent(  out) :: ErrMsg
+   integer(B4Ki)   :: i1, i2
+   integer(B4Ki)   :: LB(2), UB(2)
+   integer(IntKi)                 :: ErrStat2
+   character(ErrMsgLen)           :: ErrMsg2
+   character(*), parameter        :: RoutineName = 'AWAE_DestroyLRGParamType'
+   ErrStat = ErrID_None
+   ErrMsg  = ''
+   if (allocated(LRGParamTypeData%GridPoints)) then
+      deallocate(LRGParamTypeData%GridPoints)
+   end if
+   if (allocated(LRGParamTypeData%WakeChunks)) then
+      LB(1:1) = lbound(LRGParamTypeData%WakeChunks)
+      UB(1:1) = ubound(LRGParamTypeData%WakeChunks)
+      do i1 = LB(1), UB(1)
+         call AWAE_DestroyLRGChunkType(LRGParamTypeData%WakeChunks(i1), ErrStat2, ErrMsg2)
+         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+      end do
+      deallocate(LRGParamTypeData%WakeChunks)
+   end if
+end subroutine
+
+subroutine AWAE_PackLRGParamType(RF, Indata)
+   type(RegFile), intent(inout) :: RF
+   type(LRGParamType), intent(in) :: InData
+   character(*), parameter         :: RoutineName = 'AWAE_PackLRGParamType'
+   integer(B4Ki)   :: i1, i2
+   integer(B4Ki)   :: LB(2), UB(2)
+   if (RF%ErrStat >= AbortErrLev) return
+   call RegPack(RF, InData%oXYZ)
+   call RegPack(RF, InData%dXYZ)
+   call RegPack(RF, InData%nXYZ)
+   call RegPack(RF, InData%nPoints)
+   call RegPackAlloc(RF, InData%GridPoints)
+   call RegPack(RF, InData%Size)
+   call RegPack(RF, InData%Center)
+   call RegPack(RF, allocated(InData%WakeChunks))
+   if (allocated(InData%WakeChunks)) then
+      call RegPackBounds(RF, 1, lbound(InData%WakeChunks), ubound(InData%WakeChunks))
+      LB(1:1) = lbound(InData%WakeChunks)
+      UB(1:1) = ubound(InData%WakeChunks)
+      do i1 = LB(1), UB(1)
+         call AWAE_PackLRGChunkType(RF, InData%WakeChunks(i1)) 
+      end do
+   end if
+   if (RegCheckErr(RF, RoutineName)) return
+end subroutine
+
+subroutine AWAE_UnPackLRGParamType(RF, OutData)
+   type(RegFile), intent(inout)    :: RF
+   type(LRGParamType), intent(inout) :: OutData
+   character(*), parameter            :: RoutineName = 'AWAE_UnPackLRGParamType'
+   integer(B4Ki)   :: i1, i2
+   integer(B4Ki)   :: LB(2), UB(2)
+   integer(IntKi)  :: stat
+   logical         :: IsAllocAssoc
+   if (RF%ErrStat /= ErrID_None) return
+   call RegUnpack(RF, OutData%oXYZ); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%dXYZ); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%nXYZ); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%nPoints); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%GridPoints); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%Size); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%Center); if (RegCheckErr(RF, RoutineName)) return
+   if (allocated(OutData%WakeChunks)) deallocate(OutData%WakeChunks)
+   call RegUnpack(RF, IsAllocAssoc); if (RegCheckErr(RF, RoutineName)) return
+   if (IsAllocAssoc) then
+      call RegUnpackBounds(RF, 1, LB, UB); if (RegCheckErr(RF, RoutineName)) return
+      allocate(OutData%WakeChunks(LB(1):UB(1)),stat=stat)
+      if (stat /= 0) then 
+         call SetErrStat(ErrID_Fatal, 'Error allocating OutData%WakeChunks.', RF%ErrStat, RF%ErrMsg, RoutineName)
+         return
+      end if
+      do i1 = LB(1), UB(1)
+         call AWAE_UnpackLRGChunkType(RF, OutData%WakeChunks(i1)) ! WakeChunks 
+      end do
+   end if
+end subroutine
+
+subroutine AWAE_CopyHRGParamType(SrcHRGParamTypeData, DstHRGParamTypeData, CtrlCode, ErrStat, ErrMsg)
+   type(HRGParamType), intent(in) :: SrcHRGParamTypeData
+   type(HRGParamType), intent(inout) :: DstHRGParamTypeData
+   integer(IntKi),  intent(in   ) :: CtrlCode
+   integer(IntKi),  intent(  out) :: ErrStat
+   character(*),    intent(  out) :: ErrMsg
+   integer(B4Ki)                  :: LB(2), UB(2)
+   integer(IntKi)                 :: ErrStat2
+   character(*), parameter        :: RoutineName = 'AWAE_CopyHRGParamType'
+   ErrStat = ErrID_None
+   ErrMsg  = ''
+   DstHRGParamTypeData%WT_Position = SrcHRGParamTypeData%WT_Position
+   DstHRGParamTypeData%oXYZ = SrcHRGParamTypeData%oXYZ
+   DstHRGParamTypeData%dXYZ = SrcHRGParamTypeData%dXYZ
+   DstHRGParamTypeData%nXYZ = SrcHRGParamTypeData%nXYZ
+   DstHRGParamTypeData%nPoints = SrcHRGParamTypeData%nPoints
+   if (allocated(SrcHRGParamTypeData%GridPoints)) then
+      LB(1:2) = lbound(SrcHRGParamTypeData%GridPoints)
+      UB(1:2) = ubound(SrcHRGParamTypeData%GridPoints)
+      if (.not. allocated(DstHRGParamTypeData%GridPoints)) then
+         allocate(DstHRGParamTypeData%GridPoints(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstHRGParamTypeData%GridPoints.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstHRGParamTypeData%GridPoints = SrcHRGParamTypeData%GridPoints
+   end if
+   DstHRGParamTypeData%Size = SrcHRGParamTypeData%Size
+   DstHRGParamTypeData%Center = SrcHRGParamTypeData%Center
+   DstHRGParamTypeData%Radius = SrcHRGParamTypeData%Radius
+end subroutine
+
+subroutine AWAE_DestroyHRGParamType(HRGParamTypeData, ErrStat, ErrMsg)
+   type(HRGParamType), intent(inout) :: HRGParamTypeData
+   integer(IntKi),  intent(  out) :: ErrStat
+   character(*),    intent(  out) :: ErrMsg
+   character(*), parameter        :: RoutineName = 'AWAE_DestroyHRGParamType'
+   ErrStat = ErrID_None
+   ErrMsg  = ''
+   if (allocated(HRGParamTypeData%GridPoints)) then
+      deallocate(HRGParamTypeData%GridPoints)
+   end if
+end subroutine
+
+subroutine AWAE_PackHRGParamType(RF, Indata)
+   type(RegFile), intent(inout) :: RF
+   type(HRGParamType), intent(in) :: InData
+   character(*), parameter         :: RoutineName = 'AWAE_PackHRGParamType'
+   if (RF%ErrStat >= AbortErrLev) return
+   call RegPack(RF, InData%WT_Position)
+   call RegPack(RF, InData%oXYZ)
+   call RegPack(RF, InData%dXYZ)
+   call RegPack(RF, InData%nXYZ)
+   call RegPack(RF, InData%nPoints)
+   call RegPackAlloc(RF, InData%GridPoints)
+   call RegPack(RF, InData%Size)
+   call RegPack(RF, InData%Center)
+   call RegPack(RF, InData%Radius)
+   if (RegCheckErr(RF, RoutineName)) return
+end subroutine
+
+subroutine AWAE_UnPackHRGParamType(RF, OutData)
+   type(RegFile), intent(inout)    :: RF
+   type(HRGParamType), intent(inout) :: OutData
+   character(*), parameter            :: RoutineName = 'AWAE_UnPackHRGParamType'
+   integer(B4Ki)   :: LB(2), UB(2)
+   integer(IntKi)  :: stat
+   logical         :: IsAllocAssoc
+   if (RF%ErrStat /= ErrID_None) return
+   call RegUnpack(RF, OutData%WT_Position); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%oXYZ); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%dXYZ); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%nXYZ); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%nPoints); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%GridPoints); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%Size); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%Center); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%Radius); if (RegCheckErr(RF, RoutineName)) return
+end subroutine
+
 subroutine AWAE_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg)
    type(AWAE_ParameterType), intent(in) :: SrcParamData
    type(AWAE_ParameterType), intent(inout) :: DstParamData
    integer(IntKi),  intent(in   ) :: CtrlCode
    integer(IntKi),  intent(  out) :: ErrStat
    character(*),    intent(  out) :: ErrMsg
-   integer(B4Ki)   :: i1, i2, i3
-   integer(B4Ki)                  :: LB(3), UB(3)
+   integer(B4Ki)   :: i1
+   integer(B4Ki)                  :: LB(1), UB(1)
    integer(IntKi)                 :: ErrStat2
    character(ErrMsgLen)           :: ErrMsg2
    character(*), parameter        :: RoutineName = 'AWAE_CopyParam'
@@ -1911,7 +2189,26 @@ subroutine AWAE_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg)
    DstParamData%WindFilePath = SrcParamData%WindFilePath
    DstParamData%NumTurbines = SrcParamData%NumTurbines
    DstParamData%NumRadii = SrcParamData%NumRadii
-   DstParamData%NumPlanes = SrcParamData%NumPlanes
+   DstParamData%MaxPlanes = SrcParamData%MaxPlanes
+   call AWAE_CopyLRGParamType(SrcParamData%LowRes, DstParamData%LowRes, CtrlCode, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if (ErrStat >= AbortErrLev) return
+   if (allocated(SrcParamData%HighRes)) then
+      LB(1:1) = lbound(SrcParamData%HighRes)
+      UB(1:1) = ubound(SrcParamData%HighRes)
+      if (.not. allocated(DstParamData%HighRes)) then
+         allocate(DstParamData%HighRes(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstParamData%HighRes.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      do i1 = LB(1), UB(1)
+         call AWAE_CopyHRGParamType(SrcParamData%HighRes(i1), DstParamData%HighRes(i1), CtrlCode, ErrStat2, ErrMsg2)
+         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+         if (ErrStat >= AbortErrLev) return
+      end do
+   end if
    if (allocated(SrcParamData%y)) then
       LB(1:1) = lbound(SrcParamData%y)
       UB(1:1) = ubound(SrcParamData%y)
@@ -1936,131 +2233,9 @@ subroutine AWAE_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg)
       end if
       DstParamData%z = SrcParamData%z
    end if
+   DstParamData%dPol = SrcParamData%dPol
    DstParamData%Mod_AmbWind = SrcParamData%Mod_AmbWind
-   DstParamData%nX_low = SrcParamData%nX_low
-   DstParamData%nY_low = SrcParamData%nY_low
-   DstParamData%nZ_low = SrcParamData%nZ_low
-   DstParamData%NumGrid_low = SrcParamData%NumGrid_low
    DstParamData%n_rp_max = SrcParamData%n_rp_max
-   DstParamData%dpol = SrcParamData%dpol
-   DstParamData%dXYZ_low = SrcParamData%dXYZ_low
-   DstParamData%dX_low = SrcParamData%dX_low
-   DstParamData%dY_low = SrcParamData%dY_low
-   DstParamData%dZ_low = SrcParamData%dZ_low
-   DstParamData%X0_low = SrcParamData%X0_low
-   DstParamData%Y0_low = SrcParamData%Y0_low
-   DstParamData%Z0_low = SrcParamData%Z0_low
-   if (allocated(SrcParamData%X0_high)) then
-      LB(1:1) = lbound(SrcParamData%X0_high)
-      UB(1:1) = ubound(SrcParamData%X0_high)
-      if (.not. allocated(DstParamData%X0_high)) then
-         allocate(DstParamData%X0_high(LB(1):UB(1)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstParamData%X0_high.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstParamData%X0_high = SrcParamData%X0_high
-   end if
-   if (allocated(SrcParamData%Y0_high)) then
-      LB(1:1) = lbound(SrcParamData%Y0_high)
-      UB(1:1) = ubound(SrcParamData%Y0_high)
-      if (.not. allocated(DstParamData%Y0_high)) then
-         allocate(DstParamData%Y0_high(LB(1):UB(1)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstParamData%Y0_high.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstParamData%Y0_high = SrcParamData%Y0_high
-   end if
-   if (allocated(SrcParamData%Z0_high)) then
-      LB(1:1) = lbound(SrcParamData%Z0_high)
-      UB(1:1) = ubound(SrcParamData%Z0_high)
-      if (.not. allocated(DstParamData%Z0_high)) then
-         allocate(DstParamData%Z0_high(LB(1):UB(1)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstParamData%Z0_high.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstParamData%Z0_high = SrcParamData%Z0_high
-   end if
-   if (allocated(SrcParamData%dX_high)) then
-      LB(1:1) = lbound(SrcParamData%dX_high)
-      UB(1:1) = ubound(SrcParamData%dX_high)
-      if (.not. allocated(DstParamData%dX_high)) then
-         allocate(DstParamData%dX_high(LB(1):UB(1)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstParamData%dX_high.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstParamData%dX_high = SrcParamData%dX_high
-   end if
-   if (allocated(SrcParamData%dY_high)) then
-      LB(1:1) = lbound(SrcParamData%dY_high)
-      UB(1:1) = ubound(SrcParamData%dY_high)
-      if (.not. allocated(DstParamData%dY_high)) then
-         allocate(DstParamData%dY_high(LB(1):UB(1)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstParamData%dY_high.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstParamData%dY_high = SrcParamData%dY_high
-   end if
-   if (allocated(SrcParamData%dZ_high)) then
-      LB(1:1) = lbound(SrcParamData%dZ_high)
-      UB(1:1) = ubound(SrcParamData%dZ_high)
-      if (.not. allocated(DstParamData%dZ_high)) then
-         allocate(DstParamData%dZ_high(LB(1):UB(1)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstParamData%dZ_high.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstParamData%dZ_high = SrcParamData%dZ_high
-   end if
-   DstParamData%nX_high = SrcParamData%nX_high
-   DstParamData%nY_high = SrcParamData%nY_high
-   DstParamData%nZ_high = SrcParamData%nZ_high
-   if (allocated(SrcParamData%Grid_low)) then
-      LB(1:2) = lbound(SrcParamData%Grid_low)
-      UB(1:2) = ubound(SrcParamData%Grid_low)
-      if (.not. allocated(DstParamData%Grid_low)) then
-         allocate(DstParamData%Grid_low(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstParamData%Grid_low.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstParamData%Grid_low = SrcParamData%Grid_low
-   end if
-   if (allocated(SrcParamData%Grid_high)) then
-      LB(1:3) = lbound(SrcParamData%Grid_high)
-      UB(1:3) = ubound(SrcParamData%Grid_high)
-      if (.not. allocated(DstParamData%Grid_high)) then
-         allocate(DstParamData%Grid_high(LB(1):UB(1),LB(2):UB(2),LB(3):UB(3)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstParamData%Grid_high.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstParamData%Grid_high = SrcParamData%Grid_high
-   end if
-   if (allocated(SrcParamData%WT_Position)) then
-      LB(1:2) = lbound(SrcParamData%WT_Position)
-      UB(1:2) = ubound(SrcParamData%WT_Position)
-      if (.not. allocated(DstParamData%WT_Position)) then
-         allocate(DstParamData%WT_Position(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstParamData%WT_Position.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstParamData%WT_Position = SrcParamData%WT_Position
-   end if
    DstParamData%n_high_low = SrcParamData%n_high_low
    DstParamData%dt_low = SrcParamData%dt_low
    DstParamData%dt_high = SrcParamData%dt_high
@@ -2173,45 +2348,29 @@ subroutine AWAE_DestroyParam(ParamData, ErrStat, ErrMsg)
    type(AWAE_ParameterType), intent(inout) :: ParamData
    integer(IntKi),  intent(  out) :: ErrStat
    character(*),    intent(  out) :: ErrMsg
-   integer(B4Ki)   :: i1, i2, i3
-   integer(B4Ki)   :: LB(3), UB(3)
+   integer(B4Ki)   :: i1
+   integer(B4Ki)   :: LB(1), UB(1)
    integer(IntKi)                 :: ErrStat2
    character(ErrMsgLen)           :: ErrMsg2
    character(*), parameter        :: RoutineName = 'AWAE_DestroyParam'
    ErrStat = ErrID_None
    ErrMsg  = ''
+   call AWAE_DestroyLRGParamType(ParamData%LowRes, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if (allocated(ParamData%HighRes)) then
+      LB(1:1) = lbound(ParamData%HighRes)
+      UB(1:1) = ubound(ParamData%HighRes)
+      do i1 = LB(1), UB(1)
+         call AWAE_DestroyHRGParamType(ParamData%HighRes(i1), ErrStat2, ErrMsg2)
+         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+      end do
+      deallocate(ParamData%HighRes)
+   end if
    if (allocated(ParamData%y)) then
       deallocate(ParamData%y)
    end if
    if (allocated(ParamData%z)) then
       deallocate(ParamData%z)
-   end if
-   if (allocated(ParamData%X0_high)) then
-      deallocate(ParamData%X0_high)
-   end if
-   if (allocated(ParamData%Y0_high)) then
-      deallocate(ParamData%Y0_high)
-   end if
-   if (allocated(ParamData%Z0_high)) then
-      deallocate(ParamData%Z0_high)
-   end if
-   if (allocated(ParamData%dX_high)) then
-      deallocate(ParamData%dX_high)
-   end if
-   if (allocated(ParamData%dY_high)) then
-      deallocate(ParamData%dY_high)
-   end if
-   if (allocated(ParamData%dZ_high)) then
-      deallocate(ParamData%dZ_high)
-   end if
-   if (allocated(ParamData%Grid_low)) then
-      deallocate(ParamData%Grid_low)
-   end if
-   if (allocated(ParamData%Grid_high)) then
-      deallocate(ParamData%Grid_high)
-   end if
-   if (allocated(ParamData%WT_Position)) then
-      deallocate(ParamData%WT_Position)
    end if
    if (allocated(ParamData%IfW)) then
       LB(1:1) = lbound(ParamData%IfW)
@@ -2247,42 +2406,29 @@ subroutine AWAE_PackParam(RF, Indata)
    type(RegFile), intent(inout) :: RF
    type(AWAE_ParameterType), intent(in) :: InData
    character(*), parameter         :: RoutineName = 'AWAE_PackParam'
-   integer(B4Ki)   :: i1, i2, i3
-   integer(B4Ki)   :: LB(3), UB(3)
+   integer(B4Ki)   :: i1
+   integer(B4Ki)   :: LB(1), UB(1)
    logical         :: PtrInIndex
    if (RF%ErrStat >= AbortErrLev) return
    call RegPack(RF, InData%WindFilePath)
    call RegPack(RF, InData%NumTurbines)
    call RegPack(RF, InData%NumRadii)
-   call RegPack(RF, InData%NumPlanes)
+   call RegPack(RF, InData%MaxPlanes)
+   call AWAE_PackLRGParamType(RF, InData%LowRes) 
+   call RegPack(RF, allocated(InData%HighRes))
+   if (allocated(InData%HighRes)) then
+      call RegPackBounds(RF, 1, lbound(InData%HighRes), ubound(InData%HighRes))
+      LB(1:1) = lbound(InData%HighRes)
+      UB(1:1) = ubound(InData%HighRes)
+      do i1 = LB(1), UB(1)
+         call AWAE_PackHRGParamType(RF, InData%HighRes(i1)) 
+      end do
+   end if
    call RegPackAlloc(RF, InData%y)
    call RegPackAlloc(RF, InData%z)
+   call RegPack(RF, InData%dPol)
    call RegPack(RF, InData%Mod_AmbWind)
-   call RegPack(RF, InData%nX_low)
-   call RegPack(RF, InData%nY_low)
-   call RegPack(RF, InData%nZ_low)
-   call RegPack(RF, InData%NumGrid_low)
    call RegPack(RF, InData%n_rp_max)
-   call RegPack(RF, InData%dpol)
-   call RegPack(RF, InData%dXYZ_low)
-   call RegPack(RF, InData%dX_low)
-   call RegPack(RF, InData%dY_low)
-   call RegPack(RF, InData%dZ_low)
-   call RegPack(RF, InData%X0_low)
-   call RegPack(RF, InData%Y0_low)
-   call RegPack(RF, InData%Z0_low)
-   call RegPackAlloc(RF, InData%X0_high)
-   call RegPackAlloc(RF, InData%Y0_high)
-   call RegPackAlloc(RF, InData%Z0_high)
-   call RegPackAlloc(RF, InData%dX_high)
-   call RegPackAlloc(RF, InData%dY_high)
-   call RegPackAlloc(RF, InData%dZ_high)
-   call RegPack(RF, InData%nX_high)
-   call RegPack(RF, InData%nY_high)
-   call RegPack(RF, InData%nZ_high)
-   call RegPackAlloc(RF, InData%Grid_low)
-   call RegPackAlloc(RF, InData%Grid_high)
-   call RegPackAlloc(RF, InData%WT_Position)
    call RegPack(RF, InData%n_high_low)
    call RegPack(RF, InData%dt_low)
    call RegPack(RF, InData%dt_high)
@@ -2329,8 +2475,8 @@ subroutine AWAE_UnPackParam(RF, OutData)
    type(RegFile), intent(inout)    :: RF
    type(AWAE_ParameterType), intent(inout) :: OutData
    character(*), parameter            :: RoutineName = 'AWAE_UnPackParam'
-   integer(B4Ki)   :: i1, i2, i3
-   integer(B4Ki)   :: LB(3), UB(3)
+   integer(B4Ki)   :: i1
+   integer(B4Ki)   :: LB(1), UB(1)
    integer(IntKi)  :: stat
    logical         :: IsAllocAssoc
    integer(B8Ki)   :: PtrIdx
@@ -2339,35 +2485,26 @@ subroutine AWAE_UnPackParam(RF, OutData)
    call RegUnpack(RF, OutData%WindFilePath); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%NumTurbines); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%NumRadii); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%NumPlanes); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%MaxPlanes); if (RegCheckErr(RF, RoutineName)) return
+   call AWAE_UnpackLRGParamType(RF, OutData%LowRes) ! LowRes 
+   if (allocated(OutData%HighRes)) deallocate(OutData%HighRes)
+   call RegUnpack(RF, IsAllocAssoc); if (RegCheckErr(RF, RoutineName)) return
+   if (IsAllocAssoc) then
+      call RegUnpackBounds(RF, 1, LB, UB); if (RegCheckErr(RF, RoutineName)) return
+      allocate(OutData%HighRes(LB(1):UB(1)),stat=stat)
+      if (stat /= 0) then 
+         call SetErrStat(ErrID_Fatal, 'Error allocating OutData%HighRes.', RF%ErrStat, RF%ErrMsg, RoutineName)
+         return
+      end if
+      do i1 = LB(1), UB(1)
+         call AWAE_UnpackHRGParamType(RF, OutData%HighRes(i1)) ! HighRes 
+      end do
+   end if
    call RegUnpackAlloc(RF, OutData%y); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%z); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%dPol); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%Mod_AmbWind); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%nX_low); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%nY_low); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%nZ_low); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%NumGrid_low); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%n_rp_max); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%dpol); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%dXYZ_low); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%dX_low); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%dY_low); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%dZ_low); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%X0_low); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%Y0_low); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%Z0_low); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%X0_high); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%Y0_high); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%Z0_high); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%dX_high); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%dY_high); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%dZ_high); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%nX_high); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%nY_high); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%nZ_high); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%Grid_low); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%Grid_high); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%WT_Position); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%n_high_low); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%dt_low); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%dt_high); if (RegCheckErr(RF, RoutineName)) return
