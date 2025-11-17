@@ -43,9 +43,10 @@ MODULE AWAE_IO
          character(kind=c_char), intent(in)        :: FileName(*)
          character(kind=c_char), intent(out)       :: Desc(1024)
          integer(c_int), intent(out)               :: dims(3)
-         real(c_double), intent(out)               :: origin(3), gridSpacing(3)
+         real(c_double), intent(out)               :: origin(3)
+         real(c_double), intent(out)               :: gridSpacing(3)
          character(kind=c_char), intent(out)       :: vecLabel(1024)
-         real(c_float), intent(out)                :: values(:,:,:,:)
+         real(c_float), intent(out)                :: values(*)
          integer(c_int), intent(in)                :: read_values
          integer(c_int), intent(out)               :: err_stat
          character(kind=c_char), intent(out)       :: err_msg(1024)
@@ -114,9 +115,9 @@ subroutine ReadLowResWindFile(n, p, Vamb_Low, errStat, errMsg)
    integer(IntKi)           :: dims(3)              !  dimension of the 3D grid (nX,nY,nZ)
    real(R8Ki)               :: origin(3)            !  the lower-left corner of the 3D grid (X0,Y0,Z0)
    real(R8Ki)               :: gridSpacing(3)       !  spacing between grid points in each of the 3 directions (dX,dY,dZ)
-   character(kind=c_char,len=1)   :: FileName(1024)       ! Name of output file     
-   character(kind=c_char,len=1)   :: desc(1024)           ! Line describing the contents of the file
-   character(kind=c_char,len=1)   :: vecLabel(1024)       ! descriptor of the vector data
+   character(kind=c_char)   :: FileName(1024)       ! Name of output file     
+   character(kind=c_char)   :: desc(1024)           ! Line describing the contents of the file
+   character(kind=c_char)   :: vecLabel(1024)       ! descriptor of the vector data
    
    errStat = ErrID_None
    errMsg  = ""
@@ -141,9 +142,9 @@ subroutine ReadHighResWindFile(nt, n, p, Vamb_high, errStat, errMsg)
    integer(IntKi)           :: dims(3)              !  dimension of the 3D grid (nX,nY,nZ)
    real(R8Ki)               :: origin(3)            !  the lower-left corner of the 3D grid (X0,Y0,Z0)
    real(R8Ki)               :: gridSpacing(3)       !  spacing between grid points in each of the 3 directions (dX,dY,dZ)
-   character(kind=c_char,len=1)   :: FileName(1024)       ! Name of output file
-   character(kind=c_char,len=1)   :: desc(1024)           ! Line describing the contents of the file
-   character(kind=c_char,len=1)   :: vecLabel(1024)       ! descriptor of the vector data
+   character(kind=c_char)   :: FileName(1024)       ! Name of output file
+   character(kind=c_char)   :: desc(1024)           ! Line describing the contents of the file
+   character(kind=c_char)   :: vecLabel(1024)       ! descriptor of the vector data
    
    errStat = ErrID_None
    errMsg  = ""

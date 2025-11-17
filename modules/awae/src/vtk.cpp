@@ -131,12 +131,12 @@ extern "C"
             copy_string_to_array("Invalid vtk structured_points file: did not find POINT_DATA label", err_msg);
             return;
         }
-        int n_values{0};
+        int n_points{0};
         {
             std::istringstream iss(line);
-            iss >> label >> n_values;
+            iss >> label >> n_points;
         }
-        if (n_values != (dims[0] * dims[1] * dims[2]))
+        if (n_points != (dims[0] * dims[1] * dims[2]))
         {
             copy_string_to_array("Invalid vtk structured_points file: POINT_DATA does not match DIMENSIONS", err_msg);
             return;
@@ -176,14 +176,14 @@ extern "C"
             int n_components{0};
             {
                 std::istringstream iss(line);
-                iss >> label >> n_components >> n_values;
+                iss >> label >> n_components >> n_points;
             }
             if (n_components != 3)
             {
                 copy_string_to_array("Invalid FIELD components.  Must be set to 3.", err_msg);
                 return;
             }
-            if (n_values != (dims[0] * dims[1] * dims[2]))
+            if (n_points != (dims[0] * dims[1] * dims[2]))
             {
                 copy_string_to_array("Invalid vtk structured_points file: FIELD array does not match DIMENSIONS", err_msg);
                 return;
@@ -197,12 +197,18 @@ extern "C"
 
         // If reading of values was not requested, return
         if (read_values == 0)
+        {
+            *err_stat = ErrID_None;
             return;
+        }
 
         // Read values
+        const auto n_values{n_points * 3};
         for (auto i = 0U; i < n_values; ++i)
         {
             inputFile >> values[i];
         }
+
+        *err_stat = ErrID_None;
     }
 }
