@@ -26,6 +26,7 @@ MODULE AWAE_IO
    use NWTC_Library
    use VTK
    use AWAE_Types
+   use iso_c_binding, only: c_char, c_int, c_double, c_float, c_null_char
    
    implicit none
    
@@ -36,10 +37,10 @@ MODULE AWAE_IO
    public :: ReadLowResWindFile
 
    interface
-      subroutine ReadVTK_inflow_info(FileName, Desc, dims, origin, gridSpacing, vecLabel, values, read_values, err_stat, err_msg) BIND(C,name='ReadVTK_inflow_info')
-         use iso_c_binding, only: c_char, c_int, c_double, c_float                  
+      subroutine ReadVTK_inflow_info(FileName, Desc, dims, origin, gridSpacing, vecLabel, values, read_values, err_stat, err_msg) BIND(C,name='ReadVTK_inflow_info')     
+         use iso_c_binding, only: c_char, c_int, c_double, c_float, c_null_char        
          implicit none
-         character(kind=c_char, len=*), intent(in) :: FileName
+         character(kind=c_char), intent(in)        :: FileName(*)
          character(kind=c_char), intent(out)       :: Desc(1024)
          integer(c_int), intent(out)               :: dims(3)
          real(c_double), intent(out)               :: origin(3), gridSpacing(3)
@@ -113,20 +114,17 @@ subroutine ReadLowResWindFile(n, p, Vamb_Low, errStat, errMsg)
    integer(IntKi)           :: dims(3)              !  dimension of the 3D grid (nX,nY,nZ)
    real(R8Ki)               :: origin(3)            !  the lower-left corner of the 3D grid (X0,Y0,Z0)
    real(R8Ki)               :: gridSpacing(3)       !  spacing between grid points in each of the 3 directions (dX,dY,dZ)
-   ! integer(IntKi)           :: Un                   !  unit number of opened file
-   character(1024)          :: FileName             ! Name of output file     
-   character(1024)          :: desc                 ! Line describing the contents of the file
-   character(1024)          :: vecLabel             ! descriptor of the vector data
+   character(kind=c_char,len=1)   :: FileName(1024)       ! Name of output file     
+   character(kind=c_char,len=1)   :: desc(1024)           ! Line describing the contents of the file
+   character(kind=c_char,len=1)   :: vecLabel(1024)       ! descriptor of the vector data
    
    errStat = ErrID_None
    errMsg  = ""
   
-   FileName = trim(p%WindFilePath)//trim(PathSep)//"Low"//trim(PathSep)//"Amb.t"//trim(Num2LStr(n))//".vtk"
-   ! Un = 0; ! Initialization different from -1, important to prevent file closing 
-   ! call ReadVTK_SP_info(FileName, desc, dims, origin, gridSpacing, vecLabel, Un, ErrStat, ErrMsg) 
-   !    if (ErrStat >= AbortErrLev) return
-   ! call ReadVTK_SP_vectors(FileName, Un, dims, Vamb_Low, ErrStat, ErrMsg)
+   FileName = c_null_char
+   FileName = transfer(trim(p%WindFilePath)//trim(PathSep)//"Low"//trim(PathSep)//"Amb.t"//trim(Num2LStr(n))//".vtk", FileName)
    call ReadVTK_inflow_info(FileName, desc, dims, origin, gridSpacing, vecLabel, Vamb_Low, 1, ErrStat, ErrMsg)
+   if (ErrStat /= ErrID_None) ErrMsg = "ReadLowResWindFile: "//trim(ErrMsg)
 end subroutine ReadLowResWindFile
 
 !----------------------------------------------------------------------------------------------------------------------------------   
@@ -140,25 +138,20 @@ subroutine ReadHighResWindFile(nt, n, p, Vamb_high, errStat, errMsg)
    integer(IntKi),                 intent(  out)  :: errStat      !< Error status of the operation
    character(*),                   intent(  out)  :: errMsg       !< Error message if errStat /= ErrID_None
   
-   
    integer(IntKi)           :: dims(3)              !  dimension of the 3D grid (nX,nY,nZ)
    real(R8Ki)               :: origin(3)            !  the lower-left corner of the 3D grid (X0,Y0,Z0)
    real(R8Ki)               :: gridSpacing(3)       !  spacing between grid points in each of the 3 directions (dX,dY,dZ)
-   ! integer(IntKi)           :: Un                   !  unit number of opened file
-   character(1024)          :: FileName             ! Name of output file     
-   character(1024)          :: desc                ! Line describing the contents of the file
-   character(1024)          :: vecLabel             ! descriptor of the vector data
+   character(kind=c_char,len=1)   :: FileName(1024)       ! Name of output file
+   character(kind=c_char,len=1)   :: desc(1024)           ! Line describing the contents of the file
+   character(kind=c_char,len=1)   :: vecLabel(1024)       ! descriptor of the vector data
    
    errStat = ErrID_None
    errMsg  = ""
    
-   FileName = trim(p%WindFilePath)//trim(PathSep)//"HighT"//trim(num2lstr(nt))//trim(PathSep)//"Amb.t"//trim(num2lstr(n))//".vtk"
-   ! Un = 0; ! Initialization different from -1, important to prevent file closing 
-   ! call ReadVTK_SP_info( FileName, desc, dims, origin, gridSpacing, vecLabel, Un, ErrStat, ErrMsg ) 
-   !    if (ErrStat >= AbortErrLev) return
-   ! call ReadVTK_SP_vectors( FileName, Un, dims, Vamb_high, ErrStat, ErrMsg ) 
+   FileName = c_null_char
+   FileName = transfer(trim(p%WindFilePath)//trim(PathSep)//"HighT"//trim(num2lstr(nt))//trim(PathSep)//"Amb.t"//trim(num2lstr(n))//".vtk", FileName)
    call ReadVTK_inflow_info(FileName, desc, dims, origin, gridSpacing, vecLabel, Vamb_high, 1, ErrStat, ErrMsg)
-      
+   if (ErrStat /= ErrID_None) ErrMsg = "ReadHighResWindFile: "//trim(ErrMsg)
 end subroutine ReadHighResWindFile
 !----------------------------------------------------------------------------------------------------------------------------------   
 !> Flat array of Cartesian point coordinates

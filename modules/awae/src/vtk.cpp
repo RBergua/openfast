@@ -35,8 +35,7 @@ const auto ErrID_Fatal{4};
 
 extern "C"
 {
-
-    void ReadVTK_inflow_info(const char *filename, char desc[MaxChars],
+    void ReadVTK_inflow_info(const char filename[], char desc[MaxChars],
                              int dims[3], double origin[3], double spacing[3],
                              char vec_label[MaxChars], float values[], int *read_values,
                              int *err_stat, char err_msg[MaxChars])
@@ -51,7 +50,7 @@ extern "C"
         // If file wasn't opened, return error
         if (!inputFile.is_open())
         {
-            copy_string_to_array((std::string("Error opening file '") + filename + "'"), err_msg);
+            copy_string_to_array((std::string("Error opening file: '") + filename + "'"), err_msg);
             return;
         }
 
