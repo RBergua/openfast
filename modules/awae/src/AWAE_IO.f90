@@ -26,7 +26,6 @@ MODULE AWAE_IO
    use NWTC_Library
    use VTK
    use AWAE_Types
-
    
    implicit none
    
@@ -35,6 +34,22 @@ MODULE AWAE_IO
     
    public :: AWAE_IO_InitGridInfo
    public :: ReadLowResWindFile
+
+   interface
+      subroutine ReadVTK_inflow_info(FileName, Desc, dims, origin, gridSpacing, vecLabel, values, read_values, err_stat, err_msg) BIND(C,name='ReadVTK_inflow_info')
+         use iso_c_binding, only: c_char, c_int, c_double, c_float                  
+         implicit none
+         character(kind=c_char, len=*), intent(in) :: FileName
+         character(kind=c_char), intent(out)       :: Desc(1024)
+         integer(c_int), intent(out)               :: dims(3)
+         real(c_double), intent(out)               :: origin(3), gridSpacing(3)
+         character(kind=c_char), intent(out)       :: vecLabel(1024)
+         real(c_float), intent(out)                :: values(:,:,:,:)
+         integer(c_int), intent(in)                :: read_values
+         integer(c_int), intent(out)               :: err_stat
+         character(kind=c_char), intent(out)       :: err_msg(1024)
+      end subroutine
+   end interface
    
    contains
 
@@ -96,9 +111,9 @@ subroutine ReadLowResWindFile(n, p, Vamb_Low, errStat, errMsg)
    character(*),                   intent(  out)  :: errMsg       !< Error message if errStat /= ErrID_None
   
    integer(IntKi)           :: dims(3)              !  dimension of the 3D grid (nX,nY,nZ)
-   real(ReKi)               :: origin(3)            !  the lower-left corner of the 3D grid (X0,Y0,Z0)
-   real(ReKi)               :: gridSpacing(3)       !  spacing between grid points in each of the 3 directions (dX,dY,dZ)
-   integer(IntKi)           :: Un                   !  unit number of opened file
+   real(R8Ki)               :: origin(3)            !  the lower-left corner of the 3D grid (X0,Y0,Z0)
+   real(R8Ki)               :: gridSpacing(3)       !  spacing between grid points in each of the 3 directions (dX,dY,dZ)
+   ! integer(IntKi)           :: Un                   !  unit number of opened file
    character(1024)          :: FileName             ! Name of output file     
    character(1024)          :: desc                 ! Line describing the contents of the file
    character(1024)          :: vecLabel             ! descriptor of the vector data
@@ -107,10 +122,11 @@ subroutine ReadLowResWindFile(n, p, Vamb_Low, errStat, errMsg)
    errMsg  = ""
   
    FileName = trim(p%WindFilePath)//trim(PathSep)//"Low"//trim(PathSep)//"Amb.t"//trim(Num2LStr(n))//".vtk"
-   Un = 0; ! Initialization different from -1, important to prevent file closing 
-   call ReadVTK_SP_info(FileName, desc, dims, origin, gridSpacing, vecLabel, Un, ErrStat, ErrMsg) 
-      if (ErrStat >= AbortErrLev) return
-   call ReadVTK_SP_vectors(FileName, Un, dims, Vamb_Low, ErrStat, ErrMsg)
+   ! Un = 0; ! Initialization different from -1, important to prevent file closing 
+   ! call ReadVTK_SP_info(FileName, desc, dims, origin, gridSpacing, vecLabel, Un, ErrStat, ErrMsg) 
+   !    if (ErrStat >= AbortErrLev) return
+   ! call ReadVTK_SP_vectors(FileName, Un, dims, Vamb_Low, ErrStat, ErrMsg)
+   call ReadVTK_inflow_info(FileName, desc, dims, origin, gridSpacing, vecLabel, Vamb_Low, 1, ErrStat, ErrMsg)
 end subroutine ReadLowResWindFile
 
 !----------------------------------------------------------------------------------------------------------------------------------   
@@ -126,9 +142,9 @@ subroutine ReadHighResWindFile(nt, n, p, Vamb_high, errStat, errMsg)
   
    
    integer(IntKi)           :: dims(3)              !  dimension of the 3D grid (nX,nY,nZ)
-   real(ReKi)               :: origin(3)            !  the lower-left corner of the 3D grid (X0,Y0,Z0)
-   real(ReKi)               :: gridSpacing(3)       !  spacing between grid points in each of the 3 directions (dX,dY,dZ)
-   integer(IntKi)           :: Un                   !  unit number of opened file
+   real(R8Ki)               :: origin(3)            !  the lower-left corner of the 3D grid (X0,Y0,Z0)
+   real(R8Ki)               :: gridSpacing(3)       !  spacing between grid points in each of the 3 directions (dX,dY,dZ)
+   ! integer(IntKi)           :: Un                   !  unit number of opened file
    character(1024)          :: FileName             ! Name of output file     
    character(1024)          :: desc                ! Line describing the contents of the file
    character(1024)          :: vecLabel             ! descriptor of the vector data
@@ -137,10 +153,11 @@ subroutine ReadHighResWindFile(nt, n, p, Vamb_high, errStat, errMsg)
    errMsg  = ""
    
    FileName = trim(p%WindFilePath)//trim(PathSep)//"HighT"//trim(num2lstr(nt))//trim(PathSep)//"Amb.t"//trim(num2lstr(n))//".vtk"
-   Un = 0; ! Initialization different from -1, important to prevent file closing 
-   call ReadVTK_SP_info( FileName, desc, dims, origin, gridSpacing, vecLabel, Un, ErrStat, ErrMsg ) 
-      if (ErrStat >= AbortErrLev) return
-   call ReadVTK_SP_vectors( FileName, Un, dims, Vamb_high, ErrStat, ErrMsg ) 
+   ! Un = 0; ! Initialization different from -1, important to prevent file closing 
+   ! call ReadVTK_SP_info( FileName, desc, dims, origin, gridSpacing, vecLabel, Un, ErrStat, ErrMsg ) 
+   !    if (ErrStat >= AbortErrLev) return
+   ! call ReadVTK_SP_vectors( FileName, Un, dims, Vamb_high, ErrStat, ErrMsg ) 
+   call ReadVTK_inflow_info(FileName, desc, dims, origin, gridSpacing, vecLabel, Vamb_high, 1, ErrStat, ErrMsg)
       
 end subroutine ReadHighResWindFile
 !----------------------------------------------------------------------------------------------------------------------------------   

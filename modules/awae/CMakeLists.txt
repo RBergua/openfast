@@ -17,14 +17,18 @@ if (GENERATE_TYPES)
   generate_f90_types(src/AWAE_Registry.txt ${CMAKE_CURRENT_LIST_DIR}/src/AWAE_Types.f90 -noextrap)
 endif()
 
+add_library(awaelib_c STATIC
+  src/vtk.cpp
+)
+
 add_library(awaelib STATIC
   src/AWAE.f90
   src/AWAE_IO.f90
   src/AWAE_Types.f90
 )
-target_link_libraries(awaelib ifwlib nwtclibs)
+target_link_libraries(awaelib awaelib_c ifwlib nwtclibs)
 
-install(TARGETS awaelib
+install(TARGETS awaelib awaelib_c
   EXPORT "${CMAKE_PROJECT_NAME}Libraries"
   RUNTIME DESTINATION bin
   LIBRARY DESTINATION lib
