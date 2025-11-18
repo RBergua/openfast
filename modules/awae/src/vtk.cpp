@@ -216,13 +216,19 @@ extern "C"
         const auto n_values{n_points * 3};
         for (auto i = 1U; i < n_values; ++i)
         {
-            answer = fast_float::from_chars(answer.ptr + 1, input.data() + input.size(), values[i]);
+            while (std::isspace(*answer.ptr))
+            {
+                ++answer.ptr;
+            }
+            answer = fast_float::from_chars(answer.ptr, input.data() + input.size(), values[i]);
             if (answer.ec != std::errc())
             {
+                copy_string_to_array("error parsing", err_msg);
                 return;
             }
         }
 
+        // Set error to none
         *err_stat = ErrID_None;
     }
 }
