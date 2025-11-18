@@ -9,6 +9,8 @@
 #include <cctype>
 #include <sstream>
 
+#include "fast_float/fast_float.h"
+
 const auto MaxChars{1023};
 
 void convert_string_to_uppercase(std::string &str)
@@ -202,11 +204,23 @@ extern "C"
             return;
         }
 
-        // Read values
+        // Read entire file
+        std::stringstream buffer;
+        buffer << inputFile.rdbuf();
+        std::string input = buffer.str();
+
+        // Read first value
+        auto answer = fast_float::from_chars(input.data(), input.data() + input.size(), values[0]);
+
+        // Read remaining values
         const auto n_values{n_points * 3};
-        for (auto i = 0U; i < n_values; ++i)
+        for (auto i = 1U; i < n_values; ++i)
         {
-            inputFile >> values[i];
+            answer = fast_float::from_chars(answer.ptr + 1, input.data() + input.size(), values[i]);
+            if (answer.ec != std::errc())
+            {
+                return;
+            }
         }
 
         *err_stat = ErrID_None;
