@@ -108,7 +108,7 @@ end subroutine WriteDisWindFiles
 subroutine ReadLowResWindFile(n, p, Vamb_Low, errStat, errMsg)
    integer(IntKi),                 intent(in   )  :: n            !< Current simulation timestep increment (zero-based)
    type(AWAE_ParameterType),       intent(in   )  :: p            !< Parameters
-   real(SiKi),                     intent(inout)  :: Vamb_Low(:,0:,0:,0:)         !< Array which will contain the low resolution grid of ambient wind velocities
+   real(SiKi), contiguous,         intent(inout)  :: Vamb_Low(:,0:,0:,0:)         !< Array which will contain the low resolution grid of ambient wind velocities
    integer(IntKi),                 intent(  out)  :: errStat      !< Error status of the operation
    character(*),                   intent(  out)  :: errMsg       !< Error message if errStat /= ErrID_None
   
@@ -125,7 +125,7 @@ subroutine ReadLowResWindFile(n, p, Vamb_Low, errStat, errMsg)
    FileName = transfer(trim(p%WindFilePath)//trim(PathSep)//"Low"//trim(PathSep)//"Amb.t"//trim(Num2LStr(n))//".vtk"//c_null_char, FileName)
    call ReadVTK_inflow_info(FileName, desc, dims, origin, gridSpacing, vecLabel, Vamb_Low, 1, ErrStat, ErrMsg)
    if (ErrStat /= ErrID_None) ErrMsg = "ReadLowResWindFile:"//trim(ErrMsg)
-   
+
 end subroutine ReadLowResWindFile
 
 !----------------------------------------------------------------------------------------------------------------------------------   
@@ -135,7 +135,7 @@ subroutine ReadHighResWindFile(nt, n, p, Vamb_high, errStat, errMsg)
    integer(IntKi),                 intent(in   )  :: nt
    integer(IntKi),                 intent(in   )  :: n                       !< high-res time increment
    type(AWAE_ParameterType),       intent(in   )  :: p            !< Parameters
-   real(SiKi),                     intent(inout)  :: Vamb_high(:,0:,0:,0:)         !< Array which will contain the low resolution grid of ambient wind velocities
+   real(SiKi), contiguous,         intent(inout)  :: Vamb_high(:,0:,0:,0:)         !< Array which will contain the low resolution grid of ambient wind velocities
    integer(IntKi),                 intent(  out)  :: errStat      !< Error status of the operation
    character(*),                   intent(  out)  :: errMsg       !< Error message if errStat /= ErrID_None
   
