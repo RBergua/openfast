@@ -202,7 +202,7 @@ extern "C"
         }
 
         // If reading of values was not requested, return
-        if (read_values == 0)
+        if (*read_values == 0)
         {
             *err_stat = ErrID_None;
             return;
