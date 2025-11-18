@@ -56,15 +56,19 @@ extern "C"
             return;
         }
 
+        // Read entire file into buffer
+        std::stringstream buffer;
+        buffer << inputFile.rdbuf();
+
         std::string line;
         std::string label;
 
-        std::getline(inputFile, line); // Header
-        std::getline(inputFile, line); // Description
+        std::getline(buffer, line); // Header
+        std::getline(buffer, line); // Description
         copy_string_to_array(line, desc);
 
         // Format label
-        std::getline(inputFile, line);
+        std::getline(buffer, line);
         convert_string_to_uppercase(line);
         if (line.find("ASCII") == std::string::npos)
         {
@@ -73,7 +77,7 @@ extern "C"
         }
 
         // Dataset
-        std::getline(inputFile, line);
+        std::getline(buffer, line);
         convert_string_to_uppercase(line);
         if (line.find("DATASET") == std::string::npos)
         {
@@ -87,7 +91,7 @@ extern "C"
         }
 
         // Dimensions
-        std::getline(inputFile, line);
+        std::getline(buffer, line);
         convert_string_to_uppercase(line);
         if (line.find("DIMENSIONS") == std::string::npos)
         {
@@ -100,7 +104,7 @@ extern "C"
         }
 
         // Origin
-        std::getline(inputFile, line);
+        std::getline(buffer, line);
         convert_string_to_uppercase(line);
         if (line.find("ORIGIN") == std::string::npos)
         {
@@ -113,7 +117,7 @@ extern "C"
         }
 
         // Spacing
-        std::getline(inputFile, line);
+        std::getline(buffer, line);
         convert_string_to_uppercase(line);
         if (line.find("SPACING") == std::string::npos)
         {
@@ -126,7 +130,7 @@ extern "C"
         }
 
         // Point data
-        std::getline(inputFile, line);
+        std::getline(buffer, line);
         convert_string_to_uppercase(line);
         if (line.find("POINT_DATA") == std::string::npos)
         {
@@ -145,7 +149,7 @@ extern "C"
         }
 
         // vector or field data
-        std::getline(inputFile, line);
+        std::getline(buffer, line);
         convert_string_to_uppercase(line);
         if (line.find("VECTORS") != std::string::npos)
         {
@@ -167,7 +171,7 @@ extern "C"
                 return;
             }
 
-            std::getline(inputFile, line);
+            std::getline(buffer, line);
             convert_string_to_uppercase(line);
             if (line.find("FLOAT") == std::string::npos)
             {
@@ -204,10 +208,8 @@ extern "C"
             return;
         }
 
-        // Read entire file
-        std::stringstream buffer;
-        buffer << inputFile.rdbuf();
-        std::string input = buffer.str();
+        // Get the remainder of the input as a string
+        std::string input = buffer.str().substr(buffer.tellg());
 
         // Read first value
         auto answer = fast_float::from_chars(input.data(), input.data() + input.size(), values[0]);
@@ -223,12 +225,12 @@ extern "C"
             answer = fast_float::from_chars(answer.ptr, input.data() + input.size(), values[i]);
             if (answer.ec != std::errc())
             {
-                copy_string_to_array("error parsing", err_msg);
+                copy_string_to_array("Error parsing value", err_msg);
                 return;
             }
         }
 
-        // Set error to none
+        // Set no errors
         *err_stat = ErrID_None;
     }
 }
