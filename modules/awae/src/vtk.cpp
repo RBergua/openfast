@@ -218,11 +218,8 @@ extern "C"
         const auto n_values{n_points * 3};
         for (auto i = 1U; i < n_values; ++i)
         {
-            while (std::isspace(*answer.ptr))
-            {
-                ++answer.ptr;
-            }
-            answer = fast_float::from_chars(answer.ptr, input.data() + input.size(), values[i]);
+            answer = fast_float::from_chars(answer.ptr, input.data() + input.size(), values[i], 
+                                            fast_float::chars_format::skip_white_space);
             if (answer.ec != std::errc())
             {
                 copy_string_to_array("Error parsing value", err_msg);

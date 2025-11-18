@@ -165,7 +165,7 @@ target_link_libraries(nwtclibs PUBLIC
   ${CMAKE_DL_LIBS} 
 )
 target_include_directories(nwtclibs PUBLIC
-  ${CMAKE_CURRENT_LIST_DIR}/include
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/include>
 )
 if (USE_DLL_INTERFACE)
   target_compile_definitions(nwtclibs PRIVATE USE_DLL_INTERFACE)
