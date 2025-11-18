@@ -616,7 +616,7 @@ subroutine LowResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
    end do
    
    !----------------------------------------------------------------------------
-   ! What is this?
+   ! Calculate plane velocity vector
    !----------------------------------------------------------------------------
 
    ! Loop through turbines
