@@ -20,7 +20,7 @@ endif()
 add_library(awaelib_c STATIC
   src/vtk.cpp
 )
-# target_include_directories(awaelib_c PUBLIC ${CMAKE_CURRENT_LIST_DIR}/src)
+target_link_libraries(awaelib_c nwtclibs)
 
 add_library(awaelib STATIC
   src/AWAE.f90

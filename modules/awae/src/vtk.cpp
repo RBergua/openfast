@@ -9,7 +9,7 @@
 #include <cctype>
 #include <sstream>
 
-#include "fast_float/fast_float.h"
+#include "fast_float.h"
 
 const auto MaxChars{1023};
 
