@@ -205,6 +205,15 @@ IMPLICIT NONE
     TYPE(ModLinType)  :: Lin      !< Module linearization arrays and matrices [-]
   END TYPE ModDataType
 ! =======================
+! =========  KdTreeType  =======
+  TYPE, PUBLIC :: KdTreeType
+    INTEGER(IntKi)  :: NNodes = 0      !< Number of nodes in tree [-]
+    INTEGER(IntKi)  :: NDims = 0      !< Number of dimensions in tree [-]
+    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: Nodes      !< Array of node positions [-]
+    INTEGER(IntKi) , DIMENSION(:), ALLOCATABLE  :: OriginalIndices      !< Array of original node indices [-]
+    INTEGER(IntKi) , DIMENSION(:), ALLOCATABLE  :: Dimensions      !< The splitting dimension (1 for x, 2 for y) for each node. [-]
+  END TYPE KdTreeType
+! =======================
 
 contains
 
@@ -1511,6 +1520,103 @@ subroutine NWTC_Library_UnPackModDataType(RF, OutData)
    call RegUnpack(RF, OutData%DT); if (RegCheckErr(RF, RoutineName)) return
    call NWTC_Library_UnpackModVarsType(RF, OutData%Vars) ! Vars 
    call NWTC_Library_UnpackModLinType(RF, OutData%Lin) ! Lin 
+end subroutine
+
+subroutine NWTC_Library_CopyKdTreeType(SrcKdTreeTypeData, DstKdTreeTypeData, CtrlCode, ErrStat, ErrMsg)
+   type(KdTreeType), intent(in) :: SrcKdTreeTypeData
+   type(KdTreeType), intent(inout) :: DstKdTreeTypeData
+   integer(IntKi),  intent(in   ) :: CtrlCode
+   integer(IntKi),  intent(  out) :: ErrStat
+   character(*),    intent(  out) :: ErrMsg
+   integer(B4Ki)                  :: LB(2), UB(2)
+   integer(IntKi)                 :: ErrStat2
+   character(*), parameter        :: RoutineName = 'NWTC_Library_CopyKdTreeType'
+   ErrStat = ErrID_None
+   ErrMsg  = ''
+   DstKdTreeTypeData%NNodes = SrcKdTreeTypeData%NNodes
+   DstKdTreeTypeData%NDims = SrcKdTreeTypeData%NDims
+   if (allocated(SrcKdTreeTypeData%Nodes)) then
+      LB(1:2) = lbound(SrcKdTreeTypeData%Nodes)
+      UB(1:2) = ubound(SrcKdTreeTypeData%Nodes)
+      if (.not. allocated(DstKdTreeTypeData%Nodes)) then
+         allocate(DstKdTreeTypeData%Nodes(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstKdTreeTypeData%Nodes.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstKdTreeTypeData%Nodes = SrcKdTreeTypeData%Nodes
+   end if
+   if (allocated(SrcKdTreeTypeData%OriginalIndices)) then
+      LB(1:1) = lbound(SrcKdTreeTypeData%OriginalIndices)
+      UB(1:1) = ubound(SrcKdTreeTypeData%OriginalIndices)
+      if (.not. allocated(DstKdTreeTypeData%OriginalIndices)) then
+         allocate(DstKdTreeTypeData%OriginalIndices(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstKdTreeTypeData%OriginalIndices.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstKdTreeTypeData%OriginalIndices = SrcKdTreeTypeData%OriginalIndices
+   end if
+   if (allocated(SrcKdTreeTypeData%Dimensions)) then
+      LB(1:1) = lbound(SrcKdTreeTypeData%Dimensions)
+      UB(1:1) = ubound(SrcKdTreeTypeData%Dimensions)
+      if (.not. allocated(DstKdTreeTypeData%Dimensions)) then
+         allocate(DstKdTreeTypeData%Dimensions(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstKdTreeTypeData%Dimensions.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstKdTreeTypeData%Dimensions = SrcKdTreeTypeData%Dimensions
+   end if
+end subroutine
+
+subroutine NWTC_Library_DestroyKdTreeType(KdTreeTypeData, ErrStat, ErrMsg)
+   type(KdTreeType), intent(inout) :: KdTreeTypeData
+   integer(IntKi),  intent(  out) :: ErrStat
+   character(*),    intent(  out) :: ErrMsg
+   character(*), parameter        :: RoutineName = 'NWTC_Library_DestroyKdTreeType'
+   ErrStat = ErrID_None
+   ErrMsg  = ''
+   if (allocated(KdTreeTypeData%Nodes)) then
+      deallocate(KdTreeTypeData%Nodes)
+   end if
+   if (allocated(KdTreeTypeData%OriginalIndices)) then
+      deallocate(KdTreeTypeData%OriginalIndices)
+   end if
+   if (allocated(KdTreeTypeData%Dimensions)) then
+      deallocate(KdTreeTypeData%Dimensions)
+   end if
+end subroutine
+
+subroutine NWTC_Library_PackKdTreeType(RF, Indata)
+   type(RegFile), intent(inout) :: RF
+   type(KdTreeType), intent(in) :: InData
+   character(*), parameter         :: RoutineName = 'NWTC_Library_PackKdTreeType'
+   if (RF%ErrStat >= AbortErrLev) return
+   call RegPack(RF, InData%NNodes)
+   call RegPack(RF, InData%NDims)
+   call RegPackAlloc(RF, InData%Nodes)
+   call RegPackAlloc(RF, InData%OriginalIndices)
+   call RegPackAlloc(RF, InData%Dimensions)
+   if (RegCheckErr(RF, RoutineName)) return
+end subroutine
+
+subroutine NWTC_Library_UnPackKdTreeType(RF, OutData)
+   type(RegFile), intent(inout)    :: RF
+   type(KdTreeType), intent(inout) :: OutData
+   character(*), parameter            :: RoutineName = 'NWTC_Library_UnPackKdTreeType'
+   integer(B4Ki)   :: LB(2), UB(2)
+   integer(IntKi)  :: stat
+   logical         :: IsAllocAssoc
+   if (RF%ErrStat /= ErrID_None) return
+   call RegUnpack(RF, OutData%NNodes); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%NDims); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%Nodes); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%OriginalIndices); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%Dimensions); if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
 END MODULE NWTC_Library_Types

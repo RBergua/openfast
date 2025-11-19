@@ -148,6 +148,12 @@ typedef     ^       ^           R8Ki            DT                  -   0   -   
 typedef     ^       ^           ModVarsType     Vars                -   -   -   "Module variables type"  -
 typedef     ^       ^           ModLinType      Lin                 -   -   -   "Module linearization arrays and matrices"
 
+typedef     ^       KdTreeType  IntKi           NNodes              -   0   -   "Number of nodes in tree"  -
+typedef     ^       ^           IntKi           NDims               -   0   -   "Number of dimensions in tree"  -
+typedef     ^       ^           ReKi            Nodes               ::  0   -   "Array of node positions"  -
+typedef     ^       ^           IntKi           OriginalIndices     :   0   -   "Array of original node indices"  -
+typedef     ^       ^           IntKi           Dimensions          :   0   -   "The splitting dimension (1 for x, 2 for y) for each node."  -
+
 # This file defines types that may be  used from the NWTC_Library
 # include this into a component registry file if you wish to use these types
 # the "usefrom" keyword defines the types for the registry without generating
