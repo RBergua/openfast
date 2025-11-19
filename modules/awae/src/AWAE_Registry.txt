@@ -96,19 +96,19 @@ typedef   ^ InitOutputType AWAE_HighWindGridPtr Vdist_High    {:} - -   "Pointer
 
 # ..... States ....................................................................................................................
 # Define continuous (differentiable) states here:
-typedef   ^ ContinuousStateType InflowWind_ContinuousStateType    IfW     {:} - -  "Dummy IfW continuous states" -
+typedef   ^ ContinuousStateType ReKi       Dummy     - - -  "Dummy continuous states" -
 
 # Define discrete (nondifferentiable) states here:
-typedef   ^ DiscreteStateType   InflowWind_DiscreteStateType     IfW          {:} - -  "Dummy IfW discrete states" -
+typedef   ^ DiscreteStateType   ReKi       Dummy     - - -  "Dummy discrete states" -
 #wake added turbulence
-typedef   ^ DiscreteStateType   ReKi                             WAT_B_Box    {3} - -  "Position of passive tracer used to offset the WAT box at each low res time step" m
-typedef   ^ DiscreteStateType   ReKi                             Ufarm        {3} - -  "mean velocity of all disk average flow for all turbines in farm" m/s
+typedef   ^ DiscreteStateType   ReKi       WAT_B_Box    {3} - -  "Position of passive tracer used to offset the WAT box at each low res time step" m
+typedef   ^ DiscreteStateType   ReKi       Ufarm        {3} - -  "mean velocity of all disk average flow for all turbines in farm" m/s
 
 # Define constraint states here:
-typedef   ^ ConstraintStateType InflowWind_ConstraintStateType   IfW     {:} - -  "Dummy IfW  constraint states" -
+typedef   ^ ConstraintStateType ReKi       Dummy     - - -  "Dummy constraint states" -
 
 # Define any other states, including integer or logical states here:
-typedef   ^ OtherStateType      InflowWind_OtherStateType    IfW     {:} - -  "Dummy IfW other states" -
+typedef   ^ OtherStateType      ReKi       Dummy     - - -  "Dummy other states" -
 
 # ..... Misc/Optimization variables.................................................................................................
 # Define any data that are used only for efficiency purposes (these variables are not associated with time):
@@ -137,11 +137,10 @@ typedef   ^ MiscVarType    ReKi     pvec_ce   {:}{:}{:}    - -  "" -
 typedef   ^ MiscVarType    SiKi     outVizXYPlane  {:}{:}{:}{:} - - "An array holding the output data for a 2D visualization slice" -
 typedef   ^ MiscVarType    SiKi     outVizYZPlane  {:}{:}{:}{:} - - "An array holding the output data for a 2D visualization slice" -
 typedef   ^ MiscVarType    SiKi     outVizXZPlane  {:}{:}{:}{:} - - "An array holding the output data for a 2D visualization slice" -
-typedef   ^ MiscVarType    InflowWind_MiscVarType  IfW        {:} - - "InflowWind module misc vars" -
 typedef   ^ MiscVarType    InflowWind_InputType    u_IfW_Low   - - -  "InflowWind module inputs for the low-resolution grid" -
-typedef   ^ MiscVarType    InflowWind_InputType    u_IfW_High  - - -  "InflowWind module inputs for the high-resolution grid" -
+typedef   ^ MiscVarType    InflowWind_InputType    u_IfW_High {:} - -  "InflowWind module inputs for the high-resolution grid" -
 typedef   ^ MiscVarType    InflowWind_OutputType   y_IfW_Low   - - -  "InflowWind module outputs for the low-resolution grid" -
-typedef   ^ MiscVarType    InflowWind_OutputType   y_IfW_High  - - -  "InflowWind module outputs for the high-resolution grid" -
+typedef   ^ MiscVarType    InflowWind_OutputType   y_IfW_High {:} - -  "InflowWind module outputs for the high-resolution grid" -
 
 #wake added turbulence
 typedef   ^ MiscVarType    ReKi     V_amb_low_disk       {:}{:} - -  "Rotor averaged ambiend wind speed for each wind turbine (3 x nWT)" m/s
