@@ -118,24 +118,24 @@ IMPLICIT NONE
 ! =======================
 ! =========  AWAE_ContinuousStateType  =======
   TYPE, PUBLIC :: AWAE_ContinuousStateType
-    TYPE(InflowWind_ContinuousStateType) , DIMENSION(:), ALLOCATABLE  :: IfW      !< Dummy IfW continuous states [-]
+    REAL(ReKi)  :: Dummy = 0.0_ReKi      !< Dummy continuous states [-]
   END TYPE AWAE_ContinuousStateType
 ! =======================
 ! =========  AWAE_DiscreteStateType  =======
   TYPE, PUBLIC :: AWAE_DiscreteStateType
-    TYPE(InflowWind_DiscreteStateType) , DIMENSION(:), ALLOCATABLE  :: IfW      !< Dummy IfW discrete states [-]
+    REAL(ReKi)  :: Dummy = 0.0_ReKi      !< Dummy discrete states [-]
     REAL(ReKi) , DIMENSION(1:3)  :: WAT_B_Box = 0.0_ReKi      !< Position of passive tracer used to offset the WAT box at each low res time step [m]
     REAL(ReKi) , DIMENSION(1:3)  :: Ufarm = 0.0_ReKi      !< mean velocity of all disk average flow for all turbines in farm [m/s]
   END TYPE AWAE_DiscreteStateType
 ! =======================
 ! =========  AWAE_ConstraintStateType  =======
   TYPE, PUBLIC :: AWAE_ConstraintStateType
-    TYPE(InflowWind_ConstraintStateType) , DIMENSION(:), ALLOCATABLE  :: IfW      !< Dummy IfW  constraint states [-]
+    REAL(ReKi)  :: Dummy = 0.0_ReKi      !< Dummy constraint states [-]
   END TYPE AWAE_ConstraintStateType
 ! =======================
 ! =========  AWAE_OtherStateType  =======
   TYPE, PUBLIC :: AWAE_OtherStateType
-    TYPE(InflowWind_OtherStateType) , DIMENSION(:), ALLOCATABLE  :: IfW      !< Dummy IfW other states [-]
+    REAL(ReKi)  :: Dummy = 0.0_ReKi      !< Dummy other states [-]
   END TYPE AWAE_OtherStateType
 ! =======================
 ! =========  AWAE_MiscVarType  =======
@@ -163,11 +163,10 @@ IMPLICIT NONE
     REAL(SiKi) , DIMENSION(:,:,:,:), ALLOCATABLE  :: outVizXYPlane      !< An array holding the output data for a 2D visualization slice [-]
     REAL(SiKi) , DIMENSION(:,:,:,:), ALLOCATABLE  :: outVizYZPlane      !< An array holding the output data for a 2D visualization slice [-]
     REAL(SiKi) , DIMENSION(:,:,:,:), ALLOCATABLE  :: outVizXZPlane      !< An array holding the output data for a 2D visualization slice [-]
-    TYPE(InflowWind_MiscVarType) , DIMENSION(:), ALLOCATABLE  :: IfW      !< InflowWind module misc vars [-]
     TYPE(InflowWind_InputType)  :: u_IfW_Low      !< InflowWind module inputs for the low-resolution grid [-]
-    TYPE(InflowWind_InputType)  :: u_IfW_High      !< InflowWind module inputs for the high-resolution grid [-]
+    TYPE(InflowWind_InputType) , DIMENSION(:), ALLOCATABLE  :: u_IfW_High      !< InflowWind module inputs for the high-resolution grid [-]
     TYPE(InflowWind_OutputType)  :: y_IfW_Low      !< InflowWind module outputs for the low-resolution grid [-]
-    TYPE(InflowWind_OutputType)  :: y_IfW_High      !< InflowWind module outputs for the high-resolution grid [-]
+    TYPE(InflowWind_OutputType) , DIMENSION(:), ALLOCATABLE  :: y_IfW_High      !< InflowWind module outputs for the high-resolution grid [-]
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: V_amb_low_disk      !< Rotor averaged ambiend wind speed for each wind turbine (3 x nWT) [m/s]
   END TYPE AWAE_MiscVarType
 ! =======================
@@ -270,7 +269,7 @@ IMPLICIT NONE
     REAL(ReKi) , DIMENSION(:,:,:,:), ALLOCATABLE  :: WAT_k      !< Scaling factor for each wake plane and turbine (ny, nz, np, nWT) [-]
   END TYPE AWAE_InputType
 ! =======================
-   integer(IntKi), public, parameter :: AWAE_x_IfW_DummyContState        =   1 ! AWAE%IfW(DL%i1)%DummyContState
+   integer(IntKi), public, parameter :: AWAE_x_Dummy                     =   1 ! AWAE%Dummy
    integer(IntKi), public, parameter :: AWAE_u_NumPlanes                 =   2 ! AWAE%NumPlanes
    integer(IntKi), public, parameter :: AWAE_u_xhat_plane                =   3 ! AWAE%xhat_plane
    integer(IntKi), public, parameter :: AWAE_u_p_plane                   =   4 ! AWAE%p_plane
@@ -955,69 +954,27 @@ subroutine AWAE_CopyContState(SrcContStateData, DstContStateData, CtrlCode, ErrS
    integer(IntKi),  intent(in   ) :: CtrlCode
    integer(IntKi),  intent(  out) :: ErrStat
    character(*),    intent(  out) :: ErrMsg
-   integer(B4Ki)   :: i1
-   integer(B4Ki)                  :: LB(1), UB(1)
-   integer(IntKi)                 :: ErrStat2
-   character(ErrMsgLen)           :: ErrMsg2
    character(*), parameter        :: RoutineName = 'AWAE_CopyContState'
    ErrStat = ErrID_None
    ErrMsg  = ''
-   if (allocated(SrcContStateData%IfW)) then
-      LB(1:1) = lbound(SrcContStateData%IfW)
-      UB(1:1) = ubound(SrcContStateData%IfW)
-      if (.not. allocated(DstContStateData%IfW)) then
-         allocate(DstContStateData%IfW(LB(1):UB(1)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstContStateData%IfW.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      do i1 = LB(1), UB(1)
-         call InflowWind_CopyContState(SrcContStateData%IfW(i1), DstContStateData%IfW(i1), CtrlCode, ErrStat2, ErrMsg2)
-         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-         if (ErrStat >= AbortErrLev) return
-      end do
-   end if
+   DstContStateData%Dummy = SrcContStateData%Dummy
 end subroutine
 
 subroutine AWAE_DestroyContState(ContStateData, ErrStat, ErrMsg)
    type(AWAE_ContinuousStateType), intent(inout) :: ContStateData
    integer(IntKi),  intent(  out) :: ErrStat
    character(*),    intent(  out) :: ErrMsg
-   integer(B4Ki)   :: i1
-   integer(B4Ki)   :: LB(1), UB(1)
-   integer(IntKi)                 :: ErrStat2
-   character(ErrMsgLen)           :: ErrMsg2
    character(*), parameter        :: RoutineName = 'AWAE_DestroyContState'
    ErrStat = ErrID_None
    ErrMsg  = ''
-   if (allocated(ContStateData%IfW)) then
-      LB(1:1) = lbound(ContStateData%IfW)
-      UB(1:1) = ubound(ContStateData%IfW)
-      do i1 = LB(1), UB(1)
-         call InflowWind_DestroyContState(ContStateData%IfW(i1), ErrStat2, ErrMsg2)
-         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-      end do
-      deallocate(ContStateData%IfW)
-   end if
 end subroutine
 
 subroutine AWAE_PackContState(RF, Indata)
    type(RegFile), intent(inout) :: RF
    type(AWAE_ContinuousStateType), intent(in) :: InData
    character(*), parameter         :: RoutineName = 'AWAE_PackContState'
-   integer(B4Ki)   :: i1
-   integer(B4Ki)   :: LB(1), UB(1)
    if (RF%ErrStat >= AbortErrLev) return
-   call RegPack(RF, allocated(InData%IfW))
-   if (allocated(InData%IfW)) then
-      call RegPackBounds(RF, 1, lbound(InData%IfW), ubound(InData%IfW))
-      LB(1:1) = lbound(InData%IfW)
-      UB(1:1) = ubound(InData%IfW)
-      do i1 = LB(1), UB(1)
-         call InflowWind_PackContState(RF, InData%IfW(i1)) 
-      end do
-   end if
+   call RegPack(RF, InData%Dummy)
    if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
@@ -1025,24 +982,8 @@ subroutine AWAE_UnPackContState(RF, OutData)
    type(RegFile), intent(inout)    :: RF
    type(AWAE_ContinuousStateType), intent(inout) :: OutData
    character(*), parameter            :: RoutineName = 'AWAE_UnPackContState'
-   integer(B4Ki)   :: i1
-   integer(B4Ki)   :: LB(1), UB(1)
-   integer(IntKi)  :: stat
-   logical         :: IsAllocAssoc
    if (RF%ErrStat /= ErrID_None) return
-   if (allocated(OutData%IfW)) deallocate(OutData%IfW)
-   call RegUnpack(RF, IsAllocAssoc); if (RegCheckErr(RF, RoutineName)) return
-   if (IsAllocAssoc) then
-      call RegUnpackBounds(RF, 1, LB, UB); if (RegCheckErr(RF, RoutineName)) return
-      allocate(OutData%IfW(LB(1):UB(1)),stat=stat)
-      if (stat /= 0) then 
-         call SetErrStat(ErrID_Fatal, 'Error allocating OutData%IfW.', RF%ErrStat, RF%ErrMsg, RoutineName)
-         return
-      end if
-      do i1 = LB(1), UB(1)
-         call InflowWind_UnpackContState(RF, OutData%IfW(i1)) ! IfW 
-      end do
-   end if
+   call RegUnpack(RF, OutData%Dummy); if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
 subroutine AWAE_CopyDiscState(SrcDiscStateData, DstDiscStateData, CtrlCode, ErrStat, ErrMsg)
@@ -1051,29 +992,10 @@ subroutine AWAE_CopyDiscState(SrcDiscStateData, DstDiscStateData, CtrlCode, ErrS
    integer(IntKi),  intent(in   ) :: CtrlCode
    integer(IntKi),  intent(  out) :: ErrStat
    character(*),    intent(  out) :: ErrMsg
-   integer(B4Ki)   :: i1
-   integer(B4Ki)                  :: LB(1), UB(1)
-   integer(IntKi)                 :: ErrStat2
-   character(ErrMsgLen)           :: ErrMsg2
    character(*), parameter        :: RoutineName = 'AWAE_CopyDiscState'
    ErrStat = ErrID_None
    ErrMsg  = ''
-   if (allocated(SrcDiscStateData%IfW)) then
-      LB(1:1) = lbound(SrcDiscStateData%IfW)
-      UB(1:1) = ubound(SrcDiscStateData%IfW)
-      if (.not. allocated(DstDiscStateData%IfW)) then
-         allocate(DstDiscStateData%IfW(LB(1):UB(1)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstDiscStateData%IfW.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      do i1 = LB(1), UB(1)
-         call InflowWind_CopyDiscState(SrcDiscStateData%IfW(i1), DstDiscStateData%IfW(i1), CtrlCode, ErrStat2, ErrMsg2)
-         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-         if (ErrStat >= AbortErrLev) return
-      end do
-   end if
+   DstDiscStateData%Dummy = SrcDiscStateData%Dummy
    DstDiscStateData%WAT_B_Box = SrcDiscStateData%WAT_B_Box
    DstDiscStateData%Ufarm = SrcDiscStateData%Ufarm
 end subroutine
@@ -1082,40 +1004,17 @@ subroutine AWAE_DestroyDiscState(DiscStateData, ErrStat, ErrMsg)
    type(AWAE_DiscreteStateType), intent(inout) :: DiscStateData
    integer(IntKi),  intent(  out) :: ErrStat
    character(*),    intent(  out) :: ErrMsg
-   integer(B4Ki)   :: i1
-   integer(B4Ki)   :: LB(1), UB(1)
-   integer(IntKi)                 :: ErrStat2
-   character(ErrMsgLen)           :: ErrMsg2
    character(*), parameter        :: RoutineName = 'AWAE_DestroyDiscState'
    ErrStat = ErrID_None
    ErrMsg  = ''
-   if (allocated(DiscStateData%IfW)) then
-      LB(1:1) = lbound(DiscStateData%IfW)
-      UB(1:1) = ubound(DiscStateData%IfW)
-      do i1 = LB(1), UB(1)
-         call InflowWind_DestroyDiscState(DiscStateData%IfW(i1), ErrStat2, ErrMsg2)
-         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-      end do
-      deallocate(DiscStateData%IfW)
-   end if
 end subroutine
 
 subroutine AWAE_PackDiscState(RF, Indata)
    type(RegFile), intent(inout) :: RF
    type(AWAE_DiscreteStateType), intent(in) :: InData
    character(*), parameter         :: RoutineName = 'AWAE_PackDiscState'
-   integer(B4Ki)   :: i1
-   integer(B4Ki)   :: LB(1), UB(1)
    if (RF%ErrStat >= AbortErrLev) return
-   call RegPack(RF, allocated(InData%IfW))
-   if (allocated(InData%IfW)) then
-      call RegPackBounds(RF, 1, lbound(InData%IfW), ubound(InData%IfW))
-      LB(1:1) = lbound(InData%IfW)
-      UB(1:1) = ubound(InData%IfW)
-      do i1 = LB(1), UB(1)
-         call InflowWind_PackDiscState(RF, InData%IfW(i1)) 
-      end do
-   end if
+   call RegPack(RF, InData%Dummy)
    call RegPack(RF, InData%WAT_B_Box)
    call RegPack(RF, InData%Ufarm)
    if (RegCheckErr(RF, RoutineName)) return
@@ -1125,24 +1024,8 @@ subroutine AWAE_UnPackDiscState(RF, OutData)
    type(RegFile), intent(inout)    :: RF
    type(AWAE_DiscreteStateType), intent(inout) :: OutData
    character(*), parameter            :: RoutineName = 'AWAE_UnPackDiscState'
-   integer(B4Ki)   :: i1
-   integer(B4Ki)   :: LB(1), UB(1)
-   integer(IntKi)  :: stat
-   logical         :: IsAllocAssoc
    if (RF%ErrStat /= ErrID_None) return
-   if (allocated(OutData%IfW)) deallocate(OutData%IfW)
-   call RegUnpack(RF, IsAllocAssoc); if (RegCheckErr(RF, RoutineName)) return
-   if (IsAllocAssoc) then
-      call RegUnpackBounds(RF, 1, LB, UB); if (RegCheckErr(RF, RoutineName)) return
-      allocate(OutData%IfW(LB(1):UB(1)),stat=stat)
-      if (stat /= 0) then 
-         call SetErrStat(ErrID_Fatal, 'Error allocating OutData%IfW.', RF%ErrStat, RF%ErrMsg, RoutineName)
-         return
-      end if
-      do i1 = LB(1), UB(1)
-         call InflowWind_UnpackDiscState(RF, OutData%IfW(i1)) ! IfW 
-      end do
-   end if
+   call RegUnpack(RF, OutData%Dummy); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%WAT_B_Box); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%Ufarm); if (RegCheckErr(RF, RoutineName)) return
 end subroutine
@@ -1153,69 +1036,27 @@ subroutine AWAE_CopyConstrState(SrcConstrStateData, DstConstrStateData, CtrlCode
    integer(IntKi),  intent(in   ) :: CtrlCode
    integer(IntKi),  intent(  out) :: ErrStat
    character(*),    intent(  out) :: ErrMsg
-   integer(B4Ki)   :: i1
-   integer(B4Ki)                  :: LB(1), UB(1)
-   integer(IntKi)                 :: ErrStat2
-   character(ErrMsgLen)           :: ErrMsg2
    character(*), parameter        :: RoutineName = 'AWAE_CopyConstrState'
    ErrStat = ErrID_None
    ErrMsg  = ''
-   if (allocated(SrcConstrStateData%IfW)) then
-      LB(1:1) = lbound(SrcConstrStateData%IfW)
-      UB(1:1) = ubound(SrcConstrStateData%IfW)
-      if (.not. allocated(DstConstrStateData%IfW)) then
-         allocate(DstConstrStateData%IfW(LB(1):UB(1)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstConstrStateData%IfW.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      do i1 = LB(1), UB(1)
-         call InflowWind_CopyConstrState(SrcConstrStateData%IfW(i1), DstConstrStateData%IfW(i1), CtrlCode, ErrStat2, ErrMsg2)
-         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-         if (ErrStat >= AbortErrLev) return
-      end do
-   end if
+   DstConstrStateData%Dummy = SrcConstrStateData%Dummy
 end subroutine
 
 subroutine AWAE_DestroyConstrState(ConstrStateData, ErrStat, ErrMsg)
    type(AWAE_ConstraintStateType), intent(inout) :: ConstrStateData
    integer(IntKi),  intent(  out) :: ErrStat
    character(*),    intent(  out) :: ErrMsg
-   integer(B4Ki)   :: i1
-   integer(B4Ki)   :: LB(1), UB(1)
-   integer(IntKi)                 :: ErrStat2
-   character(ErrMsgLen)           :: ErrMsg2
    character(*), parameter        :: RoutineName = 'AWAE_DestroyConstrState'
    ErrStat = ErrID_None
    ErrMsg  = ''
-   if (allocated(ConstrStateData%IfW)) then
-      LB(1:1) = lbound(ConstrStateData%IfW)
-      UB(1:1) = ubound(ConstrStateData%IfW)
-      do i1 = LB(1), UB(1)
-         call InflowWind_DestroyConstrState(ConstrStateData%IfW(i1), ErrStat2, ErrMsg2)
-         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-      end do
-      deallocate(ConstrStateData%IfW)
-   end if
 end subroutine
 
 subroutine AWAE_PackConstrState(RF, Indata)
    type(RegFile), intent(inout) :: RF
    type(AWAE_ConstraintStateType), intent(in) :: InData
    character(*), parameter         :: RoutineName = 'AWAE_PackConstrState'
-   integer(B4Ki)   :: i1
-   integer(B4Ki)   :: LB(1), UB(1)
    if (RF%ErrStat >= AbortErrLev) return
-   call RegPack(RF, allocated(InData%IfW))
-   if (allocated(InData%IfW)) then
-      call RegPackBounds(RF, 1, lbound(InData%IfW), ubound(InData%IfW))
-      LB(1:1) = lbound(InData%IfW)
-      UB(1:1) = ubound(InData%IfW)
-      do i1 = LB(1), UB(1)
-         call InflowWind_PackConstrState(RF, InData%IfW(i1)) 
-      end do
-   end if
+   call RegPack(RF, InData%Dummy)
    if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
@@ -1223,24 +1064,8 @@ subroutine AWAE_UnPackConstrState(RF, OutData)
    type(RegFile), intent(inout)    :: RF
    type(AWAE_ConstraintStateType), intent(inout) :: OutData
    character(*), parameter            :: RoutineName = 'AWAE_UnPackConstrState'
-   integer(B4Ki)   :: i1
-   integer(B4Ki)   :: LB(1), UB(1)
-   integer(IntKi)  :: stat
-   logical         :: IsAllocAssoc
    if (RF%ErrStat /= ErrID_None) return
-   if (allocated(OutData%IfW)) deallocate(OutData%IfW)
-   call RegUnpack(RF, IsAllocAssoc); if (RegCheckErr(RF, RoutineName)) return
-   if (IsAllocAssoc) then
-      call RegUnpackBounds(RF, 1, LB, UB); if (RegCheckErr(RF, RoutineName)) return
-      allocate(OutData%IfW(LB(1):UB(1)),stat=stat)
-      if (stat /= 0) then 
-         call SetErrStat(ErrID_Fatal, 'Error allocating OutData%IfW.', RF%ErrStat, RF%ErrMsg, RoutineName)
-         return
-      end if
-      do i1 = LB(1), UB(1)
-         call InflowWind_UnpackConstrState(RF, OutData%IfW(i1)) ! IfW 
-      end do
-   end if
+   call RegUnpack(RF, OutData%Dummy); if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
 subroutine AWAE_CopyOtherState(SrcOtherStateData, DstOtherStateData, CtrlCode, ErrStat, ErrMsg)
@@ -1249,69 +1074,27 @@ subroutine AWAE_CopyOtherState(SrcOtherStateData, DstOtherStateData, CtrlCode, E
    integer(IntKi),  intent(in   ) :: CtrlCode
    integer(IntKi),  intent(  out) :: ErrStat
    character(*),    intent(  out) :: ErrMsg
-   integer(B4Ki)   :: i1
-   integer(B4Ki)                  :: LB(1), UB(1)
-   integer(IntKi)                 :: ErrStat2
-   character(ErrMsgLen)           :: ErrMsg2
    character(*), parameter        :: RoutineName = 'AWAE_CopyOtherState'
    ErrStat = ErrID_None
    ErrMsg  = ''
-   if (allocated(SrcOtherStateData%IfW)) then
-      LB(1:1) = lbound(SrcOtherStateData%IfW)
-      UB(1:1) = ubound(SrcOtherStateData%IfW)
-      if (.not. allocated(DstOtherStateData%IfW)) then
-         allocate(DstOtherStateData%IfW(LB(1):UB(1)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstOtherStateData%IfW.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      do i1 = LB(1), UB(1)
-         call InflowWind_CopyOtherState(SrcOtherStateData%IfW(i1), DstOtherStateData%IfW(i1), CtrlCode, ErrStat2, ErrMsg2)
-         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-         if (ErrStat >= AbortErrLev) return
-      end do
-   end if
+   DstOtherStateData%Dummy = SrcOtherStateData%Dummy
 end subroutine
 
 subroutine AWAE_DestroyOtherState(OtherStateData, ErrStat, ErrMsg)
    type(AWAE_OtherStateType), intent(inout) :: OtherStateData
    integer(IntKi),  intent(  out) :: ErrStat
    character(*),    intent(  out) :: ErrMsg
-   integer(B4Ki)   :: i1
-   integer(B4Ki)   :: LB(1), UB(1)
-   integer(IntKi)                 :: ErrStat2
-   character(ErrMsgLen)           :: ErrMsg2
    character(*), parameter        :: RoutineName = 'AWAE_DestroyOtherState'
    ErrStat = ErrID_None
    ErrMsg  = ''
-   if (allocated(OtherStateData%IfW)) then
-      LB(1:1) = lbound(OtherStateData%IfW)
-      UB(1:1) = ubound(OtherStateData%IfW)
-      do i1 = LB(1), UB(1)
-         call InflowWind_DestroyOtherState(OtherStateData%IfW(i1), ErrStat2, ErrMsg2)
-         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-      end do
-      deallocate(OtherStateData%IfW)
-   end if
 end subroutine
 
 subroutine AWAE_PackOtherState(RF, Indata)
    type(RegFile), intent(inout) :: RF
    type(AWAE_OtherStateType), intent(in) :: InData
    character(*), parameter         :: RoutineName = 'AWAE_PackOtherState'
-   integer(B4Ki)   :: i1
-   integer(B4Ki)   :: LB(1), UB(1)
    if (RF%ErrStat >= AbortErrLev) return
-   call RegPack(RF, allocated(InData%IfW))
-   if (allocated(InData%IfW)) then
-      call RegPackBounds(RF, 1, lbound(InData%IfW), ubound(InData%IfW))
-      LB(1:1) = lbound(InData%IfW)
-      UB(1:1) = ubound(InData%IfW)
-      do i1 = LB(1), UB(1)
-         call InflowWind_PackOtherState(RF, InData%IfW(i1)) 
-      end do
-   end if
+   call RegPack(RF, InData%Dummy)
    if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
@@ -1319,24 +1102,8 @@ subroutine AWAE_UnPackOtherState(RF, OutData)
    type(RegFile), intent(inout)    :: RF
    type(AWAE_OtherStateType), intent(inout) :: OutData
    character(*), parameter            :: RoutineName = 'AWAE_UnPackOtherState'
-   integer(B4Ki)   :: i1
-   integer(B4Ki)   :: LB(1), UB(1)
-   integer(IntKi)  :: stat
-   logical         :: IsAllocAssoc
    if (RF%ErrStat /= ErrID_None) return
-   if (allocated(OutData%IfW)) deallocate(OutData%IfW)
-   call RegUnpack(RF, IsAllocAssoc); if (RegCheckErr(RF, RoutineName)) return
-   if (IsAllocAssoc) then
-      call RegUnpackBounds(RF, 1, LB, UB); if (RegCheckErr(RF, RoutineName)) return
-      allocate(OutData%IfW(LB(1):UB(1)),stat=stat)
-      if (stat /= 0) then 
-         call SetErrStat(ErrID_Fatal, 'Error allocating OutData%IfW.', RF%ErrStat, RF%ErrMsg, RoutineName)
-         return
-      end if
-      do i1 = LB(1), UB(1)
-         call InflowWind_UnpackOtherState(RF, OutData%IfW(i1)) ! IfW 
-      end do
-   end if
+   call RegUnpack(RF, OutData%Dummy); if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
 subroutine AWAE_CopyMisc(SrcMiscData, DstMiscData, CtrlCode, ErrStat, ErrMsg)
@@ -1612,34 +1379,44 @@ subroutine AWAE_CopyMisc(SrcMiscData, DstMiscData, CtrlCode, ErrStat, ErrMsg)
       end if
       DstMiscData%outVizXZPlane = SrcMiscData%outVizXZPlane
    end if
-   if (allocated(SrcMiscData%IfW)) then
-      LB(1:1) = lbound(SrcMiscData%IfW)
-      UB(1:1) = ubound(SrcMiscData%IfW)
-      if (.not. allocated(DstMiscData%IfW)) then
-         allocate(DstMiscData%IfW(LB(1):UB(1)), stat=ErrStat2)
+   call InflowWind_CopyInput(SrcMiscData%u_IfW_Low, DstMiscData%u_IfW_Low, CtrlCode, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if (ErrStat >= AbortErrLev) return
+   if (allocated(SrcMiscData%u_IfW_High)) then
+      LB(1:1) = lbound(SrcMiscData%u_IfW_High)
+      UB(1:1) = ubound(SrcMiscData%u_IfW_High)
+      if (.not. allocated(DstMiscData%u_IfW_High)) then
+         allocate(DstMiscData%u_IfW_High(LB(1):UB(1)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstMiscData%IfW.', ErrStat, ErrMsg, RoutineName)
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstMiscData%u_IfW_High.', ErrStat, ErrMsg, RoutineName)
             return
          end if
       end if
       do i1 = LB(1), UB(1)
-         call InflowWind_CopyMisc(SrcMiscData%IfW(i1), DstMiscData%IfW(i1), CtrlCode, ErrStat2, ErrMsg2)
+         call InflowWind_CopyInput(SrcMiscData%u_IfW_High(i1), DstMiscData%u_IfW_High(i1), CtrlCode, ErrStat2, ErrMsg2)
          call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
          if (ErrStat >= AbortErrLev) return
       end do
    end if
-   call InflowWind_CopyInput(SrcMiscData%u_IfW_Low, DstMiscData%u_IfW_Low, CtrlCode, ErrStat2, ErrMsg2)
-   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-   if (ErrStat >= AbortErrLev) return
-   call InflowWind_CopyInput(SrcMiscData%u_IfW_High, DstMiscData%u_IfW_High, CtrlCode, ErrStat2, ErrMsg2)
-   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-   if (ErrStat >= AbortErrLev) return
    call InflowWind_CopyOutput(SrcMiscData%y_IfW_Low, DstMiscData%y_IfW_Low, CtrlCode, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (ErrStat >= AbortErrLev) return
-   call InflowWind_CopyOutput(SrcMiscData%y_IfW_High, DstMiscData%y_IfW_High, CtrlCode, ErrStat2, ErrMsg2)
-   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-   if (ErrStat >= AbortErrLev) return
+   if (allocated(SrcMiscData%y_IfW_High)) then
+      LB(1:1) = lbound(SrcMiscData%y_IfW_High)
+      UB(1:1) = ubound(SrcMiscData%y_IfW_High)
+      if (.not. allocated(DstMiscData%y_IfW_High)) then
+         allocate(DstMiscData%y_IfW_High(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstMiscData%y_IfW_High.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      do i1 = LB(1), UB(1)
+         call InflowWind_CopyOutput(SrcMiscData%y_IfW_High(i1), DstMiscData%y_IfW_High(i1), CtrlCode, ErrStat2, ErrMsg2)
+         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+         if (ErrStat >= AbortErrLev) return
+      end do
+   end if
    if (allocated(SrcMiscData%V_amb_low_disk)) then
       LB(1:2) = lbound(SrcMiscData%V_amb_low_disk)
       UB(1:2) = ubound(SrcMiscData%V_amb_low_disk)
@@ -1736,23 +1513,28 @@ subroutine AWAE_DestroyMisc(MiscData, ErrStat, ErrMsg)
    if (allocated(MiscData%outVizXZPlane)) then
       deallocate(MiscData%outVizXZPlane)
    end if
-   if (allocated(MiscData%IfW)) then
-      LB(1:1) = lbound(MiscData%IfW)
-      UB(1:1) = ubound(MiscData%IfW)
-      do i1 = LB(1), UB(1)
-         call InflowWind_DestroyMisc(MiscData%IfW(i1), ErrStat2, ErrMsg2)
-         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-      end do
-      deallocate(MiscData%IfW)
-   end if
    call InflowWind_DestroyInput(MiscData%u_IfW_Low, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-   call InflowWind_DestroyInput(MiscData%u_IfW_High, ErrStat2, ErrMsg2)
-   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if (allocated(MiscData%u_IfW_High)) then
+      LB(1:1) = lbound(MiscData%u_IfW_High)
+      UB(1:1) = ubound(MiscData%u_IfW_High)
+      do i1 = LB(1), UB(1)
+         call InflowWind_DestroyInput(MiscData%u_IfW_High(i1), ErrStat2, ErrMsg2)
+         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+      end do
+      deallocate(MiscData%u_IfW_High)
+   end if
    call InflowWind_DestroyOutput(MiscData%y_IfW_Low, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-   call InflowWind_DestroyOutput(MiscData%y_IfW_High, ErrStat2, ErrMsg2)
-   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if (allocated(MiscData%y_IfW_High)) then
+      LB(1:1) = lbound(MiscData%y_IfW_High)
+      UB(1:1) = ubound(MiscData%y_IfW_High)
+      do i1 = LB(1), UB(1)
+         call InflowWind_DestroyOutput(MiscData%y_IfW_High(i1), ErrStat2, ErrMsg2)
+         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+      end do
+      deallocate(MiscData%y_IfW_High)
+   end if
    if (allocated(MiscData%V_amb_low_disk)) then
       deallocate(MiscData%V_amb_low_disk)
    end if
@@ -1796,19 +1578,26 @@ subroutine AWAE_PackMisc(RF, Indata)
    call RegPackAlloc(RF, InData%outVizXYPlane)
    call RegPackAlloc(RF, InData%outVizYZPlane)
    call RegPackAlloc(RF, InData%outVizXZPlane)
-   call RegPack(RF, allocated(InData%IfW))
-   if (allocated(InData%IfW)) then
-      call RegPackBounds(RF, 1, lbound(InData%IfW), ubound(InData%IfW))
-      LB(1:1) = lbound(InData%IfW)
-      UB(1:1) = ubound(InData%IfW)
+   call InflowWind_PackInput(RF, InData%u_IfW_Low) 
+   call RegPack(RF, allocated(InData%u_IfW_High))
+   if (allocated(InData%u_IfW_High)) then
+      call RegPackBounds(RF, 1, lbound(InData%u_IfW_High), ubound(InData%u_IfW_High))
+      LB(1:1) = lbound(InData%u_IfW_High)
+      UB(1:1) = ubound(InData%u_IfW_High)
       do i1 = LB(1), UB(1)
-         call InflowWind_PackMisc(RF, InData%IfW(i1)) 
+         call InflowWind_PackInput(RF, InData%u_IfW_High(i1)) 
       end do
    end if
-   call InflowWind_PackInput(RF, InData%u_IfW_Low) 
-   call InflowWind_PackInput(RF, InData%u_IfW_High) 
    call InflowWind_PackOutput(RF, InData%y_IfW_Low) 
-   call InflowWind_PackOutput(RF, InData%y_IfW_High) 
+   call RegPack(RF, allocated(InData%y_IfW_High))
+   if (allocated(InData%y_IfW_High)) then
+      call RegPackBounds(RF, 1, lbound(InData%y_IfW_High), ubound(InData%y_IfW_High))
+      LB(1:1) = lbound(InData%y_IfW_High)
+      UB(1:1) = ubound(InData%y_IfW_High)
+      do i1 = LB(1), UB(1)
+         call InflowWind_PackOutput(RF, InData%y_IfW_High(i1)) 
+      end do
+   end if
    call RegPackAlloc(RF, InData%V_amb_low_disk)
    if (RegCheckErr(RF, RoutineName)) return
 end subroutine
@@ -1857,23 +1646,34 @@ subroutine AWAE_UnPackMisc(RF, OutData)
    call RegUnpackAlloc(RF, OutData%outVizXYPlane); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%outVizYZPlane); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%outVizXZPlane); if (RegCheckErr(RF, RoutineName)) return
-   if (allocated(OutData%IfW)) deallocate(OutData%IfW)
+   call InflowWind_UnpackInput(RF, OutData%u_IfW_Low) ! u_IfW_Low 
+   if (allocated(OutData%u_IfW_High)) deallocate(OutData%u_IfW_High)
    call RegUnpack(RF, IsAllocAssoc); if (RegCheckErr(RF, RoutineName)) return
    if (IsAllocAssoc) then
       call RegUnpackBounds(RF, 1, LB, UB); if (RegCheckErr(RF, RoutineName)) return
-      allocate(OutData%IfW(LB(1):UB(1)),stat=stat)
+      allocate(OutData%u_IfW_High(LB(1):UB(1)),stat=stat)
       if (stat /= 0) then 
-         call SetErrStat(ErrID_Fatal, 'Error allocating OutData%IfW.', RF%ErrStat, RF%ErrMsg, RoutineName)
+         call SetErrStat(ErrID_Fatal, 'Error allocating OutData%u_IfW_High.', RF%ErrStat, RF%ErrMsg, RoutineName)
          return
       end if
       do i1 = LB(1), UB(1)
-         call InflowWind_UnpackMisc(RF, OutData%IfW(i1)) ! IfW 
+         call InflowWind_UnpackInput(RF, OutData%u_IfW_High(i1)) ! u_IfW_High 
       end do
    end if
-   call InflowWind_UnpackInput(RF, OutData%u_IfW_Low) ! u_IfW_Low 
-   call InflowWind_UnpackInput(RF, OutData%u_IfW_High) ! u_IfW_High 
    call InflowWind_UnpackOutput(RF, OutData%y_IfW_Low) ! y_IfW_Low 
-   call InflowWind_UnpackOutput(RF, OutData%y_IfW_High) ! y_IfW_High 
+   if (allocated(OutData%y_IfW_High)) deallocate(OutData%y_IfW_High)
+   call RegUnpack(RF, IsAllocAssoc); if (RegCheckErr(RF, RoutineName)) return
+   if (IsAllocAssoc) then
+      call RegUnpackBounds(RF, 1, LB, UB); if (RegCheckErr(RF, RoutineName)) return
+      allocate(OutData%y_IfW_High(LB(1):UB(1)),stat=stat)
+      if (stat /= 0) then 
+         call SetErrStat(ErrID_Fatal, 'Error allocating OutData%y_IfW_High.', RF%ErrStat, RF%ErrMsg, RoutineName)
+         return
+      end if
+      do i1 = LB(1), UB(1)
+         call InflowWind_UnpackOutput(RF, OutData%y_IfW_High(i1)) ! y_IfW_High 
+      end do
+   end if
    call RegUnpackAlloc(RF, OutData%V_amb_low_disk); if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
@@ -2918,8 +2718,8 @@ subroutine AWAE_VarPackContState(V, x, ValAry)
    real(R8Ki), intent(inout)               :: ValAry(:)
    associate (DL => V%DL, VarVals => ValAry(V%iLoc(1):V%iLoc(2)))
       select case (DL%Num)
-      case (AWAE_x_IfW_DummyContState)
-         VarVals(1) = x%IfW(DL%i1)%DummyContState                             ! Scalar
+      case (AWAE_x_Dummy)
+         VarVals(1) = x%Dummy                                                 ! Scalar
       case default
          VarVals = 0.0_R8Ki
       end select
@@ -2942,8 +2742,8 @@ subroutine AWAE_VarUnpackContState(V, ValAry, x)
    type(AWAE_ContinuousStateType), intent(inout) :: x
    associate (DL => V%DL, VarVals => ValAry(V%iLoc(1):V%iLoc(2)))
       select case (DL%Num)
-      case (AWAE_x_IfW_DummyContState)
-         x%IfW(DL%i1)%DummyContState = VarVals(1)                             ! Scalar
+      case (AWAE_x_Dummy)
+         x%Dummy = VarVals(1)                                                 ! Scalar
       end select
    end associate
 end subroutine
@@ -2952,8 +2752,8 @@ function AWAE_ContinuousStateFieldName(DL) result(Name)
    type(DatLoc), intent(in)      :: DL
    character(32)                 :: Name
    select case (DL%Num)
-   case (AWAE_x_IfW_DummyContState)
-       Name = "x%IfW("//trim(Num2LStr(DL%i1))//")%DummyContState"
+   case (AWAE_x_Dummy)
+       Name = "x%Dummy"
    case default
        Name = "Unknown Field"
    end select
@@ -2975,8 +2775,8 @@ subroutine AWAE_VarPackContStateDeriv(V, x, ValAry)
    real(R8Ki), intent(inout)               :: ValAry(:)
    associate (DL => V%DL, VarVals => ValAry(V%iLoc(1):V%iLoc(2)))
       select case (DL%Num)
-      case (AWAE_x_IfW_DummyContState)
-         VarVals(1) = x%IfW(DL%i1)%DummyContState                             ! Scalar
+      case (AWAE_x_Dummy)
+         VarVals(1) = x%Dummy                                                 ! Scalar
       case default
          VarVals = 0.0_R8Ki
       end select

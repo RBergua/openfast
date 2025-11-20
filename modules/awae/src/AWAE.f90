@@ -56,11 +56,6 @@ module AWAE
    public :: AWAE_TEST_CalcOutput
    public :: AWAE_TEST_Interp2D
 
-   real(ReKi), parameter, private :: I33(3,3) = &
-      reshape([1.0_ReKi, 0.0_ReKi, 0.0_ReKi, &
-               0.0_ReKi, 1.0_ReKi, 0.0_ReKi, &
-               0.0_ReKi, 0.0_ReKi, 1.0_ReKi], [3,3])
-
    contains
 
 
@@ -616,7 +611,7 @@ subroutine LowResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
    end do
    
    !----------------------------------------------------------------------------
-   ! What is this?
+   ! Calculate plane velocity vector
    !----------------------------------------------------------------------------
 
    ! Loop through turbines
@@ -1035,13 +1030,18 @@ subroutine AWAE_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitO
    character(*),                   intent(  out) :: errMsg        !< Error message if errStat /= ErrID_None
 
    character(1024)                               :: rootDir, baseName, OutFileVTKDir ! Simulation root dir, basename for outputs
-   integer(IntKi)                                :: i,j,nt        ! loop counter
+   integer(IntKi)                                :: i,j,nt,c      ! loop counter
    real(ReKi)                                    :: gridLoc       ! Location of requested output slice in grid coordinates [0,sz-1]
    integer(IntKi)                                :: errStat2      ! temporary error status of the operation
    character(ErrMsgLen)                          :: errMsg2       ! temporary error message
    character(*), parameter                       :: RoutineName = 'AWAE_Init'
    type(InflowWind_InitInputType)                :: IfW_InitInp
    type(InflowWind_InitOutputType)               :: IfW_InitOut
+   type(InflowWind_ContinuousStateType)          :: IfW_x
+   type(InflowWind_DiscreteStateType)            :: IfW_xd
+   type(InflowWind_OtherStateType)               :: IfW_OtherState
+   type(InflowWind_ConstraintStateType)          :: IfW_z
+   type(InflowWind_MiscVarType)                  :: IfW_m
 
       ! Initialize variables for this routine
    errStat = ErrID_None
@@ -1129,9 +1129,15 @@ subroutine AWAE_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitO
    ! --------------------------------------------------------------------------------
    ! --- Initialize states 
    ! --------------------------------------------------------------------------------
+
+   allocate(m%u_IfW_High(p%NumTurbines), stat=errStat2); if (Failed0('InflowWind input data')) return;
+   allocate(m%y_IfW_High(p%NumTurbines), stat=errStat2); if (Failed0('InflowWind output data')) return;
+
    ! initialize tracer for WAT box location
    xd%WAT_B_Box(1:3) = 0.0_ReKi
-   if ( p%Mod_AmbWind > 1 ) then
+
+   if (p%Mod_AmbWind > 1) then
+
       ! Using InflowWind, so initialize that module now
       IfW_InitInp%Linearize         = .false.
       IfW_InitInp%RootName          = TRIM(p%OutFileRoot)//'.IfW'
@@ -1143,32 +1149,29 @@ subroutine AWAE_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitO
       IfW_InitInp%WtrDpth           = 0.0_ReKi
       IfW_InitInp%MSL2SWL           = 0.0_ReKi
 
-      if (      p%Mod_AmbWind == 2 ) then ! one InflowWind module
+      if (p%Mod_AmbWind == 2) then ! one InflowWind module
 
-         ALLOCATE(p%IfW(         0:0),STAT=ErrStat2);  if (Failed0('InflowWind parameter data'        )) return;
-         ALLOCATE(x%IfW(         0:0),STAT=ErrStat2);  if (Failed0('InflowWind continuous states data')) return;
-         ALLOCATE(xd%IfW(        0:0),STAT=ErrStat2);  if (Failed0('InflowWind discrete states data'  )) return;
-         ALLOCATE(z%IfW(         0:0),STAT=ErrStat2);  if (Failed0('InflowWind constraint states data')) return;
-         ALLOCATE(OtherState%IfW(0:0),STAT=ErrStat2);  if (Failed0('InflowWind other states data'     )) return;
-         ALLOCATE(m%IfW(         0:0),STAT=ErrStat2);  if (Failed0('InflowWind miscvar data'          )) return;
+         allocate(p%IfW(0:0), stat=ErrStat2);  if (Failed0('InflowWind parameter data')) return;
 
          ! Initialize InflowWind
          IfW_InitInp%FixedWindFileRootName = .false.
          IfW_InitInp%NumWindPoints         = p%LowRes%nPoints
          IfW_InitInp%RadAvg                = 0.25 * p%LowRes%nXYZ(3) * p%LowRes%dXYZ(1)    ! arbitrary garbage, just must be bigger than zero, but not bigger than grid (IfW will complain if this isn't set when it tries to calculate disk average vel)
-         IfW_InitInp%MHK                   = 0                              ! not an MHK turbine setup
       
-         call InflowWind_Init( IfW_InitInp, m%u_IfW_Low, p%IfW(0), x%IfW(0), xd%IfW(0), z%IfW(0), OtherState%IfW(0), m%y_IfW_Low, m%IfW(0), Interval, IfW_InitOut, ErrStat2, ErrMsg2 ); if(Failed()) return;
-         p%IfW(0)%NumOuts = 0    ! override outputs that might be in the input file
+         call InflowWind_Init(IfW_InitInp, m%u_IfW_Low, p%IfW(0), IfW_x, IfW_xd, IfW_z, IfW_OtherState, &
+                              m%y_IfW_Low, IfW_m, Interval, IfW_InitOut, ErrStat2, ErrMsg2)
+         if (Failed()) return
 
-      else if ( p%Mod_AmbWind == 3 ) then ! multiple InflowWind modules
+         ! Initialize InflowWind input/output for each high-resolution domain
+         do nt = 1,p%NumTurbines
+            call AllocAry(m%u_IfW_High(nt)%PositionXYZ, 3, p%HighRes(nt)%nPoints, "m%u_IfW_High(nt)%PositionXYZ", errStat2, errMsg2); if (Failed()) return
+            call AllocAry(m%y_IfW_High(nt)%VelocityUVW, 3, p%HighRes(nt)%nPoints, "m%y_IfW_High(nt)%VelocityUVW", errStat2, errMsg2); if (Failed()) return
+            m%u_IfW_High(nt)%PositionXYZ = p%HighRes(nt)%GridPoints
+         end do
 
-         ALLOCATE(p%IfW(         0:p%NumTurbines),STAT=ErrStat2);  if (Failed0('InflowWind parameter data'        )) return;
-         ALLOCATE(x%IfW(         0:p%NumTurbines),STAT=ErrStat2);  if (Failed0('InflowWind continuous states data')) return;
-         ALLOCATE(xd%IfW(        0:p%NumTurbines),STAT=ErrStat2);  if (Failed0('InflowWind discrete states data'  )) return;
-         ALLOCATE(z%IfW(         0:p%NumTurbines),STAT=ErrStat2);  if (Failed0('InflowWind constraint states data')) return;
-         ALLOCATE(OtherState%IfW(0:p%NumTurbines),STAT=ErrStat2);  if (Failed0('InflowWind other states data'     )) return;
-         ALLOCATE(m%IfW(         0:p%NumTurbines),STAT=ErrStat2);  if (Failed0('InflowWind miscvar data'          )) return;
+      else if (p%Mod_AmbWind == 3) then ! multiple InflowWind modules
+
+         allocate(p%IfW(0:p%NumTurbines), stat=ErrStat2);  if (Failed0('InflowWind parameter data')) return;
 
          ! Initialize InflowWind for the low-resolution domain
          IfW_InitInp%FixedWindFileRootName = .true.
@@ -1176,52 +1179,51 @@ subroutine AWAE_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitO
          IfW_InitInp%TurbineID             = 0
          IfW_InitInp%MHK                   = MHK_None
       
-         call InflowWind_Init( IfW_InitInp, m%u_IfW_Low, p%IfW(0), x%IfW(0), xd%IfW(0), z%IfW(0), OtherState%IfW(0), m%y_IfW_Low, m%IfW(0), Interval, IfW_InitOut, ErrStat2, ErrMsg2 ); if(Failed()) return;
-         p%IfW(0)%NumOuts = 0    ! override outputs that might be in the input file
+         call InflowWind_Init(IfW_InitInp, m%u_IfW_Low, p%IfW(0), IfW_x, IfW_xd, IfW_z, IfW_OtherState, &
+                              m%y_IfW_Low, IfW_m, Interval, IfW_InitOut, ErrStat2, ErrMsg2)
+         if (Failed()) return
 
          ! Initialize InflowWind for each high-resolution domain
          do nt = 1,p%NumTurbines
+
+            ! Destroy any previous data in types used only for initialization
+            call InflowWind_DestroyContState(IfW_x, errStat2, errMsg2)
+            call InflowWind_DestroyDiscState(IfW_xd, errStat2, errMsg2)
+            call InflowWind_DestroyOtherState(IfW_OtherState, errStat2, errMsg2)
+            call InflowWind_DestroyConstrState(IfW_z, errStat2, errMsg2)
+            call InflowWind_DestroyMisc(IfW_m, errStat2, errMsg2)
+
+            ! Update initialization inputs for this turbine
             IfW_InitInp%TurbineID = nt
             IfW_InitInp%NumWindPoints = p%HighRes(nt)%nPoints
-            call InflowWind_Init( IfW_InitInp, m%u_IfW_High, p%IfW(nt), x%IfW(nt), xd%IfW(nt), z%IfW(nt), OtherState%IfW(nt), m%y_IfW_High, m%IfW(nt), Interval, IfW_InitOut, ErrStat2, ErrMsg2 ); if(Failed()) return;
-            p%IfW(nt)%NumOuts = 0    ! override outputs that might be in the input file
+
+            call InflowWind_Init(IfW_InitInp, m%u_IfW_High(nt), p%IfW(nt), IfW_x, IfW_xd, IfW_z, IfW_OtherState, &
+                                 m%y_IfW_High(nt), IfW_m, Interval, IfW_InitOut, ErrStat2, ErrMsg2)
+            if (Failed()) return
 
             ! Check that the high resolution grid placement is correct
             !     The InflowWind grid location is exactly centered on the TurbPos location in the Y direction.  The high resolution grid
             !     must exactly match the sizing and location of the InflowWind grid.  We are only going to check the Y and Z locations
             !     for now and throw an error if these don't match appropriately.
-            call CheckModAmb3Boundaries()
+            call CheckModAmb3Boundaries(); if (Failed()) return
+
+            ! Set the position of the high-resolution grid points relative to the turbine position
+            do c = 1, p%HighRes(nt)%nPoints
+               m%u_IfW_High(nt)%PositionXYZ(:,c) = p%HighRes(nt)%GridPoints(:,c) - p%HighRes(nt)%WT_Position
+            end do
 
          end do
-         if (errStat >= AbortErrLev) return
-
       end if
 
       ! Set the position inputs once for the low-resolution grid
       m%u_IfW_Low%PositionXYZ = p%LowRes%GridPoints
-      
-      ! Set the hub position and orientation to pass to IfW (FIXME: IfW always calculates hub and disk avg vel. Change this after IfW pointers fully enabled.)
-      m%u_IfW_Low%HubPosition = p%LowRes%oXYZ + 0.5_ReKi * p%LowRes%nXYZ * p%LowRes%dXYZ
-      m%u_IfW_Low%HubOrientation = I33
 
-         ! Initialize the high-resolution grid inputs and outputs
-      IF ( .NOT. ALLOCATED( m%u_IfW_High%PositionXYZ ) ) THEN
-         call AllocAry(m%u_IfW_High%PositionXYZ, 3, p%HighRes(1)%nPoints, 'm%u_IfW_High%PositionXYZ', ErrStat2, ErrMsg2); if(Failed()) return;
-         call AllocAry(m%y_IfW_High%VelocityUVW, 3, p%HighRes(1)%nPoints, 'm%y_IfW_High%VelocityUVW', ErrStat2, ErrMsg2); if(Failed()) return;
-         call AllocAry(m%y_IfW_High%WriteOutput, size(m%y_IfW_Low%WriteOutput),    'm%y_IfW_High%WriteOutput', ErrStat2, ErrMsg2); if(Failed()) return;
-         if (allocated(m%y_IfW_Low%lidar%LidSpeed)) then
-            call AllocAry(m%y_IfW_High%lidar%LidSpeed,      size(m%y_IfW_Low%lidar%LidSpeed      ), 'm%y_IfW_High%lidar%LidSpeed',      ErrStat2, ErrMsg2); if(Failed()) return;
-         endif
-         if (allocated(m%y_IfW_High%lidar%MsrPositionsX)) then
-            call AllocAry(m%y_IfW_High%lidar%MsrPositionsX, size(m%y_IfW_High%lidar%MsrPositionsX), 'm%y_IfW_High%lidar%MsrPositionsX', ErrStat2, ErrMsg2); if(Failed()) return;
-         endif
-         if (allocated(m%y_IfW_High%lidar%MsrPositionsY)) then
-            call AllocAry(m%y_IfW_High%lidar%MsrPositionsY, size(m%y_IfW_High%lidar%MsrPositionsY), 'm%y_IfW_High%lidar%MsrPositionsY', ErrStat2, ErrMsg2); if(Failed()) return;
-         endif
-         if (allocated(m%y_IfW_High%lidar%MsrPositionsZ)) then
-            call AllocAry(m%y_IfW_High%lidar%MsrPositionsZ, size(m%y_IfW_High%lidar%MsrPositionsZ), 'm%y_IfW_High%lidar%MsrPositionsZ', ErrStat2, ErrMsg2); if(Failed()) return;
-         endif
-      END IF
+      ! Destroy any previous data in types used only for initialization
+      call InflowWind_DestroyInitInput(IfW_InitInp, errStat2, errMsg2)
+      call InflowWind_DestroyInitOutput(IfW_InitOut, errStat2, errMsg2)
+      call InflowWind_DestroyContState(IfW_x, errStat2, errMsg2)
+      call InflowWind_DestroyDiscState(IfW_xd, errStat2, errMsg2)
+      call InflowWind_DestroyMisc(IfW_m, errStat2, errMsg2)
 
    end if
 
@@ -1502,14 +1504,20 @@ subroutine AWAE_End( u, p, x, xd, z, OtherState, y, m, errStat, errMsg )
       errStat = ErrID_None
       errMsg  = ""
 
-      ! End all instances of the InflowWind module
-      if (      p%Mod_AmbWind == 2 ) then
-         call    InflowWind_End( m%u_IfW_Low, p%IfW(0 ), x%IfW(0 ), xd%IfW(0 ), z%IfW(0 ), OtherState%IfW(0 ), m%y_IfW_Low, m%IfW(0 ), errStat, errMsg )
-      else if ( p%Mod_AmbWind == 3 ) then
-         call    InflowWind_End( m%u_IfW_Low, p%IfW(0 ), x%IfW(0 ), xd%IfW(0 ), z%IfW(0 ), OtherState%IfW(0 ), m%y_IfW_Low, m%IfW(0 ), errStat, errMsg )
-         do nt = 1,p%NumTurbines
-            call InflowWind_End( m%u_IfW_Low, p%IfW(nt), x%IfW(nt), xd%IfW(nt), z%IfW(nt), OtherState%IfW(nt), m%y_IfW_Low, m%IfW(nt), errStat, errMsg )
-         end do
+      ! Destroy InflowWind data
+      if (p%Mod_AmbWind > 1) then
+
+         call InflowWind_DestroyInput(m%u_IfW_Low, errStat, errMsg)
+         call InflowWind_DestroyParam(p%IfW(0), errStat, errMsg)
+         call InflowWind_DestroyOutput(m%y_IfW_Low, errStat, errMsg)
+
+         if (p%Mod_AmbWind == 3) then
+            do nt = 1,p%NumTurbines
+               call InflowWind_DestroyInput(m%u_IfW_High(nt), errStat, errMsg)
+               call InflowWind_DestroyParam(p%IfW(nt), errStat, errMsg)
+               call InflowWind_DestroyOutput(m%y_IfW_High(nt), errStat, errMsg)
+            end do
+         end if
       end if
 
       ! Destroy the input data:
@@ -1585,8 +1593,7 @@ subroutine AWAE_UpdateStates( t, n, u, p, x, xd, z, OtherState, m, errStat, errM
    ! InflowWind-based ambient wind (single or multiple instances)
    case (2, 3)
 
-      ! Set the hub position and orientation to pass to IfW (IfW always calculates hub and disk avg vel)
-      ! Set low-resolution inflow wind velocities
+      ! Calculate the low-resolution grid inflow velocities
       call IfW_FlowField_GetVelAcc(p%IfW(0)%FlowField, 1, t+p%dt_low, p%LowRes%GridPoints, m%y_IfW_Low%VelocityUVW, AccUVW, errStat2, errMsg2)
       if (Failed()) return
       
@@ -1608,7 +1615,8 @@ subroutine AWAE_UpdateStates( t, n, u, p, x, xd, z, OtherState, m, errStat, errM
    ! File-based ambient wind
    case (1)
 
-      !$OMP PARALLEL DO DEFAULT(Shared) PRIVATE(nt, i_hl, errStat2, errMsg2) !Private(nt,tm2,tm3)
+      !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(nt, i_hl, errStat2, errMsg2) &
+      !$OMP SHARED(p, n_high_low, n, m, errStat, errMsg, AbortErrLev)
       do nt = 1,p%NumTurbines
          do i_hl=0, n_high_low
             
@@ -1636,15 +1644,15 @@ subroutine AWAE_UpdateStates( t, n, u, p, x, xd, z, OtherState, m, errStat, errM
 
             ! Calculate wind velocities at grid locations from InflowWind
             call IfW_FlowField_GetVelAcc(p%IfW(0)%FlowField, 1, t+p%dt_low+i_hl*p%DT_high, &
-                                         p%HighRes(nt)%GridPoints(:,:), &
-                                         m%y_IfW_High%VelocityUVW, AccUVW, errStat2, errMsg2)
+                                         m%u_IfW_High(nt)%PositionXYZ, &
+                                         m%y_IfW_High(nt)%VelocityUVW, AccUVW, errStat2, errMsg2)
             if (Failed()) return
 
             ! Transfer velocities to high resolution grid
-            V_Grid(1:size(m%Vamb_high(nt)%data,1),&
-                   1:size(m%Vamb_high(nt)%data,2),&
-                   1:size(m%Vamb_high(nt)%data,3),&
-                   1:size(m%Vamb_high(nt)%data,4)) => m%y_IfW_High%VelocityUVW
+            V_Grid(lbound(m%Vamb_high(nt)%data,1):ubound(m%Vamb_high(nt)%data,1),&
+                   lbound(m%Vamb_high(nt)%data,2):ubound(m%Vamb_high(nt)%data,2),&
+                   lbound(m%Vamb_high(nt)%data,3):ubound(m%Vamb_high(nt)%data,3),&
+                   lbound(m%Vamb_high(nt)%data,4):ubound(m%Vamb_high(nt)%data,4)) => m%y_IfW_High(nt)%VelocityUVW
             m%Vamb_high(nt)%data(:,:,:,:,i_hl) = V_Grid
             end do
          end do
@@ -1655,25 +1663,20 @@ subroutine AWAE_UpdateStates( t, n, u, p, x, xd, z, OtherState, m, errStat, errM
       ! Loop through turbines
       do nt = 1, p%NumTurbines
 
-         ! Calculate high resolution grid position relative to turbine position
-         do c = 1, p%HighRes(nt)%nPoints
-            m%u_IfW_High%PositionXYZ(:,c) = p%HighRes(nt)%GridPoints(:,c) - p%HighRes(nt)%WT_Position
-         end do
-
          ! Loop through high resolution grids
          do i_hl = 0, n_high_low
 
             ! Calculate wind velocities at grid locations from InflowWind
             call IfW_FlowField_GetVelAcc(p%IfW(nt)%FlowField, 1, t+p%dt_low+i_hl*p%DT_high, &
-                                         m%u_IfW_High%PositionXYZ, &
-                                         m%y_IfW_High%VelocityUVW, AccUVW, errStat2, errMsg2)
+                                         m%u_IfW_High(nt)%PositionXYZ, &
+                                         m%y_IfW_High(nt)%VelocityUVW, AccUVW, errStat2, errMsg2)
             if (Failed()) return
 
             ! Transfer velocities to high resolution grid
-            V_Grid(1:size(m%Vamb_high(nt)%data,1),&
-                   1:size(m%Vamb_high(nt)%data,2),&
-                   1:size(m%Vamb_high(nt)%data,3),&
-                   1:size(m%Vamb_high(nt)%data,4)) => m%y_IfW_High%VelocityUVW
+            V_Grid(lbound(m%Vamb_high(nt)%data,1):ubound(m%Vamb_high(nt)%data,1),&
+                   lbound(m%Vamb_high(nt)%data,2):ubound(m%Vamb_high(nt)%data,2),&
+                   lbound(m%Vamb_high(nt)%data,3):ubound(m%Vamb_high(nt)%data,3),&
+                   lbound(m%Vamb_high(nt)%data,4):ubound(m%Vamb_high(nt)%data,4)) => m%y_IfW_High(nt)%VelocityUVW
             m%Vamb_high(nt)%data(:,:,:,:,i_hl) = V_Grid
          end do
       end do
