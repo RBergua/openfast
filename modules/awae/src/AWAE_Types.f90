@@ -56,7 +56,6 @@ IMPLICIT NONE
     REAL(DbKi)  :: dt_low = 0.0_R8Ki      !< Low-resolution (FAST.Farm driver/glue code) time step [s]
     INTEGER(IntKi)  :: NumTurbines = 0_IntKi      !< Number of wind turbines in the farm [>=1] [-]
     INTEGER(IntKi)  :: NumRadii = 0_IntKi      !< Number of radii in the radial finite-difference grid  [>=2] [-]
-    INTEGER(IntKi)  :: NumPlanes = 0_IntKi      !< Number of wake planes downwind of the rotor where the wake is propagated [>=2] [-]
     CHARACTER(1024)  :: WindFilePath      !< Path name to the Root folder containing the wind data files from ABLSolver precursor [-]
     LOGICAL  :: WrDisWind = .false.      !< Write disturbed wind data to <WindFilePath>/Low/Dis.t<n>.vtk etc.? [-]
     INTEGER(IntKi)  :: NOutDisWindXY = 0_IntKi      !< Number of XY planes for output of disturbed wind data across the low-resolution domain to <WindFilePath>/Low/DisXY.<n_out>.t<n>.vtk [0 to 9] [-]
@@ -99,6 +98,7 @@ IMPLICIT NONE
     TYPE(AWAE_InputFileType)  :: InputFileData      !< FAST.Farm input-file data for AWAE module [-]
     INTEGER(IntKi)  :: n_high_low = 0_IntKi      !< Number of high-resolution time steps per low [-]
     INTEGER(IntKi)  :: NumDT = 0_IntKi      !< Number of low-resolution (FAST.Farm driver/glue code) time steps [-]
+    INTEGER(IntKi)  :: MaxPlanes = 0_IntKi      !< Maximum number of wake planes downwind of the rotor where the wake is propagated [>=2] [-]
     CHARACTER(1024)  :: OutFileRoot      !< The root name derived from the primary FAST.Farm input file [-]
     LOGICAL  :: WAT_Enabled = .false.      !< Is WAT enabled? [-]
     TYPE(FlowFieldType) , POINTER :: WAT_FlowField => NULL()      !< Pointer to the InflowWinds flow field data type [-]
@@ -259,6 +259,7 @@ IMPLICIT NONE
 ! =======================
 ! =========  AWAE_InputType  =======
   TYPE, PUBLIC :: AWAE_InputType
+    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: NumPlanes      !< Number of active wake planes for each turbine [-]
     REAL(ReKi) , DIMENSION(:,:,:), ALLOCATABLE  :: xhat_plane      !< Orientations of wake planes, normal to wake planes, for each turbine [-]
     REAL(ReKi) , DIMENSION(:,:,:), ALLOCATABLE  :: p_plane      !< Center positions of wake planes for each turbine [m]
     REAL(ReKi) , DIMENSION(:,:,:,:), ALLOCATABLE  :: Vx_wake      !< Axial wake velocity deficit at wake planes, distributed across the plane, for each turbine (ny,nz,np,nWT) [m/s]
@@ -269,17 +270,18 @@ IMPLICIT NONE
   END TYPE AWAE_InputType
 ! =======================
    integer(IntKi), public, parameter :: AWAE_x_Dummy                     =   1 ! AWAE%Dummy
-   integer(IntKi), public, parameter :: AWAE_u_xhat_plane                =   2 ! AWAE%xhat_plane
-   integer(IntKi), public, parameter :: AWAE_u_p_plane                   =   3 ! AWAE%p_plane
-   integer(IntKi), public, parameter :: AWAE_u_Vx_wake                   =   4 ! AWAE%Vx_wake
-   integer(IntKi), public, parameter :: AWAE_u_Vy_wake                   =   5 ! AWAE%Vy_wake
-   integer(IntKi), public, parameter :: AWAE_u_Vz_wake                   =   6 ! AWAE%Vz_wake
-   integer(IntKi), public, parameter :: AWAE_u_D_wake                    =   7 ! AWAE%D_wake
-   integer(IntKi), public, parameter :: AWAE_u_WAT_k                     =   8 ! AWAE%WAT_k
-   integer(IntKi), public, parameter :: AWAE_y_Vdist_High_data           =   9 ! AWAE%Vdist_High(DL%i1)%data
-   integer(IntKi), public, parameter :: AWAE_y_V_plane                   =  10 ! AWAE%V_plane
-   integer(IntKi), public, parameter :: AWAE_y_TI_amb                    =  11 ! AWAE%TI_amb
-   integer(IntKi), public, parameter :: AWAE_y_Vx_wind_disk              =  12 ! AWAE%Vx_wind_disk
+   integer(IntKi), public, parameter :: AWAE_u_NumPlanes                 =   2 ! AWAE%NumPlanes
+   integer(IntKi), public, parameter :: AWAE_u_xhat_plane                =   3 ! AWAE%xhat_plane
+   integer(IntKi), public, parameter :: AWAE_u_p_plane                   =   4 ! AWAE%p_plane
+   integer(IntKi), public, parameter :: AWAE_u_Vx_wake                   =   5 ! AWAE%Vx_wake
+   integer(IntKi), public, parameter :: AWAE_u_Vy_wake                   =   6 ! AWAE%Vy_wake
+   integer(IntKi), public, parameter :: AWAE_u_Vz_wake                   =   7 ! AWAE%Vz_wake
+   integer(IntKi), public, parameter :: AWAE_u_D_wake                    =   8 ! AWAE%D_wake
+   integer(IntKi), public, parameter :: AWAE_u_WAT_k                     =   9 ! AWAE%WAT_k
+   integer(IntKi), public, parameter :: AWAE_y_Vdist_High_data           =  10 ! AWAE%Vdist_High(DL%i1)%data
+   integer(IntKi), public, parameter :: AWAE_y_V_plane                   =  11 ! AWAE%V_plane
+   integer(IntKi), public, parameter :: AWAE_y_TI_amb                    =  12 ! AWAE%TI_amb
+   integer(IntKi), public, parameter :: AWAE_y_Vx_wind_disk              =  13 ! AWAE%Vx_wind_disk
 
 contains
 
@@ -406,7 +408,6 @@ subroutine AWAE_CopyInputFileType(SrcInputFileTypeData, DstInputFileTypeData, Ct
    DstInputFileTypeData%dt_low = SrcInputFileTypeData%dt_low
    DstInputFileTypeData%NumTurbines = SrcInputFileTypeData%NumTurbines
    DstInputFileTypeData%NumRadii = SrcInputFileTypeData%NumRadii
-   DstInputFileTypeData%NumPlanes = SrcInputFileTypeData%NumPlanes
    DstInputFileTypeData%WindFilePath = SrcInputFileTypeData%WindFilePath
    DstInputFileTypeData%WrDisWind = SrcInputFileTypeData%WrDisWind
    DstInputFileTypeData%NOutDisWindXY = SrcInputFileTypeData%NOutDisWindXY
@@ -602,7 +603,6 @@ subroutine AWAE_PackInputFileType(RF, Indata)
    call RegPack(RF, InData%dt_low)
    call RegPack(RF, InData%NumTurbines)
    call RegPack(RF, InData%NumRadii)
-   call RegPack(RF, InData%NumPlanes)
    call RegPack(RF, InData%WindFilePath)
    call RegPack(RF, InData%WrDisWind)
    call RegPack(RF, InData%NOutDisWindXY)
@@ -653,7 +653,6 @@ subroutine AWAE_UnPackInputFileType(RF, OutData)
    call RegUnpack(RF, OutData%dt_low); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%NumTurbines); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%NumRadii); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%NumPlanes); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%WindFilePath); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%WrDisWind); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%NOutDisWindXY); if (RegCheckErr(RF, RoutineName)) return
@@ -708,6 +707,7 @@ subroutine AWAE_CopyInitInput(SrcInitInputData, DstInitInputData, CtrlCode, ErrS
    if (ErrStat >= AbortErrLev) return
    DstInitInputData%n_high_low = SrcInitInputData%n_high_low
    DstInitInputData%NumDT = SrcInitInputData%NumDT
+   DstInitInputData%MaxPlanes = SrcInitInputData%MaxPlanes
    DstInitInputData%OutFileRoot = SrcInitInputData%OutFileRoot
    DstInitInputData%WAT_Enabled = SrcInitInputData%WAT_Enabled
    DstInitInputData%WAT_FlowField => SrcInitInputData%WAT_FlowField
@@ -736,6 +736,7 @@ subroutine AWAE_PackInitInput(RF, Indata)
    call AWAE_PackInputFileType(RF, InData%InputFileData) 
    call RegPack(RF, InData%n_high_low)
    call RegPack(RF, InData%NumDT)
+   call RegPack(RF, InData%MaxPlanes)
    call RegPack(RF, InData%OutFileRoot)
    call RegPack(RF, InData%WAT_Enabled)
    call RegPack(RF, associated(InData%WAT_FlowField))
@@ -761,6 +762,7 @@ subroutine AWAE_UnPackInitInput(RF, OutData)
    call AWAE_UnpackInputFileType(RF, OutData%InputFileData) ! InputFileData 
    call RegUnpack(RF, OutData%n_high_low); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%NumDT); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%MaxPlanes); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%OutFileRoot); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%WAT_Enabled); if (RegCheckErr(RF, RoutineName)) return
    if (associated(OutData%WAT_FlowField)) deallocate(OutData%WAT_FlowField)
@@ -2517,6 +2519,18 @@ subroutine AWAE_CopyInput(SrcInputData, DstInputData, CtrlCode, ErrStat, ErrMsg)
    character(*), parameter        :: RoutineName = 'AWAE_CopyInput'
    ErrStat = ErrID_None
    ErrMsg  = ''
+   if (allocated(SrcInputData%NumPlanes)) then
+      LB(1:1) = lbound(SrcInputData%NumPlanes)
+      UB(1:1) = ubound(SrcInputData%NumPlanes)
+      if (.not. allocated(DstInputData%NumPlanes)) then
+         allocate(DstInputData%NumPlanes(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstInputData%NumPlanes.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstInputData%NumPlanes = SrcInputData%NumPlanes
+   end if
    if (allocated(SrcInputData%xhat_plane)) then
       LB(1:3) = lbound(SrcInputData%xhat_plane)
       UB(1:3) = ubound(SrcInputData%xhat_plane)
@@ -2610,6 +2624,9 @@ subroutine AWAE_DestroyInput(InputData, ErrStat, ErrMsg)
    character(*), parameter        :: RoutineName = 'AWAE_DestroyInput'
    ErrStat = ErrID_None
    ErrMsg  = ''
+   if (allocated(InputData%NumPlanes)) then
+      deallocate(InputData%NumPlanes)
+   end if
    if (allocated(InputData%xhat_plane)) then
       deallocate(InputData%xhat_plane)
    end if
@@ -2638,6 +2655,7 @@ subroutine AWAE_PackInput(RF, Indata)
    type(AWAE_InputType), intent(in) :: InData
    character(*), parameter         :: RoutineName = 'AWAE_PackInput'
    if (RF%ErrStat >= AbortErrLev) return
+   call RegPackAlloc(RF, InData%NumPlanes)
    call RegPackAlloc(RF, InData%xhat_plane)
    call RegPackAlloc(RF, InData%p_plane)
    call RegPackAlloc(RF, InData%Vx_wake)
@@ -2656,6 +2674,7 @@ subroutine AWAE_UnPackInput(RF, OutData)
    integer(IntKi)  :: stat
    logical         :: IsAllocAssoc
    if (RF%ErrStat /= ErrID_None) return
+   call RegUnpackAlloc(RF, OutData%NumPlanes); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%xhat_plane); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%p_plane); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%Vx_wake); if (RegCheckErr(RF, RoutineName)) return
@@ -2780,6 +2799,8 @@ subroutine AWAE_VarPackInput(V, u, ValAry)
    real(R8Ki), intent(inout)               :: ValAry(:)
    associate (DL => V%DL, VarVals => ValAry(V%iLoc(1):V%iLoc(2)))
       select case (DL%Num)
+      case (AWAE_u_NumPlanes)
+         VarVals = u%NumPlanes(V%iLB:V%iUB)                                   ! Rank 1 Array
       case (AWAE_u_xhat_plane)
          VarVals = u%xhat_plane(V%iLB:V%iUB, V%j, V%k)                        ! Rank 3 Array
       case (AWAE_u_p_plane)
@@ -2816,6 +2837,8 @@ subroutine AWAE_VarUnpackInput(V, ValAry, u)
    type(AWAE_InputType), intent(inout)     :: u
    associate (DL => V%DL, VarVals => ValAry(V%iLoc(1):V%iLoc(2)))
       select case (DL%Num)
+      case (AWAE_u_NumPlanes)
+         u%NumPlanes(V%iLB:V%iUB) = VarVals                                   ! Rank 1 Array
       case (AWAE_u_xhat_plane)
          u%xhat_plane(V%iLB:V%iUB, V%j, V%k) = VarVals                        ! Rank 3 Array
       case (AWAE_u_p_plane)
@@ -2838,6 +2861,8 @@ function AWAE_InputFieldName(DL) result(Name)
    type(DatLoc), intent(in)      :: DL
    character(32)                 :: Name
    select case (DL%Num)
+   case (AWAE_u_NumPlanes)
+       Name = "u%NumPlanes"
    case (AWAE_u_xhat_plane)
        Name = "u%xhat_plane"
    case (AWAE_u_p_plane)
