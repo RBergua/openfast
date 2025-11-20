@@ -1611,7 +1611,8 @@ subroutine AWAE_UpdateStates( t, n, u, p, x, xd, z, OtherState, m, errStat, errM
    ! File-based ambient wind
    case (1)
 
-      !$OMP PARALLEL DO DEFAULT(Shared) PRIVATE(nt, i_hl, errStat2, errMsg2) !Private(nt,tm2,tm3)
+      !$OMP PARALLEL DO DEFAULT(NONE) PRIVATE(nt, i_hl, errStat2, errMsg2) &
+      !$OMP SHARED(p, n_high_low, n, m, errStat, errMsg, AbortErrLev)
       do nt = 1,p%NumTurbines
          do i_hl=0, n_high_low
             
