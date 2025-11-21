@@ -7708,7 +7708,14 @@ SUBROUTINE CalculateForcesMoments( p, x, CoordSys, u, RtHSdat )
          RtHSdat%MomH0Bt(:,K) = RtHSdat%MomH0Bt(:,K) + TmpVec2 + TmpVec3
       
       END DO !J
-      
+
+      IF (p%BD4Blades) THEN
+
+         RtHSdat%FrcS0Bt(:,K) = RtHSdat%FrcS0Bt(:,K) + (/u%BladeRootLoads(K)%Force (1,1), u%BladeRootLoads(K)%Force (3,1), -u%BladeRootLoads(K)%Force (2,1)/)
+         RtHSdat%MomH0Bt(:,K) = RtHSdat%MomH0Bt(:,K) + (/u%BladeRootLoads(K)%Moment(1,1), u%BladeRootLoads(K)%Moment(3,1), -u%BladeRootLoads(K)%Moment(2,1)/)
+
+      END IF
+
    END DO !K   
          
       
@@ -8297,8 +8304,16 @@ SUBROUTINE FillAugMat( p, x, CoordSys, u, HSSBrTrq, RtHSdat, AugMat )
                                              + DOT_PRODUCT( RtHSdat%PAngVelEM(K,0,p%DOFs%PSBE(K,I),0,:),         &
                                                               TmpVec2 + TmpVec3 )
       ENDDO                ! I - All active (enabled) blade DOFs that contribute to the QD2T-related linear accelerations of the tip of blade K (point S(p%BldFlexL))
-   
-      
+
+      ! Apply BeamDyn blade-root loads. Note: When BeamDyn is used, blade bending DoF in ED are disabled, so PSBE should only contain the pitch modes if enabled.
+      IF (p%BD4Blades) THEN
+         TmpVec1 = (/u%BladeRootLoads(K)%Force (1,1), u%BladeRootLoads(K)%Force (3,1), -u%BladeRootLoads(K)%Force (2,1)/)
+         TmpVec2 = (/u%BladeRootLoads(K)%Moment(1,1), u%BladeRootLoads(K)%Moment(3,1), -u%BladeRootLoads(K)%Moment(2,1)/)
+         DO I = 1,p%DOFs%NPSBE(K)
+               AugMat(p%DOFs%PSBE(K,I), p%NAug) = DOT_PRODUCT( RtHSdat%PLinVelES(K,0,p%DOFs%PSBE(K,I),0,:), TmpVec1 ) &
+                                                + DOT_PRODUCT( RtHSdat%PAngVelEM(K,0,p%DOFs%PSBE(K,I),0,:), TmpVec2 )
+         ENDDO
+      END IF
 
       DO J = 1,p%BldNodes ! Loop through the blade nodes / elements
 
@@ -8945,7 +8960,8 @@ SUBROUTINE ED_AllocOutput( p, m, u, y, ErrStat, ErrMsg )
                      ,ErrStat          = ErrStat2               &
                      ,ErrMess          = ErrMsg2                )
          CALL CheckError(ErrStat2,ErrMsg2)
-         IF (ErrStat >= AbortErrLev) RETURN            
+         IF (ErrStat >= AbortErrLev) RETURN
+
    END DO
    
       
@@ -8980,7 +8996,24 @@ SUBROUTINE ED_AllocOutput( p, m, u, y, ErrStat, ErrMsg )
          IF (ErrStat >= AbortErrLev) RETURN
    END DO
    
-      
+   IF (p%BD4Blades) THEN
+      ALLOCATE( u%BladeRootLoads(p%NumBl), Stat=ErrStat2 )
+      IF ( ErrStat2 /= 0 ) THEN
+         CALL CheckError( ErrID_Fatal, 'ED: Could not allocate space for y%BladeRootLoads{p%NumBl}' )
+         RETURN
+      END IF
+
+      DO k=1,p%NumBl
+         CALL MeshCopy( SrcMesh  = y%BladeRootMotion(K) &
+                      , DestMesh = u%BladeRootLoads(K)  &
+                      , CtrlCode = MESH_SIBLING         &
+                      , IOS      = COMPONENT_INPUT      &
+                      , Force    = .TRUE.               &
+                      , Moment   = .TRUE.               &
+                      , ErrStat  = ErrStat2             &
+                      , ErrMess  = ErrMsg2              )
+      END DO
+   END IF
      
    ! -------------- Nacelle -----------------------------------      
    CALL MeshCopy ( SrcMesh  = u%NacelleLoads   &
@@ -11213,6 +11246,18 @@ subroutine ED_InitVars(u, p, x, y, m, Vars, InputFileData, Linearize, ErrStat, E
                             Flags=Flags, &
                             Perturbs=[MaxThrust / (100.0_R8Ki*p%NumBl*p%BldNodes), &
                                       MaxTorque / (100.0_R8Ki*p%NumBl*p%BldNodes)])
+      end do
+   end if
+
+   ! Blade Root Loads
+   if (p%BD4Blades) then
+      do i = 1, p%NumBl
+         call MV_AddMeshVar(Vars%u, "Blade root "//Num2LStr(i), LoadFields, &
+                            DL=DatLoc(ED_u_BladeRootLoads, i), &
+                            Mesh=u%BladeRootLoads(i), &
+                            Flags = VF_None, &
+                            Perturbs=[MaxThrust / (100.0_R8Ki*p%NumBl), &
+                                      MaxTorque / (100.0_R8Ki*p%NumBl)])
       end do
    end if
 
