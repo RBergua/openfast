@@ -11158,7 +11158,7 @@ subroutine ED_InitVars(u, p, x, y, m, Vars, InputFileData, Linearize, ErrStat, E
                   DL=DatLoc(ED_x_QT), iAry=DOF_BP(i), &
                   Flags=VF_DerivOrder2, &
                   Perturb=2.0_R8Ki * D2R_D, &
-                  LinNames=['Blade pitch DOF (internal DOF index = DOF_BP(trim(Num2LStr(i)))), rad'], &
+                  LinNames=['Blade pitch DOF (internal DOF index = DOF_BP('//trim(Num2LStr(i))//')), rad'], &
                   Active=InputFileData%PitchDOF)
    end do
 
