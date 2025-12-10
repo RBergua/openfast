@@ -338,7 +338,7 @@ of_regression("5MW_ITIBarge_DLL_WTurb_WavesIrr"        "openfast;elastodyn;aerod
 of_regression("5MW_TLP_DLL_WTurb_WavesIrr_WavesMulti"  "openfast;elastodyn;aerodyn;servodyn;hydrodyn;map;offshore")
 of_regression("5MW_OC3Spar_DLL_WTurb_WavesIrr"         "openfast;elastodyn;aerodyn;servodyn;hydrodyn;map;offshore")
 of_regression("5MW_OC4Semi_WSt_WavesWN"                "openfast;elastodyn;aerodyn;servodyn;hydrodyn;moordyn;offshore")
-# of_regression("5MW_OC4Semi_WSt_WavesWN_MR"             "openfast;elastodyn;aerodyn;servodyn;hydrodyn;moordyn;multirotor;offshore")
+of_regression("5MW_MRSemi_DLL_WSt_WavesIrr"            "openfast;elastodyn;aerodyn;servodyn;hydrodyn;moordyn;offshore;subdyn;olaf;multirotor")
 of_regression("5MW_Land_BD_DLL_WTurb"                  "openfast;beamdyn;aerodyn;servodyn")
 of_regression("5MW_Land_BD_DLL_WTurb_StC"              "openfast;beamdyn;aerodyn;servodyn;stc")
 of_regression("5MW_Land_BD_Init"                       "openfast;beamdyn;aerodyn;servodyn")
@@ -346,8 +346,10 @@ of_regression("5MW_OC4Jckt_ExtPtfm"                    "openfast;elastodyn;extpt
 of_regression("HelicalWake_OLAF"                       "openfast;aerodyn;olaf")
 of_regression("EllipticalWing_OLAF"                    "openfast;aerodyn;olaf")
 of_regression("StC_test_OC4Semi"                       "openfast;servodyn;hydrodyn;moordyn;offshore;stc")
+of_regression("StC_test_OC4Semi_blade2"                "openfast;servodyn;hydrodyn;moordyn;offshore;stc")
 of_regression("MHK_RM1_Fixed"                          "openfast;elastodyn;aerodyn;mhk;offshore")
 of_regression("MHK_RM1_Floating"                       "openfast;elastodyn;aerodyn;hydrodyn;moordyn;mhk;offshore")
+of_regression("MHK_RM1_Floating_MR"                    "openfast;elastodyn;aerodyn;servodyn;hydrodyn;moordyn;multirotor;offshore")
 of_regression("MHK_RM1_Floating_wNacDrag"              "openfast;elastodyn;aerodyn;hydrodyn;moordyn;mhk;offshore")
 of_regression("Tailfin_FreeYaw1DOF_PolarBased"         "openfast;elastodyn;aerodyn")
 of_regression("Tailfin_FreeYaw1DOF_Unsteady"           "openfast;elastodyn;aerodyn")
@@ -400,7 +402,7 @@ of_regression_linear("StC_test_OC4Semi_Linear_Tow"    ""                "openfas
 of_regression_linear("WP_Stationary_Linear"           ""                "openfast;linear;elastodyn")
 of_regression_linear("5MW_OC3Spar_Linear"             ""                "openfast;linear;map;hydrodyn")
 of_regression_linear("5MW_OC3Mnpl_Linear"             ""                "openfast;linear;hydrodyn;servodyn;moordyn")
-# of_regression_linear("MHK_RM1_Floating_Linear"        "-highpass=0.05"  "openfast;linear;elastodyn;aerodyn;hydrodyn;moordyn;mhk")
+of_regression_linear("MHK_RM1_Floating_MR_Linear"     "-highpass=0.05"  "openfast;linear;elastodyn;aerodyn;servodyn;hydrodyn;moordyn;multirotor;offshore;mhk")
 
 # FAST Farm regression tests
 if(BUILD_FASTFARM)

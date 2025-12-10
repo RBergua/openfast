@@ -4988,8 +4988,7 @@ SUBROUTINE Morison_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, errStat, 
             s2 = 0.0_DbKi;
          end if
 
-         dFdl(1:3) = dFdl(1:3) + &
-            -n(:,i) * ( z1*(s2-s1) + 0.5_DbKi*(z2-z1)/s*(s2*s2-s1*s1) )
+         dFdl(1:3) = dFdl(1:3) -n(:,i) * ( z1*(s2-s1) + 0.5_DbKi*(z2-z1)/s*(s2*s2-s1*s1) )
          C(1) = (z2-z1)*(x2-x1)/3.0_DbKi/(s*s)*(s2**3-s1**3) + 0.5_DbKi*((z2-z1)*(x1-x0)/s+(x2-x1)*z1/s)*(s2*s2-s1*s1) + z1*(x1-x0)*(s2-s1)
          C(2) = (z2-z1)*(y2-y1)/3.0_DbKi/(s*s)*(s2**3-s1**3) + 0.5_DbKi*((z2-z1)*(y1-y0)/s+(y2-y1)*z1/s)*(s2*s2-s1*s1) + z1*(y1-y0)*(s2-s1)
          C(3) = (z2-z1)*(z2-z1)/3.0_DbKi/(s*s)*(s2**3-s1**3) + 0.5_DbKi*((z2-z1)*(z1-z0)/s+(z2-z1)*z1/s)*(s2*s2-s1*s1) + z1*(z1-z0)*(s2-s1)
