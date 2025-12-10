@@ -105,6 +105,7 @@ IMPLICIT NONE
     LOGICAL  :: FlapDOF1 = .false.      !< First flapwise blade mode DOF [-]
     LOGICAL  :: FlapDOF2 = .false.      !< Second flapwise blade mode DOF [-]
     LOGICAL  :: EdgeDOF = .false.      !< Edgewise blade mode DOF [-]
+    LOGICAL  :: PitchDOF = .false.      !< Blade pitch DOF [-]
     LOGICAL  :: TeetDOF = .false.      !< Rotor-teeter DOF [-]
     LOGICAL  :: DrTrDOF = .false.      !< Drivetrain rotational-flexibility DOF [-]
     LOGICAL  :: GenDOF = .false.      !< Generator DOF [-]
@@ -161,6 +162,8 @@ IMPLICIT NONE
     REAL(ReKi)  :: PtfmRefyt = 0.0_ReKi      !< Lateral distance from the ground level [onshore], MSL [offshore wind or floating MHK], or seabed [fixed MHK] to the platform reference point [meters]
     REAL(ReKi)  :: PtfmRefzt = 0.0_ReKi      !< Vertical distance from the ground level [onshore], MSL [offshore wind or floating MHK], or seabed [fixed MHK] to the platform reference point [meters]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: TipMass      !< Tip-brake masses [kg]
+    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: PBrIner      !< Pitch bearing inertia about the pitch axis [kg]
+    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: BlPIner      !< Blade inertia about the pitch axis [kg]
     REAL(ReKi)  :: HubMass = 0.0_ReKi      !< Hub mass [kg]
     REAL(ReKi)  :: HubIner = 0.0_ReKi      !< Hub inertia about teeter axis (2-blader) or rotor axis (3-blader) [kg m^2]
     REAL(ReKi)  :: GenIner = 0.0_ReKi      !< Generator inertia about HSS [kg m^2]
@@ -678,6 +681,7 @@ IMPLICIT NONE
     REAL(ReKi)  :: TFinMass = 0.0_ReKi      !< Tail fin mass [-]
     REAL(ReKi)  :: TFrlIner = 0.0_ReKi      !< Tail boom inertia about tail-furl axis [-]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: TipMass      !< Tip-brake masses [-]
+    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: PitchIner      !< Blade inertia about the pitch axis [-]
     REAL(ReKi)  :: TurbMass = 0.0_ReKi      !< Mass of turbine (tower + rotor + nacelle) [-]
     REAL(ReKi)  :: TwrMass = 0.0_ReKi      !< Mass of tower [-]
     REAL(ReKi)  :: TwrTpMass = 0.0_ReKi      !< Tower-top mass (rotor + nacelle) [-]
@@ -794,12 +798,14 @@ IMPLICIT NONE
     TYPE(MeshType) , DIMENSION(:), ALLOCATABLE  :: BladePtLoads      !< A mesh on each blade, containing aerodynamic forces and moments (formerly AeroBladeForce and AeroBladeMoment) [-]
     TYPE(MeshType)  :: PlatformPtMesh      !< A mesh at the platform reference (point Z), containing force: surge/xi (1), sway/yi (2), and heave/zi (3)-components; and moments: roll/xi (1), pitch/yi (2), and yaw/zi (3)-components acting at the platform (body X) / platform reference (point Z) associated with everything but the QD2T()s [N]
     TYPE(MeshType)  :: TowerPtLoads      !< Tower line2 mesh with forces: surge/xi (1), sway/yi (2), and heave/zi (3)-components of the portion of the tower force at the current tower node (point T); and moments: roll/xi (1), pitch/yi (2), and yaw/zi (3)-components of the portion of the tower moment acting at the current tower node [N/m]
+    TYPE(MeshType) , DIMENSION(:), ALLOCATABLE  :: BladeRootLoads      !< For BeamDyn: loads at the blade roots [-]
     TYPE(MeshType)  :: HubPtLoad      !< A mesh at the teeter pin, containing forces: surge/xi (1), sway/yi (2), and heave/zi (3)-components; and moments: roll/xi (1), pitch/yi (2), and yaw/zi (3)-components acting at the hub. Passed from BeamDyn [-]
     TYPE(MeshType)  :: NacelleLoads      !< From ServoDyn/TMD: loads on the nacelle. [-]
     TYPE(MeshType)  :: TFinCMLoads      !< Aerodynamic forces and moments at the tail-fin center of mass point (point J) [-]
     REAL(ReKi) , DIMENSION(:,:,:), ALLOCATABLE  :: TwrAddedMass      !< 6-by-6 added mass matrix of the tower elements, per unit length-bjj: place on a mesh [per unit length]
     REAL(ReKi) , DIMENSION(1:6,1:6)  :: PtfmAddedMass = 0.0_ReKi      !< Platform added mass matrix [kg, kg-m, kg-m^2]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: BlPitchCom      !< Commanded blade pitch angles [radians]
+    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: BlPitchMom      !< Blade pitch motor torque [N-m]
     REAL(ReKi)  :: YawMom = 0.0_ReKi      !< Torque transmitted through the yaw bearing [N-m]
     REAL(ReKi)  :: GenTrq = 0.0_ReKi      !< Electrical generator torque [N-m]
     REAL(ReKi)  :: HSSBrTrqC = 0.0_ReKi      !< Commanded HSS brake torque [N-m]
@@ -816,6 +822,7 @@ IMPLICIT NONE
     TYPE(MeshType)  :: TFinCMMotion      !< For AeroDyn: motions of the tail find CM point (point J) [-]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: WriteOutput      !< Data to be written to an output file: see WriteOutputHdr for names of each variable [see WriteOutputUnt]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: BlPitch      !< Current blade pitch angles [radians]
+    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: BlPRate      !< Current blade pitch rate [rad/s]
     REAL(ReKi)  :: Yaw = 0.0_ReKi      !< Current nacelle yaw [radians]
     REAL(ReKi)  :: YawRate = 0.0_ReKi      !< Current nacelle yaw rate [rad/s]
     REAL(ReKi)  :: LSS_Spd = 0.0_ReKi      !< Low-speed shaft (LSS) speed at entrance to gearbox [rad/s]
@@ -872,50 +879,53 @@ IMPLICIT NONE
    integer(IntKi), public, parameter :: ED_u_BladePtLoads                =   3 ! ED%BladePtLoads(DL%i1)
    integer(IntKi), public, parameter :: ED_u_PlatformPtMesh              =   4 ! ED%PlatformPtMesh
    integer(IntKi), public, parameter :: ED_u_TowerPtLoads                =   5 ! ED%TowerPtLoads
-   integer(IntKi), public, parameter :: ED_u_HubPtLoad                   =   6 ! ED%HubPtLoad
-   integer(IntKi), public, parameter :: ED_u_NacelleLoads                =   7 ! ED%NacelleLoads
-   integer(IntKi), public, parameter :: ED_u_TFinCMLoads                 =   8 ! ED%TFinCMLoads
-   integer(IntKi), public, parameter :: ED_u_TwrAddedMass                =   9 ! ED%TwrAddedMass
-   integer(IntKi), public, parameter :: ED_u_PtfmAddedMass               =  10 ! ED%PtfmAddedMass
-   integer(IntKi), public, parameter :: ED_u_BlPitchCom                  =  11 ! ED%BlPitchCom
-   integer(IntKi), public, parameter :: ED_u_YawMom                      =  12 ! ED%YawMom
-   integer(IntKi), public, parameter :: ED_u_GenTrq                      =  13 ! ED%GenTrq
-   integer(IntKi), public, parameter :: ED_u_HSSBrTrqC                   =  14 ! ED%HSSBrTrqC
-   integer(IntKi), public, parameter :: ED_y_BladeLn2Mesh                =  15 ! ED%BladeLn2Mesh(DL%i1)
-   integer(IntKi), public, parameter :: ED_y_PlatformPtMesh              =  16 ! ED%PlatformPtMesh
-   integer(IntKi), public, parameter :: ED_y_TowerLn2Mesh                =  17 ! ED%TowerLn2Mesh
-   integer(IntKi), public, parameter :: ED_y_HubPtMotion                 =  18 ! ED%HubPtMotion
-   integer(IntKi), public, parameter :: ED_y_BladeRootMotion             =  19 ! ED%BladeRootMotion(DL%i1)
-   integer(IntKi), public, parameter :: ED_y_NacelleMotion               =  20 ! ED%NacelleMotion
-   integer(IntKi), public, parameter :: ED_y_TFinCMMotion                =  21 ! ED%TFinCMMotion
-   integer(IntKi), public, parameter :: ED_y_WriteOutput                 =  22 ! ED%WriteOutput
-   integer(IntKi), public, parameter :: ED_y_BlPitch                     =  23 ! ED%BlPitch
-   integer(IntKi), public, parameter :: ED_y_Yaw                         =  24 ! ED%Yaw
-   integer(IntKi), public, parameter :: ED_y_YawRate                     =  25 ! ED%YawRate
-   integer(IntKi), public, parameter :: ED_y_LSS_Spd                     =  26 ! ED%LSS_Spd
-   integer(IntKi), public, parameter :: ED_y_HSS_Spd                     =  27 ! ED%HSS_Spd
-   integer(IntKi), public, parameter :: ED_y_RotSpeed                    =  28 ! ED%RotSpeed
-   integer(IntKi), public, parameter :: ED_y_TwrAccel                    =  29 ! ED%TwrAccel
-   integer(IntKi), public, parameter :: ED_y_YawAngle                    =  30 ! ED%YawAngle
-   integer(IntKi), public, parameter :: ED_y_RootMyc                     =  31 ! ED%RootMyc
-   integer(IntKi), public, parameter :: ED_y_YawBrTAxp                   =  32 ! ED%YawBrTAxp
-   integer(IntKi), public, parameter :: ED_y_YawBrTAyp                   =  33 ! ED%YawBrTAyp
-   integer(IntKi), public, parameter :: ED_y_LSSTipPxa                   =  34 ! ED%LSSTipPxa
-   integer(IntKi), public, parameter :: ED_y_RootMxc                     =  35 ! ED%RootMxc
-   integer(IntKi), public, parameter :: ED_y_LSSTipMxa                   =  36 ! ED%LSSTipMxa
-   integer(IntKi), public, parameter :: ED_y_LSSTipMya                   =  37 ! ED%LSSTipMya
-   integer(IntKi), public, parameter :: ED_y_LSSTipMza                   =  38 ! ED%LSSTipMza
-   integer(IntKi), public, parameter :: ED_y_LSSTipMys                   =  39 ! ED%LSSTipMys
-   integer(IntKi), public, parameter :: ED_y_LSSTipMzs                   =  40 ! ED%LSSTipMzs
-   integer(IntKi), public, parameter :: ED_y_YawBrMyn                    =  41 ! ED%YawBrMyn
-   integer(IntKi), public, parameter :: ED_y_YawBrMzn                    =  42 ! ED%YawBrMzn
-   integer(IntKi), public, parameter :: ED_y_NcIMURAxs                   =  43 ! ED%NcIMURAxs
-   integer(IntKi), public, parameter :: ED_y_NcIMURAys                   =  44 ! ED%NcIMURAys
-   integer(IntKi), public, parameter :: ED_y_NcIMURAzs                   =  45 ! ED%NcIMURAzs
-   integer(IntKi), public, parameter :: ED_y_RotPwr                      =  46 ! ED%RotPwr
-   integer(IntKi), public, parameter :: ED_y_LSShftFxa                   =  47 ! ED%LSShftFxa
-   integer(IntKi), public, parameter :: ED_y_LSShftFys                   =  48 ! ED%LSShftFys
-   integer(IntKi), public, parameter :: ED_y_LSShftFzs                   =  49 ! ED%LSShftFzs
+   integer(IntKi), public, parameter :: ED_u_BladeRootLoads              =   6 ! ED%BladeRootLoads(DL%i1)
+   integer(IntKi), public, parameter :: ED_u_HubPtLoad                   =   7 ! ED%HubPtLoad
+   integer(IntKi), public, parameter :: ED_u_NacelleLoads                =   8 ! ED%NacelleLoads
+   integer(IntKi), public, parameter :: ED_u_TFinCMLoads                 =   9 ! ED%TFinCMLoads
+   integer(IntKi), public, parameter :: ED_u_TwrAddedMass                =  10 ! ED%TwrAddedMass
+   integer(IntKi), public, parameter :: ED_u_PtfmAddedMass               =  11 ! ED%PtfmAddedMass
+   integer(IntKi), public, parameter :: ED_u_BlPitchCom                  =  12 ! ED%BlPitchCom
+   integer(IntKi), public, parameter :: ED_u_BlPitchMom                  =  13 ! ED%BlPitchMom
+   integer(IntKi), public, parameter :: ED_u_YawMom                      =  14 ! ED%YawMom
+   integer(IntKi), public, parameter :: ED_u_GenTrq                      =  15 ! ED%GenTrq
+   integer(IntKi), public, parameter :: ED_u_HSSBrTrqC                   =  16 ! ED%HSSBrTrqC
+   integer(IntKi), public, parameter :: ED_y_BladeLn2Mesh                =  17 ! ED%BladeLn2Mesh(DL%i1)
+   integer(IntKi), public, parameter :: ED_y_PlatformPtMesh              =  18 ! ED%PlatformPtMesh
+   integer(IntKi), public, parameter :: ED_y_TowerLn2Mesh                =  19 ! ED%TowerLn2Mesh
+   integer(IntKi), public, parameter :: ED_y_HubPtMotion                 =  20 ! ED%HubPtMotion
+   integer(IntKi), public, parameter :: ED_y_BladeRootMotion             =  21 ! ED%BladeRootMotion(DL%i1)
+   integer(IntKi), public, parameter :: ED_y_NacelleMotion               =  22 ! ED%NacelleMotion
+   integer(IntKi), public, parameter :: ED_y_TFinCMMotion                =  23 ! ED%TFinCMMotion
+   integer(IntKi), public, parameter :: ED_y_WriteOutput                 =  24 ! ED%WriteOutput
+   integer(IntKi), public, parameter :: ED_y_BlPitch                     =  25 ! ED%BlPitch
+   integer(IntKi), public, parameter :: ED_y_BlPRate                     =  26 ! ED%BlPRate
+   integer(IntKi), public, parameter :: ED_y_Yaw                         =  27 ! ED%Yaw
+   integer(IntKi), public, parameter :: ED_y_YawRate                     =  28 ! ED%YawRate
+   integer(IntKi), public, parameter :: ED_y_LSS_Spd                     =  29 ! ED%LSS_Spd
+   integer(IntKi), public, parameter :: ED_y_HSS_Spd                     =  30 ! ED%HSS_Spd
+   integer(IntKi), public, parameter :: ED_y_RotSpeed                    =  31 ! ED%RotSpeed
+   integer(IntKi), public, parameter :: ED_y_TwrAccel                    =  32 ! ED%TwrAccel
+   integer(IntKi), public, parameter :: ED_y_YawAngle                    =  33 ! ED%YawAngle
+   integer(IntKi), public, parameter :: ED_y_RootMyc                     =  34 ! ED%RootMyc
+   integer(IntKi), public, parameter :: ED_y_YawBrTAxp                   =  35 ! ED%YawBrTAxp
+   integer(IntKi), public, parameter :: ED_y_YawBrTAyp                   =  36 ! ED%YawBrTAyp
+   integer(IntKi), public, parameter :: ED_y_LSSTipPxa                   =  37 ! ED%LSSTipPxa
+   integer(IntKi), public, parameter :: ED_y_RootMxc                     =  38 ! ED%RootMxc
+   integer(IntKi), public, parameter :: ED_y_LSSTipMxa                   =  39 ! ED%LSSTipMxa
+   integer(IntKi), public, parameter :: ED_y_LSSTipMya                   =  40 ! ED%LSSTipMya
+   integer(IntKi), public, parameter :: ED_y_LSSTipMza                   =  41 ! ED%LSSTipMza
+   integer(IntKi), public, parameter :: ED_y_LSSTipMys                   =  42 ! ED%LSSTipMys
+   integer(IntKi), public, parameter :: ED_y_LSSTipMzs                   =  43 ! ED%LSSTipMzs
+   integer(IntKi), public, parameter :: ED_y_YawBrMyn                    =  44 ! ED%YawBrMyn
+   integer(IntKi), public, parameter :: ED_y_YawBrMzn                    =  45 ! ED%YawBrMzn
+   integer(IntKi), public, parameter :: ED_y_NcIMURAxs                   =  46 ! ED%NcIMURAxs
+   integer(IntKi), public, parameter :: ED_y_NcIMURAys                   =  47 ! ED%NcIMURAys
+   integer(IntKi), public, parameter :: ED_y_NcIMURAzs                   =  48 ! ED%NcIMURAzs
+   integer(IntKi), public, parameter :: ED_y_RotPwr                      =  49 ! ED%RotPwr
+   integer(IntKi), public, parameter :: ED_y_LSShftFxa                   =  50 ! ED%LSShftFxa
+   integer(IntKi), public, parameter :: ED_y_LSShftFys                   =  51 ! ED%LSShftFys
+   integer(IntKi), public, parameter :: ED_y_LSShftFzs                   =  52 ! ED%LSShftFzs
 
 contains
 
@@ -1484,6 +1494,7 @@ subroutine ED_CopyInputFile(SrcInputFileData, DstInputFileData, CtrlCode, ErrSta
    DstInputFileData%FlapDOF1 = SrcInputFileData%FlapDOF1
    DstInputFileData%FlapDOF2 = SrcInputFileData%FlapDOF2
    DstInputFileData%EdgeDOF = SrcInputFileData%EdgeDOF
+   DstInputFileData%PitchDOF = SrcInputFileData%PitchDOF
    DstInputFileData%TeetDOF = SrcInputFileData%TeetDOF
    DstInputFileData%DrTrDOF = SrcInputFileData%DrTrDOF
    DstInputFileData%GenDOF = SrcInputFileData%GenDOF
@@ -1572,6 +1583,30 @@ subroutine ED_CopyInputFile(SrcInputFileData, DstInputFileData, CtrlCode, ErrSta
          end if
       end if
       DstInputFileData%TipMass = SrcInputFileData%TipMass
+   end if
+   if (allocated(SrcInputFileData%PBrIner)) then
+      LB(1:1) = lbound(SrcInputFileData%PBrIner)
+      UB(1:1) = ubound(SrcInputFileData%PBrIner)
+      if (.not. allocated(DstInputFileData%PBrIner)) then
+         allocate(DstInputFileData%PBrIner(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstInputFileData%PBrIner.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstInputFileData%PBrIner = SrcInputFileData%PBrIner
+   end if
+   if (allocated(SrcInputFileData%BlPIner)) then
+      LB(1:1) = lbound(SrcInputFileData%BlPIner)
+      UB(1:1) = ubound(SrcInputFileData%BlPIner)
+      if (.not. allocated(DstInputFileData%BlPIner)) then
+         allocate(DstInputFileData%BlPIner(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstInputFileData%BlPIner.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstInputFileData%BlPIner = SrcInputFileData%BlPIner
    end if
    DstInputFileData%HubMass = SrcInputFileData%HubMass
    DstInputFileData%HubIner = SrcInputFileData%HubIner
@@ -1872,6 +1907,12 @@ subroutine ED_DestroyInputFile(InputFileData, ErrStat, ErrMsg)
    if (allocated(InputFileData%TipMass)) then
       deallocate(InputFileData%TipMass)
    end if
+   if (allocated(InputFileData%PBrIner)) then
+      deallocate(InputFileData%PBrIner)
+   end if
+   if (allocated(InputFileData%BlPIner)) then
+      deallocate(InputFileData%BlPIner)
+   end if
    if (allocated(InputFileData%InpBlMesh)) then
       LB(1:1) = lbound(InputFileData%InpBlMesh)
       UB(1:1) = ubound(InputFileData%InpBlMesh)
@@ -1939,6 +1980,7 @@ subroutine ED_PackInputFile(RF, Indata)
    call RegPack(RF, InData%FlapDOF1)
    call RegPack(RF, InData%FlapDOF2)
    call RegPack(RF, InData%EdgeDOF)
+   call RegPack(RF, InData%PitchDOF)
    call RegPack(RF, InData%TeetDOF)
    call RegPack(RF, InData%DrTrDOF)
    call RegPack(RF, InData%GenDOF)
@@ -1995,6 +2037,8 @@ subroutine ED_PackInputFile(RF, Indata)
    call RegPack(RF, InData%PtfmRefyt)
    call RegPack(RF, InData%PtfmRefzt)
    call RegPackAlloc(RF, InData%TipMass)
+   call RegPackAlloc(RF, InData%PBrIner)
+   call RegPackAlloc(RF, InData%BlPIner)
    call RegPack(RF, InData%HubMass)
    call RegPack(RF, InData%HubIner)
    call RegPack(RF, InData%GenIner)
@@ -2142,6 +2186,7 @@ subroutine ED_UnPackInputFile(RF, OutData)
    call RegUnpack(RF, OutData%FlapDOF1); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%FlapDOF2); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%EdgeDOF); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%PitchDOF); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%TeetDOF); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%DrTrDOF); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%GenDOF); if (RegCheckErr(RF, RoutineName)) return
@@ -2198,6 +2243,8 @@ subroutine ED_UnPackInputFile(RF, OutData)
    call RegUnpack(RF, OutData%PtfmRefyt); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%PtfmRefzt); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%TipMass); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%PBrIner); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%BlPIner); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%HubMass); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%HubIner); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%GenIner); if (RegCheckErr(RF, RoutineName)) return
@@ -5215,6 +5262,18 @@ subroutine ED_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg)
       end if
       DstParamData%TipMass = SrcParamData%TipMass
    end if
+   if (allocated(SrcParamData%PitchIner)) then
+      LB(1:1) = lbound(SrcParamData%PitchIner)
+      UB(1:1) = ubound(SrcParamData%PitchIner)
+      if (.not. allocated(DstParamData%PitchIner)) then
+         allocate(DstParamData%PitchIner(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstParamData%PitchIner.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstParamData%PitchIner = SrcParamData%PitchIner
+   end if
    DstParamData%TurbMass = SrcParamData%TurbMass
    DstParamData%TwrMass = SrcParamData%TwrMass
    DstParamData%TwrTpMass = SrcParamData%TwrTpMass
@@ -5811,6 +5870,9 @@ subroutine ED_DestroyParam(ParamData, ErrStat, ErrMsg)
    if (allocated(ParamData%TipMass)) then
       deallocate(ParamData%TipMass)
    end if
+   if (allocated(ParamData%PitchIner)) then
+      deallocate(ParamData%PitchIner)
+   end if
    if (allocated(ParamData%PitchAxis)) then
       deallocate(ParamData%PitchAxis)
    end if
@@ -6074,6 +6136,7 @@ subroutine ED_PackParam(RF, Indata)
    call RegPack(RF, InData%TFinMass)
    call RegPack(RF, InData%TFrlIner)
    call RegPackAlloc(RF, InData%TipMass)
+   call RegPackAlloc(RF, InData%PitchIner)
    call RegPack(RF, InData%TurbMass)
    call RegPack(RF, InData%TwrMass)
    call RegPack(RF, InData%TwrTpMass)
@@ -6347,6 +6410,7 @@ subroutine ED_UnPackParam(RF, OutData)
    call RegUnpack(RF, OutData%TFinMass); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%TFrlIner); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%TipMass); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%PitchIner); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%TurbMass); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%TwrMass); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%TwrTpMass); if (RegCheckErr(RF, RoutineName)) return
@@ -6505,6 +6569,22 @@ subroutine ED_CopyInput(SrcInputData, DstInputData, CtrlCode, ErrStat, ErrMsg)
    call MeshCopy(SrcInputData%TowerPtLoads, DstInputData%TowerPtLoads, CtrlCode, ErrStat2, ErrMsg2 )
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (ErrStat >= AbortErrLev) return
+   if (allocated(SrcInputData%BladeRootLoads)) then
+      LB(1:1) = lbound(SrcInputData%BladeRootLoads)
+      UB(1:1) = ubound(SrcInputData%BladeRootLoads)
+      if (.not. allocated(DstInputData%BladeRootLoads)) then
+         allocate(DstInputData%BladeRootLoads(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstInputData%BladeRootLoads.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      do i1 = LB(1), UB(1)
+         call MeshCopy(SrcInputData%BladeRootLoads(i1), DstInputData%BladeRootLoads(i1), CtrlCode, ErrStat2, ErrMsg2 )
+         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+         if (ErrStat >= AbortErrLev) return
+      end do
+   end if
    call MeshCopy(SrcInputData%HubPtLoad, DstInputData%HubPtLoad, CtrlCode, ErrStat2, ErrMsg2 )
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (ErrStat >= AbortErrLev) return
@@ -6539,6 +6619,18 @@ subroutine ED_CopyInput(SrcInputData, DstInputData, CtrlCode, ErrStat, ErrMsg)
       end if
       DstInputData%BlPitchCom = SrcInputData%BlPitchCom
    end if
+   if (allocated(SrcInputData%BlPitchMom)) then
+      LB(1:1) = lbound(SrcInputData%BlPitchMom)
+      UB(1:1) = ubound(SrcInputData%BlPitchMom)
+      if (.not. allocated(DstInputData%BlPitchMom)) then
+         allocate(DstInputData%BlPitchMom(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstInputData%BlPitchMom.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstInputData%BlPitchMom = SrcInputData%BlPitchMom
+   end if
    DstInputData%YawMom = SrcInputData%YawMom
    DstInputData%GenTrq = SrcInputData%GenTrq
    DstInputData%HSSBrTrqC = SrcInputData%HSSBrTrqC
@@ -6568,6 +6660,15 @@ subroutine ED_DestroyInput(InputData, ErrStat, ErrMsg)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    call MeshDestroy( InputData%TowerPtLoads, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if (allocated(InputData%BladeRootLoads)) then
+      LB(1:1) = lbound(InputData%BladeRootLoads)
+      UB(1:1) = ubound(InputData%BladeRootLoads)
+      do i1 = LB(1), UB(1)
+         call MeshDestroy( InputData%BladeRootLoads(i1), ErrStat2, ErrMsg2)
+         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+      end do
+      deallocate(InputData%BladeRootLoads)
+   end if
    call MeshDestroy( InputData%HubPtLoad, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    call MeshDestroy( InputData%NacelleLoads, ErrStat2, ErrMsg2)
@@ -6579,6 +6680,9 @@ subroutine ED_DestroyInput(InputData, ErrStat, ErrMsg)
    end if
    if (allocated(InputData%BlPitchCom)) then
       deallocate(InputData%BlPitchCom)
+   end if
+   if (allocated(InputData%BlPitchMom)) then
+      deallocate(InputData%BlPitchMom)
    end if
 end subroutine
 
@@ -6600,12 +6704,22 @@ subroutine ED_PackInput(RF, Indata)
    end if
    call MeshPack(RF, InData%PlatformPtMesh) 
    call MeshPack(RF, InData%TowerPtLoads) 
+   call RegPack(RF, allocated(InData%BladeRootLoads))
+   if (allocated(InData%BladeRootLoads)) then
+      call RegPackBounds(RF, 1, lbound(InData%BladeRootLoads), ubound(InData%BladeRootLoads))
+      LB(1:1) = lbound(InData%BladeRootLoads)
+      UB(1:1) = ubound(InData%BladeRootLoads)
+      do i1 = LB(1), UB(1)
+         call MeshPack(RF, InData%BladeRootLoads(i1)) 
+      end do
+   end if
    call MeshPack(RF, InData%HubPtLoad) 
    call MeshPack(RF, InData%NacelleLoads) 
    call MeshPack(RF, InData%TFinCMLoads) 
    call RegPackAlloc(RF, InData%TwrAddedMass)
    call RegPack(RF, InData%PtfmAddedMass)
    call RegPackAlloc(RF, InData%BlPitchCom)
+   call RegPackAlloc(RF, InData%BlPitchMom)
    call RegPack(RF, InData%YawMom)
    call RegPack(RF, InData%GenTrq)
    call RegPack(RF, InData%HSSBrTrqC)
@@ -6636,12 +6750,26 @@ subroutine ED_UnPackInput(RF, OutData)
    end if
    call MeshUnpack(RF, OutData%PlatformPtMesh) ! PlatformPtMesh 
    call MeshUnpack(RF, OutData%TowerPtLoads) ! TowerPtLoads 
+   if (allocated(OutData%BladeRootLoads)) deallocate(OutData%BladeRootLoads)
+   call RegUnpack(RF, IsAllocAssoc); if (RegCheckErr(RF, RoutineName)) return
+   if (IsAllocAssoc) then
+      call RegUnpackBounds(RF, 1, LB, UB); if (RegCheckErr(RF, RoutineName)) return
+      allocate(OutData%BladeRootLoads(LB(1):UB(1)),stat=stat)
+      if (stat /= 0) then 
+         call SetErrStat(ErrID_Fatal, 'Error allocating OutData%BladeRootLoads.', RF%ErrStat, RF%ErrMsg, RoutineName)
+         return
+      end if
+      do i1 = LB(1), UB(1)
+         call MeshUnpack(RF, OutData%BladeRootLoads(i1)) ! BladeRootLoads 
+      end do
+   end if
    call MeshUnpack(RF, OutData%HubPtLoad) ! HubPtLoad 
    call MeshUnpack(RF, OutData%NacelleLoads) ! NacelleLoads 
    call MeshUnpack(RF, OutData%TFinCMLoads) ! TFinCMLoads 
    call RegUnpackAlloc(RF, OutData%TwrAddedMass); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%PtfmAddedMass); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%BlPitchCom); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%BlPitchMom); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%YawMom); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%GenTrq); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%HSSBrTrqC); if (RegCheckErr(RF, RoutineName)) return
@@ -6731,6 +6859,18 @@ subroutine ED_CopyOutput(SrcOutputData, DstOutputData, CtrlCode, ErrStat, ErrMsg
       end if
       DstOutputData%BlPitch = SrcOutputData%BlPitch
    end if
+   if (allocated(SrcOutputData%BlPRate)) then
+      LB(1:1) = lbound(SrcOutputData%BlPRate)
+      UB(1:1) = ubound(SrcOutputData%BlPRate)
+      if (.not. allocated(DstOutputData%BlPRate)) then
+         allocate(DstOutputData%BlPRate(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstOutputData%BlPRate.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstOutputData%BlPRate = SrcOutputData%BlPRate
+   end if
    DstOutputData%Yaw = SrcOutputData%Yaw
    DstOutputData%YawRate = SrcOutputData%YawRate
    DstOutputData%LSS_Spd = SrcOutputData%LSS_Spd
@@ -6804,6 +6944,9 @@ subroutine ED_DestroyOutput(OutputData, ErrStat, ErrMsg)
    if (allocated(OutputData%BlPitch)) then
       deallocate(OutputData%BlPitch)
    end if
+   if (allocated(OutputData%BlPRate)) then
+      deallocate(OutputData%BlPRate)
+   end if
 end subroutine
 
 subroutine ED_PackOutput(RF, Indata)
@@ -6838,6 +6981,7 @@ subroutine ED_PackOutput(RF, Indata)
    call MeshPack(RF, InData%TFinCMMotion) 
    call RegPackAlloc(RF, InData%WriteOutput)
    call RegPackAlloc(RF, InData%BlPitch)
+   call RegPackAlloc(RF, InData%BlPRate)
    call RegPack(RF, InData%Yaw)
    call RegPack(RF, InData%YawRate)
    call RegPack(RF, InData%LSS_Spd)
@@ -6909,6 +7053,7 @@ subroutine ED_UnPackOutput(RF, OutData)
    call MeshUnpack(RF, OutData%TFinCMMotion) ! TFinCMMotion 
    call RegUnpackAlloc(RF, OutData%WriteOutput); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%BlPitch); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%BlPRate); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%Yaw); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%YawRate); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%LSS_Spd); if (RegCheckErr(RF, RoutineName)) return
@@ -7288,6 +7433,12 @@ SUBROUTINE ED_Input_ExtrapInterp1(u1, u2, tin, u_out, tin_out, ErrStat, ErrMsg )
       CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
    CALL MeshExtrapInterp1(u1%TowerPtLoads, u2%TowerPtLoads, tin, u_out%TowerPtLoads, tin_out, ErrStat2, ErrMsg2)
       CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
+   IF (ALLOCATED(u_out%BladeRootLoads) .AND. ALLOCATED(u1%BladeRootLoads)) THEN
+      do i1 = lbound(u_out%BladeRootLoads,1),ubound(u_out%BladeRootLoads,1)
+         CALL MeshExtrapInterp1(u1%BladeRootLoads(i1), u2%BladeRootLoads(i1), tin, u_out%BladeRootLoads(i1), tin_out, ErrStat2, ErrMsg2)
+            CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
+      END DO
+   END IF ! check if allocated
    CALL MeshExtrapInterp1(u1%HubPtLoad, u2%HubPtLoad, tin, u_out%HubPtLoad, tin_out, ErrStat2, ErrMsg2)
       CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
    CALL MeshExtrapInterp1(u1%NacelleLoads, u2%NacelleLoads, tin, u_out%NacelleLoads, tin_out, ErrStat2, ErrMsg2)
@@ -7302,6 +7453,9 @@ SUBROUTINE ED_Input_ExtrapInterp1(u1, u2, tin, u_out, tin_out, ErrStat, ErrMsg )
       do i1 = lbound(u_out%BlPitchCom,1),ubound(u_out%BlPitchCom,1)
          CALL Angles_ExtrapInterp( u1%BlPitchCom(i1), u2%BlPitchCom(i1), tin, u_out%BlPitchCom(i1), tin_out )
       END DO
+   END IF ! check if allocated
+   IF (ALLOCATED(u_out%BlPitchMom) .AND. ALLOCATED(u1%BlPitchMom)) THEN
+      u_out%BlPitchMom = a1*u1%BlPitchMom + a2*u2%BlPitchMom
    END IF ! check if allocated
    u_out%YawMom = a1*u1%YawMom + a2*u2%YawMom
    u_out%GenTrq = a1*u1%GenTrq + a2*u2%GenTrq
@@ -7377,6 +7531,12 @@ SUBROUTINE ED_Input_ExtrapInterp2(u1, u2, u3, tin, u_out, tin_out, ErrStat, ErrM
       CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
    CALL MeshExtrapInterp2(u1%TowerPtLoads, u2%TowerPtLoads, u3%TowerPtLoads, tin, u_out%TowerPtLoads, tin_out, ErrStat2, ErrMsg2)
       CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
+   IF (ALLOCATED(u_out%BladeRootLoads) .AND. ALLOCATED(u1%BladeRootLoads)) THEN
+      do i1 = lbound(u_out%BladeRootLoads,1),ubound(u_out%BladeRootLoads,1)
+         CALL MeshExtrapInterp2(u1%BladeRootLoads(i1), u2%BladeRootLoads(i1), u3%BladeRootLoads(i1), tin, u_out%BladeRootLoads(i1), tin_out, ErrStat2, ErrMsg2)
+            CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
+      END DO
+   END IF ! check if allocated
    CALL MeshExtrapInterp2(u1%HubPtLoad, u2%HubPtLoad, u3%HubPtLoad, tin, u_out%HubPtLoad, tin_out, ErrStat2, ErrMsg2)
       CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
    CALL MeshExtrapInterp2(u1%NacelleLoads, u2%NacelleLoads, u3%NacelleLoads, tin, u_out%NacelleLoads, tin_out, ErrStat2, ErrMsg2)
@@ -7391,6 +7551,9 @@ SUBROUTINE ED_Input_ExtrapInterp2(u1, u2, u3, tin, u_out, tin_out, ErrStat, ErrM
       do i1 = lbound(u_out%BlPitchCom,1),ubound(u_out%BlPitchCom,1)
          CALL Angles_ExtrapInterp( u1%BlPitchCom(i1), u2%BlPitchCom(i1), u3%BlPitchCom(i1), tin, u_out%BlPitchCom(i1), tin_out )
       END DO
+   END IF ! check if allocated
+   IF (ALLOCATED(u_out%BlPitchMom) .AND. ALLOCATED(u1%BlPitchMom)) THEN
+      u_out%BlPitchMom = a1*u1%BlPitchMom + a2*u2%BlPitchMom + a3*u3%BlPitchMom
    END IF ! check if allocated
    u_out%YawMom = a1*u1%YawMom + a2*u2%YawMom + a3*u3%YawMom
    u_out%GenTrq = a1*u1%GenTrq + a2*u2%GenTrq + a3*u3%GenTrq
@@ -7524,6 +7687,9 @@ SUBROUTINE ED_Output_ExtrapInterp1(y1, y2, tin, y_out, tin_out, ErrStat, ErrMsg 
          CALL Angles_ExtrapInterp( y1%BlPitch(i1), y2%BlPitch(i1), tin, y_out%BlPitch(i1), tin_out )
       END DO
    END IF ! check if allocated
+   IF (ALLOCATED(y_out%BlPRate) .AND. ALLOCATED(y1%BlPRate)) THEN
+      y_out%BlPRate = a1*y1%BlPRate + a2*y2%BlPRate
+   END IF ! check if allocated
    CALL Angles_ExtrapInterp( y1%Yaw, y2%Yaw, tin, y_out%Yaw, tin_out )
    y_out%YawRate = a1*y1%YawRate + a2*y2%YawRate
    y_out%LSS_Spd = a1*y1%LSS_Spd + a2*y2%LSS_Spd
@@ -7637,6 +7803,9 @@ SUBROUTINE ED_Output_ExtrapInterp2(y1, y2, y3, tin, y_out, tin_out, ErrStat, Err
          CALL Angles_ExtrapInterp( y1%BlPitch(i1), y2%BlPitch(i1), y3%BlPitch(i1), tin, y_out%BlPitch(i1), tin_out )
       END DO
    END IF ! check if allocated
+   IF (ALLOCATED(y_out%BlPRate) .AND. ALLOCATED(y1%BlPRate)) THEN
+      y_out%BlPRate = a1*y1%BlPRate + a2*y2%BlPRate + a3*y3%BlPRate
+   END IF ! check if allocated
    CALL Angles_ExtrapInterp( y1%Yaw, y2%Yaw, y3%Yaw, tin, y_out%Yaw, tin_out )
    y_out%YawRate = a1*y1%YawRate + a2*y2%YawRate + a3*y3%YawRate
    y_out%LSS_Spd = a1*y1%LSS_Spd + a2*y2%LSS_Spd + a3*y3%LSS_Spd
@@ -7677,6 +7846,8 @@ function ED_InputMeshPointer(u, DL) result(Mesh)
        Mesh => u%PlatformPtMesh
    case (ED_u_TowerPtLoads)
        Mesh => u%TowerPtLoads
+   case (ED_u_BladeRootLoads)
+       Mesh => u%BladeRootLoads(DL%i1)
    case (ED_u_HubPtLoad)
        Mesh => u%HubPtLoad
    case (ED_u_NacelleLoads)
@@ -7820,6 +7991,8 @@ subroutine ED_VarPackInput(V, u, ValAry)
          call MV_PackMesh(V, u%PlatformPtMesh, ValAry)                        ! Mesh
       case (ED_u_TowerPtLoads)
          call MV_PackMesh(V, u%TowerPtLoads, ValAry)                          ! Mesh
+      case (ED_u_BladeRootLoads)
+         call MV_PackMesh(V, u%BladeRootLoads(DL%i1), ValAry)                 ! Mesh
       case (ED_u_HubPtLoad)
          call MV_PackMesh(V, u%HubPtLoad, ValAry)                             ! Mesh
       case (ED_u_NacelleLoads)
@@ -7832,6 +8005,8 @@ subroutine ED_VarPackInput(V, u, ValAry)
          VarVals = u%PtfmAddedMass(V%iLB:V%iUB,V%j)                           ! Rank 2 Array
       case (ED_u_BlPitchCom)
          VarVals = u%BlPitchCom(V%iLB:V%iUB)                                  ! Rank 1 Array
+      case (ED_u_BlPitchMom)
+         VarVals = u%BlPitchMom(V%iLB:V%iUB)                                  ! Rank 1 Array
       case (ED_u_YawMom)
          VarVals(1) = u%YawMom                                                ! Scalar
       case (ED_u_GenTrq)
@@ -7866,6 +8041,8 @@ subroutine ED_VarUnpackInput(V, ValAry, u)
          call MV_UnpackMesh(V, ValAry, u%PlatformPtMesh)                      ! Mesh
       case (ED_u_TowerPtLoads)
          call MV_UnpackMesh(V, ValAry, u%TowerPtLoads)                        ! Mesh
+      case (ED_u_BladeRootLoads)
+         call MV_UnpackMesh(V, ValAry, u%BladeRootLoads(DL%i1))               ! Mesh
       case (ED_u_HubPtLoad)
          call MV_UnpackMesh(V, ValAry, u%HubPtLoad)                           ! Mesh
       case (ED_u_NacelleLoads)
@@ -7878,6 +8055,8 @@ subroutine ED_VarUnpackInput(V, ValAry, u)
          u%PtfmAddedMass(V%iLB:V%iUB, V%j) = VarVals                          ! Rank 2 Array
       case (ED_u_BlPitchCom)
          u%BlPitchCom(V%iLB:V%iUB) = VarVals                                  ! Rank 1 Array
+      case (ED_u_BlPitchMom)
+         u%BlPitchMom(V%iLB:V%iUB) = VarVals                                  ! Rank 1 Array
       case (ED_u_YawMom)
          u%YawMom = VarVals(1)                                                ! Scalar
       case (ED_u_GenTrq)
@@ -7898,6 +8077,8 @@ function ED_InputFieldName(DL) result(Name)
        Name = "u%PlatformPtMesh"
    case (ED_u_TowerPtLoads)
        Name = "u%TowerPtLoads"
+   case (ED_u_BladeRootLoads)
+       Name = "u%BladeRootLoads("//trim(Num2LStr(DL%i1))//")"
    case (ED_u_HubPtLoad)
        Name = "u%HubPtLoad"
    case (ED_u_NacelleLoads)
@@ -7910,6 +8091,8 @@ function ED_InputFieldName(DL) result(Name)
        Name = "u%PtfmAddedMass"
    case (ED_u_BlPitchCom)
        Name = "u%BlPitchCom"
+   case (ED_u_BlPitchMom)
+       Name = "u%BlPitchMom"
    case (ED_u_YawMom)
        Name = "u%YawMom"
    case (ED_u_GenTrq)
@@ -7955,6 +8138,8 @@ subroutine ED_VarPackOutput(V, y, ValAry)
          VarVals = y%WriteOutput(V%iLB:V%iUB)                                 ! Rank 1 Array
       case (ED_y_BlPitch)
          VarVals = y%BlPitch(V%iLB:V%iUB)                                     ! Rank 1 Array
+      case (ED_y_BlPRate)
+         VarVals = y%BlPRate(V%iLB:V%iUB)                                     ! Rank 1 Array
       case (ED_y_Yaw)
          VarVals(1) = y%Yaw                                                   ! Scalar
       case (ED_y_YawRate)
@@ -8047,6 +8232,8 @@ subroutine ED_VarUnpackOutput(V, ValAry, y)
          y%WriteOutput(V%iLB:V%iUB) = VarVals                                 ! Rank 1 Array
       case (ED_y_BlPitch)
          y%BlPitch(V%iLB:V%iUB) = VarVals                                     ! Rank 1 Array
+      case (ED_y_BlPRate)
+         y%BlPRate(V%iLB:V%iUB) = VarVals                                     ! Rank 1 Array
       case (ED_y_Yaw)
          y%Yaw = VarVals(1)                                                   ! Scalar
       case (ED_y_YawRate)
@@ -8125,6 +8312,8 @@ function ED_OutputFieldName(DL) result(Name)
        Name = "y%WriteOutput"
    case (ED_y_BlPitch)
        Name = "y%BlPitch"
+   case (ED_y_BlPRate)
+       Name = "y%BlPRate"
    case (ED_y_Yaw)
        Name = "y%Yaw"
    case (ED_y_YawRate)

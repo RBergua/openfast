@@ -930,7 +930,7 @@ subroutine InitMappings_ED(Mappings, SrcMod, DstMod, Turbine, ErrStat, ErrMsg)
    character(*), parameter    :: RoutineName = 'InitMappings_ED'
    integer(IntKi)             :: ErrStat2
    character(ErrMsgLen)       :: ErrMsg2
-   integer(IntKi)             :: i, j
+   integer(IntKi)             :: i, j, iBld
    logical                    :: NotCompAeroMaps, CompAeroAD, CompElastED, CompSubSD
 
    ErrStat = ErrID_None
@@ -1021,12 +1021,25 @@ subroutine InitMappings_ED(Mappings, SrcMod, DstMod, Turbine, ErrStat, ErrMsg)
 
    case (Module_BD)
 
-      ! Hub Loads
+      ! ! Hub Loads
+      ! call MapLoadMesh(Turbine, Mappings, SrcMod=SrcMod, DstMod=DstMod, &
+      !                  SrcDL=DatLoc(BD_y_ReactionForce), &      ! BD%y(SrcMod%Ins)%ReactionForce
+      !                  SrcDispDL=DatLoc(BD_u_RootMotion), &     ! BD%u(SrcMod%Ins)%RootMotion
+      !                  DstDL=DatLoc(ED_u_HubPtLoad), &          ! ED%u%HubPtLoad
+      !                  DstDispDL=DatLoc(ED_y_HubPtMotion), &    ! ED%y%HubPtMotion
+      !                  ErrStat=ErrStat2, ErrMsg=ErrMsg2, &
+      !                  Active=NotCompAeroMaps)
+      ! if (Failed()) return
+
+      ! Get the blade number for this BeamDyn instance
+      iBld = Turbine%p_FAST%BDBldMap(SrcMod%Ins)
+
+      ! Blade Root Loads
       call MapLoadMesh(Turbine, Mappings, SrcMod=SrcMod, DstMod=DstMod, &
-                       SrcDL=DatLoc(BD_y_ReactionForce), &      ! BD%y(SrcMod%Ins)%ReactionForce
-                       SrcDispDL=DatLoc(BD_u_RootMotion), &     ! BD%u(SrcMod%Ins)%RootMotion
-                       DstDL=DatLoc(ED_u_HubPtLoad), &          ! ED%u%HubPtLoad
-                       DstDispDL=DatLoc(ED_y_HubPtMotion), &    ! ED%y%HubPtMotion
+                       SrcDL=DatLoc(BD_y_ReactionForce), &                 ! BD%y(SrcMod%Ins)%ReactionForce
+                       SrcDispDL=DatLoc(BD_u_RootMotion), &                ! BD%u(SrcMod%Ins)%RootMotion
+                       DstDL=DatLoc(ED_u_BladeRootLoads, iBld), &          ! ED%u%BladeRootLoads
+                       DstDispDL=DatLoc(ED_y_BladeRootMotion, iBld), &     ! ED%y%BladeRootMotion
                        ErrStat=ErrStat2, ErrMsg=ErrMsg2, &
                        Active=NotCompAeroMaps)
       if (Failed()) return
@@ -1172,6 +1185,11 @@ subroutine InitMappings_ED(Mappings, SrcMod, DstMod, Turbine, ErrStat, ErrMsg)
       call MapVariable(Mappings, &
                        SrcMod=SrcMod, SrcDL=DatLoc(SrvD_y_BlPitchCom), &
                        DstMod=DstMod, DstDL=DatLoc(ED_u_BlPitchCom), &
+                       ErrStat=ErrStat2, ErrMsg=ErrMsg2); if (Failed()) return
+
+      call MapVariable(Mappings, &
+                       SrcMod=SrcMod, SrcDL=DatLoc(SrvD_y_BlPitchMom), &
+                       DstMod=DstMod, DstDL=DatLoc(ED_u_BlPitchMom), &
                        ErrStat=ErrStat2, ErrMsg=ErrMsg2); if (Failed()) return
 
       call MapVariable(Mappings, &
@@ -1980,6 +1998,16 @@ subroutine InitMappings_SrvD(Mappings, SrcMod, DstMod, Turbine, ErrStat, ErrMsg)
    case (Module_ED)
 
       call MapCustom(Mappings, Custom_ED_to_SrvD, SrcMod, DstMod)
+
+      call MapVariable(Mappings, &
+                       SrcMod=SrcMod, SrcDL=DatLoc(ED_y_BlPitch), &
+                       DstMod=DstMod, DstDL=DatLoc(SrvD_u_BlPitch), &
+                       ErrStat=ErrStat2, ErrMsg=ErrMsg2); if (Failed()) return
+
+      call MapVariable(Mappings, &
+                       SrcMod=SrcMod, SrcDL=DatLoc(ED_y_BlPRate), &
+                       DstMod=DstMod, DstDL=DatLoc(SrvD_u_BlPRate), &
+                       ErrStat=ErrStat2, ErrMsg=ErrMsg2); if (Failed()) return
 
       call MapVariable(Mappings, &
                        SrcMod=SrcMod, SrcDL=DatLoc(ED_y_Yaw), &
@@ -3212,6 +3240,7 @@ subroutine Custom_InputSolve(Mapping, ModSrc, ModDst, iInput, T, ErrStat, ErrMsg
       T%ED%Input(iInput, ModDst%Ins)%GenTrq = T%SrvD%y(ModSrc%Ins)%GenTrq
       T%ED%Input(iInput, ModDst%Ins)%HSSBrTrqC = T%SrvD%y(ModSrc%Ins)%HSSBrTrqC
       T%ED%Input(iInput, ModDst%Ins)%BlPitchCom = T%SrvD%y(ModSrc%Ins)%BlPitchCom
+      T%ED%Input(iInput, ModDst%Ins)%BlPitchMom = T%SrvD%y(ModSrc%Ins)%BlPitchMom
       T%ED%Input(iInput, ModDst%Ins)%YawMom = T%SrvD%y(ModSrc%Ins)%YawMom
 
    case (Custom_ED_Tower_Damping)
