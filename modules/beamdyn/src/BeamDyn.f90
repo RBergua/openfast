@@ -2182,9 +2182,6 @@ SUBROUTINE BD_UpdateDiscState( t, n, u, p, x, xd, z, OtherState, m, ErrStat, Err
    CHARACTER(*),                      INTENT(  OUT)  :: ErrMsg      !< Error message if ErrStat /= ErrID_None
 
    ! local variables
-   REAL(BDKi)                                        :: temp_R(3,3)
-   REAL(BDKi)                                        :: Hub_theta_Root(3)
-   REAL(BDKi)                                        :: u_theta_pitch
 
       ! Initialize ErrStat
 
