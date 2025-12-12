@@ -871,12 +871,6 @@ class InputReader_OpenFAST(object):
         #---------------------- MATERIAL PARAMETER --------------------------------------
         f.readline()
         self.fst_vt['BeamDyn'][BladeNumber]['BldFile']     = f.readline().split()[0].replace('"','').replace("'",'')
-        #---------------------- PITCH ACTUATOR PARAMETERS -------------------------------
-        f.readline()
-        self.fst_vt['BeamDyn'][BladeNumber]['UsePitchAct'] = bool_read(f.readline().split()[0])
-        self.fst_vt['BeamDyn'][BladeNumber]['PitchJ']      = float_read(f.readline().split()[0])
-        self.fst_vt['BeamDyn'][BladeNumber]['PitchK']      = float_read(f.readline().split()[0])
-        self.fst_vt['BeamDyn'][BladeNumber]['PitchC']      = float_read(f.readline().split()[0])
         #---------------------- OUTPUTS -------------------------------------------------
         f.readline()
         self.fst_vt['BeamDyn'][BladeNumber]['SumPrint']    = bool_read(f.readline().split()[0])
