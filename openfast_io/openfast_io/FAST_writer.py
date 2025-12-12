@@ -631,16 +631,15 @@ class InputWriter_OpenFAST(object):
         f.write('{:<22} {:<11} {:}'.format(EDbld_dict['AdjFlSt'], 'AdjFlSt', '- Factor to adjust blade flap stiffness (-)\n'))
         f.write('{:<22} {:<11} {:}'.format(EDbld_dict['AdjEdSt'], 'AdjEdSt', '- Factor to adjust blade edge stiffness (-)\n'))
         f.write('---------------------- DISTRIBUTED BLADE PROPERTIES ----------------------------\n')
-        f.write('    BlFract      PitchAxis      StrcTwst       BMassDen        FlpStff        EdgStff\n')
-        f.write('      (-)           (-)          (deg)          (kg/m)         (Nm^2)         (Nm^2)\n')
+        f.write('    BlFract      StrcTwst       BMassDen        FlpStff        EdgStff\n')
+        f.write('      (-)         (deg)          (kg/m)         (Nm^2)         (Nm^2)\n')
         BlFract   = EDbld_dict['BlFract']
-        PitchAxis = EDbld_dict['PitchAxis']
         StrcTwst  = EDbld_dict['StrcTwst']
         BMassDen  = EDbld_dict['BMassDen']
         FlpStff   = EDbld_dict['FlpStff']
         EdgStff   = EDbld_dict['EdgStff']
-        for BlFracti, PitchAxisi, StrcTwsti, BMassDeni, FlpStffi, EdgStffi in zip(BlFract, PitchAxis, StrcTwst, BMassDen, FlpStff, EdgStff):
-            f.write('{: 2.15e} {: 2.15e} {: 2.15e} {: 2.15e} {: 2.15e} {: 2.15e}\n'.format(BlFracti, PitchAxisi, StrcTwsti, BMassDeni, FlpStffi, EdgStffi))
+        for BlFracti, StrcTwsti, BMassDeni, FlpStffi, EdgStffi in zip(BlFract, StrcTwst, BMassDen, FlpStff, EdgStff):
+            f.write('{: 2.15e} {: 2.15e} {: 2.15e} {: 2.15e} {: 2.15e}\n'.format(BlFracti, StrcTwsti, BMassDeni, FlpStffi, EdgStffi))
         f.write('---------------------- BLADE MODE SHAPES ---------------------------------------\n')
         f.write('{:<22} {:<11} {:}'.format(EDbld_dict['BldFl1Sh'][0], 'BldFl1Sh(2)', '- Flap mode 1, coeff of x^2\n'))
         f.write('{:<22} {:<11} {:}'.format(EDbld_dict['BldFl1Sh'][1], 'BldFl1Sh(3)', '-            , coeff of x^3\n'))
