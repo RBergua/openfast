@@ -348,7 +348,6 @@ typedef   ^        MiscVarType    ^            LP_RHS_LU    {:}           - - "R
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 typedef   ^        MiscVarType    IntKi        LP_indx      {:}           - - "Index vector for LU" -
 typedef   ^        MiscVarType    BD_InputType u             -            - - "Inputs converted to the internal BD coordinate system" -
-typedef   ^        MiscVarType    BD_InputType u2            -            - - "Inputs in the FAST coordinate system, possibly modified by pitch actuator" -
 typedef   ^        MiscVarType    ModJacType   Jac           -            - - "Jacobian matrices and arrays corresponding to module variables"
 typedef   ^        MiscVarType    BD_ContinuousStateType    x_perturb   - - - "" -
 typedef   ^        MiscVarType    BD_ContinuousStateType    dxdt_lin  - - - "" -

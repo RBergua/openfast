@@ -307,7 +307,6 @@ IMPLICIT NONE
     REAL(R8Ki) , DIMENSION(:), ALLOCATABLE  :: LP_RHS_LU      !< Right-hand-side vector for LU [-]
     INTEGER(IntKi) , DIMENSION(:), ALLOCATABLE  :: LP_indx      !< Index vector for LU [-]
     TYPE(BD_InputType)  :: u      !< Inputs converted to the internal BD coordinate system [-]
-    TYPE(BD_InputType)  :: u2      !< Inputs in the FAST coordinate system, possibly modified by pitch actuator [-]
     TYPE(ModJacType)  :: Jac      !< Jacobian matrices and arrays corresponding to module variables [-]
     TYPE(BD_ContinuousStateType)  :: x_perturb      !<  [-]
     TYPE(BD_ContinuousStateType)  :: dxdt_lin      !<  [-]
@@ -2918,9 +2917,6 @@ subroutine BD_CopyMisc(SrcMiscData, DstMiscData, CtrlCode, ErrStat, ErrMsg)
    call BD_CopyInput(SrcMiscData%u, DstMiscData%u, CtrlCode, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (ErrStat >= AbortErrLev) return
-   call BD_CopyInput(SrcMiscData%u2, DstMiscData%u2, CtrlCode, ErrStat2, ErrMsg2)
-   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-   if (ErrStat >= AbortErrLev) return
    call NWTC_Library_CopyModJacType(SrcMiscData%Jac, DstMiscData%Jac, CtrlCode, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (ErrStat >= AbortErrLev) return
@@ -3053,8 +3049,6 @@ subroutine BD_DestroyMisc(MiscData, ErrStat, ErrMsg)
    end if
    call BD_DestroyInput(MiscData%u, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-   call BD_DestroyInput(MiscData%u2, ErrStat2, ErrMsg2)
-   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    call NWTC_Library_DestroyModJacType(MiscData%Jac, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    call BD_DestroyContState(MiscData%x_perturb, ErrStat2, ErrMsg2)
@@ -3111,7 +3105,6 @@ subroutine BD_PackMisc(RF, Indata)
    call RegPackAlloc(RF, InData%LP_RHS_LU)
    call RegPackAlloc(RF, InData%LP_indx)
    call BD_PackInput(RF, InData%u) 
-   call BD_PackInput(RF, InData%u2) 
    call NWTC_Library_PackModJacType(RF, InData%Jac) 
    call BD_PackContState(RF, InData%x_perturb) 
    call BD_PackContState(RF, InData%dxdt_lin) 
@@ -3167,7 +3160,6 @@ subroutine BD_UnPackMisc(RF, OutData)
    call RegUnpackAlloc(RF, OutData%LP_RHS_LU); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%LP_indx); if (RegCheckErr(RF, RoutineName)) return
    call BD_UnpackInput(RF, OutData%u) ! u 
-   call BD_UnpackInput(RF, OutData%u2) ! u2 
    call NWTC_Library_UnpackModJacType(RF, OutData%Jac) ! Jac 
    call BD_UnpackContState(RF, OutData%x_perturb) ! x_perturb 
    call BD_UnpackContState(RF, OutData%dxdt_lin) ! dxdt_lin 

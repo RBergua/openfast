@@ -1667,9 +1667,6 @@ subroutine Init_MiscVars( p, u, y, m, ErrStat, ErrMsg )
    CALL BD_CopyInput(u, m%u, MESH_NEWCOPY, ErrStat2, ErrMsg2)
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-   CALL BD_CopyInput(u, m%u2, MESH_NEWCOPY, ErrStat2, ErrMsg2)
-      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-
    ! compute mapping of applied distributed loads to the root location
    ! NOTE: PtLoads are not handled at present. See comments in BeamDyn_IO.f90 for changes required.
    if (p%CompAppliedLdAtRoot .and. p%BldMotionNodeLoc == BD_MESH_QP) then
@@ -1928,11 +1925,8 @@ SUBROUTINE BD_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg, 
    CALL BD_CopyContState(x, x_tmp, MESH_NEWCOPY, ErrStat2, ErrMsg2)
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-      ! we may change the inputs (u) by applying the pitch actuator, so we will use m%u in this routine
+      ! We need to convert the inputs (u) to BD coordinates, so we will use m%u in this routine
    CALL BD_CopyInput(u, m%u, MESH_UPDATECOPY, ErrStat2, ErrMsg2)
-      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-
-   CALL BD_CopyInput(m%u, m%u2, MESH_UPDATECOPY, ErrStat2, ErrMsg2) ! this is a copy of the inputs before converting to BD coordinates. will use this for computing WriteOutput values.
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
       if (ErrStat >= AbortErrLev) then
@@ -2013,7 +2007,7 @@ SUBROUTINE BD_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg, 
    !  compute RootMxr and RootMyr for ServoDyn and
    !  get values to output to file:
    !-------------------------------------------------------
-   call Calc_WriteOutput( p, AllOuts, y, m, ErrStat2, ErrMsg2, IsFullLin )  !uses m%u2
+   call Calc_WriteOutput( u, p, AllOuts, y, m, ErrStat2, ErrMsg2, IsFullLin )
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
    y%RootMxr = AllOuts( RootMxr )
@@ -2034,7 +2028,7 @@ SUBROUTINE BD_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg, 
          y%WriteOutput(p%NumOuts+1:) = 0.0_ReKi
 
             ! Now we need to populate the blade node outputs here
-          call Calc_WriteBldNdOutput( p, OtherState, m, y, ErrStat2, ErrMsg2 )   ! Call after normal writeoutput.  Will just postpend data on here.
+          call Calc_WriteBldNdOutput( u, p, OtherState, m, y, ErrStat2, ErrMsg2 )   ! Call after normal writeoutput.  Will just postpend data on here.
             CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       ENDIF
    end if

@@ -1676,8 +1676,9 @@ SUBROUTINE BD_ValidateInputData( InitInp, InputFileData, ErrStat, ErrMsg )
 END SUBROUTINE BD_ValidateInputData
 !----------------------------------------------------------------------------------------------------------------------------------
 !> this routine fills the AllOuts array, which is used to send data to the glue code to be written to an output file.
-SUBROUTINE Calc_WriteOutput( p, AllOuts, y, m, ErrStat, ErrMsg, CalcWriteOutput )
+SUBROUTINE Calc_WriteOutput( u, p, AllOuts, y, m, ErrStat, ErrMsg, CalcWriteOutput )
 
+   TYPE(BD_InputType),           INTENT(IN   )  :: u                                 !< Module inputs
    TYPE(BD_ParameterType),       INTENT(IN   )  :: p                                 !< The module parameters
    REAL(ReKi),                   INTENT(INOUT)  :: AllOuts(0:)                       !< array of values to potentially write to file
    TYPE(BD_OutputType),          INTENT(IN   )  :: y                                 !< outputs
@@ -1710,14 +1711,14 @@ SUBROUTINE Calc_WriteOutput( p, AllOuts, y, m, ErrStat, ErrMsg, CalcWriteOutput 
 
       !-------------------------
       ! Reaction forces
-   temp_vec = MATMUL(m%u2%RootMotion%Orientation(:,:,1),y%ReactionForce%Force(:,1))
+   temp_vec = MATMUL(u%RootMotion%Orientation(:,:,1),y%ReactionForce%Force(:,1))
    AllOuts( RootFxr ) = temp_vec(1)
    AllOuts( RootFyr ) = temp_vec(2)
    AllOuts( RootFzr ) = temp_vec(3)
 
       !-------------------------
       ! Reaction moments (these are being computed for ServoDyn output, as well as for WriteOutput)
-   temp_vec = MATMUL(m%u2%RootMotion%Orientation(:,:,1),y%ReactionForce%Moment(:,1))
+   temp_vec = MATMUL(u%RootMotion%Orientation(:,:,1),y%ReactionForce%Moment(:,1))
    AllOuts( RootMxr ) = temp_vec(1)
    AllOuts( RootMyr ) = temp_vec(2)
    AllOuts( RootMzr ) = temp_vec(3)
@@ -1730,15 +1731,15 @@ SUBROUTINE Calc_WriteOutput( p, AllOuts, y, m, ErrStat, ErrMsg, CalcWriteOutput 
 
    
       ! compute the root relative orientation, RootRelOrient, which is used in several calculations below 
-      ! RootRelOrient = matmul( transpose(m%u2%RootMotion%Orientation(:,:,1)), m%u2%RootMotion%RefOrientation(:,:,1))
-   call LAPACK_GEMM('T', 'N', 1.0_BDKi, m%u2%RootMotion%Orientation(:,:,1), m%u2%RootMotion%RefOrientation(:,:,1), 0.0_BDKi, RootRelOrient,   ErrStat2, ErrMsg2 )
+      ! RootRelOrient = matmul( transpose(u%RootMotion%Orientation(:,:,1)), u%RootMotion%RefOrientation(:,:,1))
+   call LAPACK_GEMM('T', 'N', 1.0_BDKi, u%RootMotion%Orientation(:,:,1), u%RootMotion%RefOrientation(:,:,1), 0.0_BDKi, RootRelOrient,   ErrStat2, ErrMsg2 )
    
       !------------------------------------
       ! Tip translational deflection (relative to the undeflected position) expressed in r   
-   d     = y%BldMotion%TranslationDisp(:, y%BldMotion%NNodes) - m%u2%RootMotion%TranslationDisp(:,1)
-   d_ref = y%BldMotion%Position(       :, y%BldMotion%NNodes) - m%u2%RootMotion%Position(       :,1)
+   d     = y%BldMotion%TranslationDisp(:, y%BldMotion%NNodes) - u%RootMotion%TranslationDisp(:,1)
+   d_ref = y%BldMotion%Position(       :, y%BldMotion%NNodes) - u%RootMotion%Position(       :,1)
    temp_vec2 = d + d_ref - matmul( RootRelOrient, d_ref ) ! tip displacement
-   temp_vec = MATMUL(m%u2%RootMotion%Orientation(:,:,1),temp_vec2)
+   temp_vec = MATMUL(u%RootMotion%Orientation(:,:,1),temp_vec2)
       
    AllOuts( TipTDxr ) = temp_vec(1)
    AllOuts( TipTDyr ) = temp_vec(2)
@@ -1751,7 +1752,7 @@ SUBROUTINE Calc_WriteOutput( p, AllOuts, y, m, ErrStat, ErrMsg, CalcWriteOutput 
    call BD_CrvExtractCrv(temp33,temp_vec2, ErrStat2, ErrMsg2) ! temp_vec2 = the Wiener-Milenkovic parameters of the tip angular/rotational defelctions
       CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
       if (ErrStat >= AbortErrLev) return
-   temp_vec = MATMUL(m%u2%RootMotion%Orientation(:,:,1),temp_vec2) ! translate these parameters to the correct system for output
+   temp_vec = MATMUL(u%RootMotion%Orientation(:,:,1),temp_vec2) ! translate these parameters to the correct system for output
    
    AllOuts( TipRDxr ) = temp_vec(1)
    AllOuts( TipRDyr ) = temp_vec(2)
@@ -1821,10 +1822,10 @@ SUBROUTINE Calc_WriteOutput( p, AllOuts, y, m, ErrStat, ErrMsg, CalcWriteOutput 
       
          !------------------------------------
          ! Sectional translational deflection (relative to the undeflected position) expressed in r   
-      d     = y%BldMotion%TranslationDisp(:, j_BldMotion) - m%u2%RootMotion%TranslationDisp(:,1)
-      d_ref = y%BldMotion%Position(       :, j_BldMotion) - m%u2%RootMotion%Position(       :,1)
+      d     = y%BldMotion%TranslationDisp(:, j_BldMotion) - u%RootMotion%TranslationDisp(:,1)
+      d_ref = y%BldMotion%Position(       :, j_BldMotion) - u%RootMotion%Position(       :,1)
       temp_vec2 = d + d_ref - MATMUL( RootRelOrient, d_ref ) ! tip displacement
-      temp_vec = MATMUL(m%u2%RootMotion%Orientation(:,:,1),temp_vec2)
+      temp_vec = MATMUL(u%RootMotion%Orientation(:,:,1),temp_vec2)
       
       AllOuts( NTDr( beta,1 ) ) = temp_vec(1)
       AllOuts( NTDr( beta,2 ) ) = temp_vec(2)
@@ -1837,7 +1838,7 @@ SUBROUTINE Calc_WriteOutput( p, AllOuts, y, m, ErrStat, ErrMsg, CalcWriteOutput 
       call BD_CrvExtractCrv(temp33,temp_vec2, ErrStat2, ErrMsg2) ! temp_vec2 = the Wiener-Milenkovic parameters of the node's angular/rotational defelctions
          CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
          if (ErrStat >= AbortErrLev) return
-      temp_vec = MATMUL(m%u2%RootMotion%Orientation(:,:,1),temp_vec2) ! translate these parameters to the correct system for output
+      temp_vec = MATMUL(u%RootMotion%Orientation(:,:,1),temp_vec2) ! translate these parameters to the correct system for output
             
       AllOuts( NRDr( beta,1 ) ) = temp_vec(1)
       AllOuts( NRDr( beta,2 ) ) = temp_vec(2)
@@ -1875,14 +1876,14 @@ SUBROUTINE Calc_WriteOutput( p, AllOuts, y, m, ErrStat, ErrMsg, CalcWriteOutput 
                                                  !! with the nodes meaning something different) or we need to map the u2%PointLoad like we do for the m%u2%DistrLoad%Force loads.
             !-------------------------
             ! Applied point forces at Node 1 expressed in l, given in N
-         temp_vec = MATMUL(y%BldMotion%Orientation(1:3,1:3,j_BldMotion),m%u2%PointLoad%Force(:,j))
+         temp_vec = MATMUL(y%BldMotion%Orientation(1:3,1:3,j_BldMotion),u%PointLoad%Force(:,j))
          AllOuts( NPFl( beta,1 ) ) = temp_vec(1)
          AllOuts( NPFl( beta,2 ) ) = temp_vec(2)
          AllOuts( NPFl( beta,3 ) ) = temp_vec(3)
 
             !-------------------------
             ! Applied point moments at Node 1 expressed in l, given in N-m
-         temp_vec = MATMUL(y%BldMotion%Orientation(1:3,1:3,j_BldMotion),m%u2%PointLoad%Moment(:,j))
+         temp_vec = MATMUL(y%BldMotion%Orientation(1:3,1:3,j_BldMotion),u%PointLoad%Moment(:,j))
          AllOuts( NPMl( beta,1 ) ) = temp_vec(1)
          AllOuts( NPMl( beta,2 ) ) = temp_vec(2)
          AllOuts( NPMl( beta,3 ) ) = temp_vec(3)
@@ -1903,14 +1904,14 @@ SUBROUTINE Calc_WriteOutput( p, AllOuts, y, m, ErrStat, ErrMsg, CalcWriteOutput 
 
                !-------------------------
                ! Applied distributed forces at Node 1 expressed in l, in N/m
-            temp_vec = MATMUL(y%BldMotion%Orientation(:,:,j_BldMotion), m%u2%DistrLoad%Force( :,j_BldMotion))
+            temp_vec = MATMUL(y%BldMotion%Orientation(:,:,j_BldMotion), u%DistrLoad%Force( :,j_BldMotion))
             AllOuts( NDFl( beta,1 ) ) = temp_vec(1)
             AllOuts( NDFl( beta,2 ) ) = temp_vec(2)
             AllOuts( NDFl( beta,3 ) ) = temp_vec(3)
          
                !-------------------------
                ! Applied distributed moments at Node 1 expressed in l, in N-m/m
-            temp_vec = MATMUL(y%BldMotion%Orientation(:,:,j_BldMotion), m%u2%DistrLoad%Moment(:,j_BldMotion))
+            temp_vec = MATMUL(y%BldMotion%Orientation(:,:,j_BldMotion), u%DistrLoad%Moment(:,j_BldMotion))
             AllOuts( NDMl( beta,1 ) ) = temp_vec(1)
             AllOuts( NDMl( beta,2 ) ) = temp_vec(2)
             AllOuts( NDMl( beta,3 ) ) = temp_vec(3)
@@ -1926,7 +1927,7 @@ SUBROUTINE Calc_WriteOutput( p, AllOuts, y, m, ErrStat, ErrMsg, CalcWriteOutput 
             CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
             ! transfer the input loads to the output nodes for writing output
-         CALL Transfer_Line2_to_Line2( m%u2%DistrLoad, m%u_DistrLoad_at_y, m%Map_u_DistrLoad_to_y, ErrStat2, ErrMsg2, m%y_BldMotion_at_u, y%BldMotion)
+         CALL Transfer_Line2_to_Line2( u%DistrLoad, m%u_DistrLoad_at_y, m%Map_u_DistrLoad_to_y, ErrStat2, ErrMsg2, m%y_BldMotion_at_u, y%BldMotion)
             CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
 
@@ -1969,7 +1970,7 @@ SUBROUTINE Calc_WriteOutput( p, AllOuts, y, m, ErrStat, ErrMsg, CalcWriteOutput 
       associate(RF => m%LoadsAtRoot%Force, RM => m%LoadsAtRoot%Moment)
 
       ! mapping of distributed loads to LoadsAtRoot
-      call Transfer_Line2_to_Point( m%u2%DistrLoad, m%LoadsAtRoot, m%Map_u_DistrLoad_to_R, ErrStat2, ErrMsg2, y%BldMotion, m%u2%RootMotion )
+      call Transfer_Line2_to_Point( u%DistrLoad, m%LoadsAtRoot, m%Map_u_DistrLoad_to_R, ErrStat2, ErrMsg2, y%BldMotion, u%RootMotion )
          call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
       ! Global coords
@@ -1981,11 +1982,11 @@ SUBROUTINE Calc_WriteOutput( p, AllOuts, y, m, ErrStat, ErrMsg, CalcWriteOutput 
       AllOuts( RootAppliedMzg ) = RM(3,1)
 
       ! Root coords
-      temp_vec = MATMUL(m%u2%RootMotion%Orientation(:,:,1),RF(:,1))
+      temp_vec = MATMUL(u%RootMotion%Orientation(:,:,1),RF(:,1))
       AllOuts( RootAppliedFxr ) = temp_vec(1)
       AllOuts( RootAppliedFyr ) = temp_vec(2)
       AllOuts( RootAppliedFzr ) = temp_vec(3)
-      temp_vec = MATMUL(m%u2%RootMotion%Orientation(:,:,1),RM(:,1))
+      temp_vec = MATMUL(u%RootMotion%Orientation(:,:,1),RM(:,1))
       AllOuts( RootAppliedMxr ) = temp_vec(1)
       AllOuts( RootAppliedMyr ) = temp_vec(2)
       AllOuts( RootAppliedMzr ) = temp_vec(3)
