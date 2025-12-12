@@ -438,9 +438,6 @@ SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SE
             p_FAST%BDRotMap(j) = iRot     ! Set this rotor number for this instance
             p_FAST%BDBldMap(j) = k        ! Set this blade number for this instance
 
-            Init%InData_BD%HubPos       = ED%y(iRot)%HubPtMotion%Position(:,1)
-            Init%InData_BD%HubRot       = ED%y(iRot)%HubPtMotion%RefOrientation(:,:,1)
-
             Init%InData_BD%RootName     = TRIM(p_FAST%OutFileRoot)//'.'//TRIM(y_FAST%Module_Abrev(Module_BD))//TRIM(Num2LStr(k))
             Init%InData_BD%InputFile    = p_FAST%BDBldFile(k, iRot)
             Init%InData_BD%GlbPos       = ED%y(iRot)%BladeRootMotion(k)%Position(:,1)          ! {:}    - - "Initial Position Vector of the local blade coordinate system"
@@ -5693,8 +5690,8 @@ SUBROUTINE WrVTK_AllMeshes(p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInfw, HD, SD
          
             !call MeshWrVTK(p_FAST%TurbinePos, BD%Input(1,k)%RootMotion, trim(p_FAST%VTK_OutFileRoot)//'.BD_RootMotion'//trim(Num2LStr(k)), &
             !               y_FAST%VTK_count, p_FAST%VTK_fields, ErrStat2, ErrMsg2, p_FAST%VTK_tWidth )
-            call MeshWrVTK(p_FAST%TurbinePos, BD%Input(INPUT_CURR,k)%HubMotion, trim(p_FAST%VTK_OutFileRoot)//'.BD_HubMotion'//Suffix, &
-                           y_FAST%VTK_count, p_FAST%VTK_fields, ErrStat2, ErrMsg2, p_FAST%VTK_tWidth)
+            !call MeshWrVTK(p_FAST%TurbinePos, BD%Input(INPUT_CURR,k)%HubMotion, trim(p_FAST%VTK_OutFileRoot)//'.BD_HubMotion'//Suffix, &
+            !               y_FAST%VTK_count, p_FAST%VTK_fields, ErrStat2, ErrMsg2, p_FAST%VTK_tWidth)
             if (p_FAST%BD_OutputSibling) then
                call MeshWrVTK(p_FAST%TurbinePos, BD%Input(1,k)%DistrLoad, trim(p_FAST%VTK_OutFileRoot)//'.BD_Blade'//Suffix, &
                               y_FAST%VTK_count, p_FAST%VTK_fields, ErrStat2, ErrMsg2, p_FAST%VTK_tWidth, BD%y(k)%BldMotion)

@@ -1300,44 +1300,6 @@ subroutine Init_u( InitInp, p, OtherState, u, ErrStat, ErrMsg )
    ErrStat = ErrID_None
    ErrMsg  = ""
 
-   !.................................
-   ! u%HubMotion (from ElastoDyn for pitch actuator)
-   !.................................
-
-   CALL MeshCreate( BlankMesh        = u%HubMotion        &
-                   ,IOS              = COMPONENT_INPUT    &
-                   ,NNodes           = 1                  &
-                   , TranslationDisp = .TRUE.             &
-                   , Orientation     = .TRUE.             &
-                   ,ErrStat          = ErrStat2           &
-                   ,ErrMess          = ErrMsg2            )
-      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-      if (ErrStat>=AbortErrLev) return
-
-      ! possible type conversions here:
-   DCM = InitInp%HubRot
-   Pos = InitInp%HubPos
-   CALL MeshPositionNode ( Mesh    = u%HubMotion          &
-                         , INode   = 1                    &
-                         , Pos     = Pos                  &
-                         , ErrStat = ErrStat2             &
-                         , ErrMess = ErrMsg2              &
-                         , Orient  = DCM                  )
-      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-
-   CALL MeshConstructElement ( Mesh = u%HubMotion         &
-                             , Xelement = ELEMENT_POINT   &
-                             , P1       = 1               &
-                             , ErrStat  = ErrStat2        &
-                             , ErrMess  = ErrMsg2         )
-      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-
-   CALL MeshCommit(u%HubMotion, ErrStat2, ErrMsg2)
-      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-
-      ! initial guesses
-   u%HubMotion%TranslationDisp(1:3,1) = 0.0_ReKi
-   u%HubMotion%Orientation(1:3,1:3,1) = InitInp%HubRot
 
    !.................................
    ! u%RootMotion (for coupling with ElastoDyn)
@@ -5842,17 +5804,6 @@ subroutine BD_InitVars(u, p, x, y, m, InitOut, Linearize, ErrStat, ErrMsg)
                       Mesh=u%DistrLoad, &
                       Perturbs=[MaxThrust/(100.0_R8Ki*3.0_R8Ki*u%PointLoad%Nnodes), &  ! FieldForce
                                 MaxTorque/(100.0_R8Ki*3.0_R8Ki*u%PointLoad%Nnodes)])   ! FieldMoment
-
-   ! call MV_AddMeshVar(InitOut%Vars%u, "HubMotion", MotionFields, &
-   !                    DatLoc(BD_u_HubMotion), &
-   !                    Mesh=u%HubMotion, &
-   !                    Flags=VF_NoLin, &
-   !                    Perturbs=[0.2_R8Ki*D2R_D * p%blade_length, &    ! FieldTransDisp
-   !                              0.2_R8Ki*D2R_D, &                     ! FieldOrientation
-   !                              0.2_R8Ki*D2R_D * p%blade_length, &    ! FieldTransVel
-   !                              0.2_R8Ki*D2R_D, &                     ! FieldAngularVel
-   !                              0.2_R8Ki*D2R_D * p%blade_length, &    ! FieldTransAcc
-   !                              0.2_R8Ki*D2R_D])                      ! FieldAngularAcc
 
    !----------------------------------------------------------------------------
    ! Output variables

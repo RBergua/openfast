@@ -30,8 +30,6 @@ typedef   ^         InitInputType R8Ki            GlbRot    {3}{3} - - "Initial 
 typedef   ^         InitInputType R8Ki            RootDisp  {3}    - - "Initial root displacement"
 typedef   ^         InitInputType R8Ki            RootOri   {3}{3} - - "Initial root orientation"
 typedef   ^         InitInputType ReKi            RootVel   {6}    - - "Initial root velocities and angular veolcities"
-typedef   ^         InitInputType ReKi            HubPos    {3}    - - "Initial Hub position vector"
-typedef   ^         InitInputType R8Ki            HubRot    {3}{3} - - "Initial Hub direction cosine matrix"
 typedef   ^         InitInputType Logical         Linearize - .FALSE. - "Flag that tells this module if the glue code wants to linearize." -
 typedef   ^         InitInputType Logical         DynamicSolve - .TRUE. - "Use dynamic solve option.  Set to False for static solving (handled by glue code or driver code)." -
 typedef   ^         InitInputType LOGICAL         CompAeroMaps -   .FALSE. - "flag to determine if BeamDyn is computing aero maps (true) or running a normal simulation (false)"	-
@@ -232,7 +230,7 @@ typedef   ^        ParameterType    LOGICAL     CompAppliedLdAtRoot     -   .FAL
 typedef   ^        InputType  MeshType  RootMotion - - - "contains motion" -
 typedef   ^        InputType  MeshType  PointLoad  - - - "Applied point forces along beam axis" -
 typedef   ^        InputType  MeshType  DistrLoad  - - - "Applied distributed forces along beam axis" -
-typedef   ^        InputType  MeshType  HubMotion  - - - "motion (orientation) at the hub" -
+
 
 # ..... Outputs
 # ...................................................................................................................
