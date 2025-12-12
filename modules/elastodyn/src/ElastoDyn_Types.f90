@@ -78,7 +78,6 @@ IMPLICIT NONE
   TYPE, PUBLIC :: BladeInputData
     INTEGER(IntKi)  :: NBlInpSt = 0_IntKi      !< Number of blade input stations [-]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: BlFract      !< Blade fractional radius for distributed input data [-]
-    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: PitchAx      !< Pitch axis for distributed input data [-]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: StrcTwst      !< Structural twist for distributed input data [radians]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: BMassDen      !< Blade mass density for distributed input data [-]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: FlpStff      !< Blade flap stiffness for distributed input data [-]
@@ -512,7 +511,6 @@ IMPLICIT NONE
     REAL(ReKi)  :: TFrlMom = 0.0_ReKi      !< The total tail-furl spring and damper moment [-]
     REAL(ReKi)  :: RFrlMom = 0.0_ReKi      !< The total rotor-furl spring and damper moment [-]
     REAL(ReKi)  :: GBoxEffFac = 0.0_ReKi      !< The factor used to apply the gearbox efficiency effects to the equation associated with the generator DOF [-]
-    REAL(ReKi) , DIMENSION(:,:,:), ALLOCATABLE  :: rSAerCen      !< aerodynamic pitching moment arm (i.e., the position vector from point S on the blade to the aerodynamic center of the element) [-]
     REAL(ReKi)  :: YawFriMom = 0.0_ReKi      !< Yaw Friction Moment [kN-m]
   END TYPE ED_RtHndSide
 ! =======================
@@ -687,7 +685,6 @@ IMPLICIT NONE
     REAL(ReKi)  :: TwrTpMass = 0.0_ReKi      !< Tower-top mass (rotor + nacelle) [-]
     REAL(ReKi)  :: YawBrMass = 0.0_ReKi      !< Yaw bearing mass [-]
     REAL(ReKi)  :: Gravity = 0.0_ReKi      !< Gravitational acceleration [m/s^2]
-    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: PitchAxis      !< Pitch axis for analysis nodes [-]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: AeroTwst      !< Aerodynamic twist of the blade at the analysis nodes [-]
     REAL(ReKi) , DIMENSION(:,:,:,:), ALLOCATABLE  :: AxRedBld      !< The axial-reduction terms of the blade shape function [-]
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: BldEDamp      !< Blade edgewise damping coefficients [-]
@@ -705,8 +702,6 @@ IMPLICIT NONE
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: MassB      !< Interpolated lineal blade mass density [-]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: RNodes      !< Radius to analysis nodes relative to hub ( 0 < RNodes(:) < BldFlexL ) [-]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: RNodesNorm      !< Normalized radius to analysis nodes relative to hub ( 0 < RNodesNorm(:) < 1 ) [-]
-    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: rSAerCenn1      !< Distance from point S on a blade to the aerodynamic center in the n1 direction (m) [-]
-    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: rSAerCenn2      !< Distance from point S on a blade to the aerodynamic center in the n2 direction (m) [-]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: SAeroTwst      !< Sine of the aerodynamic twist of the blade at the analysis nodes [-]
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: StiffBE      !< Interpolated edgewise blade stiffness [-]
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: StiffBF      !< Interpolated flapwise blade stiffness [-]
@@ -1202,18 +1197,6 @@ subroutine ED_CopyBladeInputData(SrcBladeInputDataData, DstBladeInputDataData, C
       end if
       DstBladeInputDataData%BlFract = SrcBladeInputDataData%BlFract
    end if
-   if (allocated(SrcBladeInputDataData%PitchAx)) then
-      LB(1:1) = lbound(SrcBladeInputDataData%PitchAx)
-      UB(1:1) = ubound(SrcBladeInputDataData%PitchAx)
-      if (.not. allocated(DstBladeInputDataData%PitchAx)) then
-         allocate(DstBladeInputDataData%PitchAx(LB(1):UB(1)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstBladeInputDataData%PitchAx.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstBladeInputDataData%PitchAx = SrcBladeInputDataData%PitchAx
-   end if
    if (allocated(SrcBladeInputDataData%StrcTwst)) then
       LB(1:1) = lbound(SrcBladeInputDataData%StrcTwst)
       UB(1:1) = ubound(SrcBladeInputDataData%StrcTwst)
@@ -1313,9 +1296,6 @@ subroutine ED_DestroyBladeInputData(BladeInputDataData, ErrStat, ErrMsg)
    if (allocated(BladeInputDataData%BlFract)) then
       deallocate(BladeInputDataData%BlFract)
    end if
-   if (allocated(BladeInputDataData%PitchAx)) then
-      deallocate(BladeInputDataData%PitchAx)
-   end if
    if (allocated(BladeInputDataData%StrcTwst)) then
       deallocate(BladeInputDataData%StrcTwst)
    end if
@@ -1346,7 +1326,6 @@ subroutine ED_PackBladeInputData(RF, Indata)
    if (RF%ErrStat >= AbortErrLev) return
    call RegPack(RF, InData%NBlInpSt)
    call RegPackAlloc(RF, InData%BlFract)
-   call RegPackAlloc(RF, InData%PitchAx)
    call RegPackAlloc(RF, InData%StrcTwst)
    call RegPackAlloc(RF, InData%BMassDen)
    call RegPackAlloc(RF, InData%FlpStff)
@@ -1370,7 +1349,6 @@ subroutine ED_UnPackBladeInputData(RF, OutData)
    if (RF%ErrStat /= ErrID_None) return
    call RegUnpack(RF, OutData%NBlInpSt); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%BlFract); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%PitchAx); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%StrcTwst); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%BMassDen); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%FlpStff); if (RegCheckErr(RF, RoutineName)) return
@@ -4066,18 +4044,6 @@ subroutine ED_CopyRtHndSide(SrcRtHndSideData, DstRtHndSideData, CtrlCode, ErrSta
    DstRtHndSideData%TFrlMom = SrcRtHndSideData%TFrlMom
    DstRtHndSideData%RFrlMom = SrcRtHndSideData%RFrlMom
    DstRtHndSideData%GBoxEffFac = SrcRtHndSideData%GBoxEffFac
-   if (allocated(SrcRtHndSideData%rSAerCen)) then
-      LB(1:3) = lbound(SrcRtHndSideData%rSAerCen)
-      UB(1:3) = ubound(SrcRtHndSideData%rSAerCen)
-      if (.not. allocated(DstRtHndSideData%rSAerCen)) then
-         allocate(DstRtHndSideData%rSAerCen(LB(1):UB(1),LB(2):UB(2),LB(3):UB(3)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstRtHndSideData%rSAerCen.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstRtHndSideData%rSAerCen = SrcRtHndSideData%rSAerCen
-   end if
    DstRtHndSideData%YawFriMom = SrcRtHndSideData%YawFriMom
 end subroutine
 
@@ -4292,9 +4258,6 @@ subroutine ED_DestroyRtHndSide(RtHndSideData, ErrStat, ErrMsg)
    if (allocated(RtHndSideData%PMomXAll)) then
       deallocate(RtHndSideData%PMomXAll)
    end if
-   if (allocated(RtHndSideData%rSAerCen)) then
-      deallocate(RtHndSideData%rSAerCen)
-   end if
 end subroutine
 
 subroutine ED_PackRtHndSide(RF, Indata)
@@ -4444,7 +4407,6 @@ subroutine ED_PackRtHndSide(RF, Indata)
    call RegPack(RF, InData%TFrlMom)
    call RegPack(RF, InData%RFrlMom)
    call RegPack(RF, InData%GBoxEffFac)
-   call RegPackAlloc(RF, InData%rSAerCen)
    call RegPack(RF, InData%YawFriMom)
    if (RegCheckErr(RF, RoutineName)) return
 end subroutine
@@ -4599,7 +4561,6 @@ subroutine ED_UnPackRtHndSide(RF, OutData)
    call RegUnpack(RF, OutData%TFrlMom); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%RFrlMom); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%GBoxEffFac); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%rSAerCen); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%YawFriMom); if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
@@ -5279,18 +5240,6 @@ subroutine ED_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg)
    DstParamData%TwrTpMass = SrcParamData%TwrTpMass
    DstParamData%YawBrMass = SrcParamData%YawBrMass
    DstParamData%Gravity = SrcParamData%Gravity
-   if (allocated(SrcParamData%PitchAxis)) then
-      LB(1:2) = lbound(SrcParamData%PitchAxis)
-      UB(1:2) = ubound(SrcParamData%PitchAxis)
-      if (.not. allocated(DstParamData%PitchAxis)) then
-         allocate(DstParamData%PitchAxis(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstParamData%PitchAxis.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstParamData%PitchAxis = SrcParamData%PitchAxis
-   end if
    if (allocated(SrcParamData%AeroTwst)) then
       LB(1:1) = lbound(SrcParamData%AeroTwst)
       UB(1:1) = ubound(SrcParamData%AeroTwst)
@@ -5483,30 +5432,6 @@ subroutine ED_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg)
          end if
       end if
       DstParamData%RNodesNorm = SrcParamData%RNodesNorm
-   end if
-   if (allocated(SrcParamData%rSAerCenn1)) then
-      LB(1:2) = lbound(SrcParamData%rSAerCenn1)
-      UB(1:2) = ubound(SrcParamData%rSAerCenn1)
-      if (.not. allocated(DstParamData%rSAerCenn1)) then
-         allocate(DstParamData%rSAerCenn1(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstParamData%rSAerCenn1.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstParamData%rSAerCenn1 = SrcParamData%rSAerCenn1
-   end if
-   if (allocated(SrcParamData%rSAerCenn2)) then
-      LB(1:2) = lbound(SrcParamData%rSAerCenn2)
-      UB(1:2) = ubound(SrcParamData%rSAerCenn2)
-      if (.not. allocated(DstParamData%rSAerCenn2)) then
-         allocate(DstParamData%rSAerCenn2(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstParamData%rSAerCenn2.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstParamData%rSAerCenn2 = SrcParamData%rSAerCenn2
    end if
    if (allocated(SrcParamData%SAeroTwst)) then
       LB(1:1) = lbound(SrcParamData%SAeroTwst)
@@ -5873,9 +5798,6 @@ subroutine ED_DestroyParam(ParamData, ErrStat, ErrMsg)
    if (allocated(ParamData%PitchIner)) then
       deallocate(ParamData%PitchIner)
    end if
-   if (allocated(ParamData%PitchAxis)) then
-      deallocate(ParamData%PitchAxis)
-   end if
    if (allocated(ParamData%AeroTwst)) then
       deallocate(ParamData%AeroTwst)
    end if
@@ -5923,12 +5845,6 @@ subroutine ED_DestroyParam(ParamData, ErrStat, ErrMsg)
    end if
    if (allocated(ParamData%RNodesNorm)) then
       deallocate(ParamData%RNodesNorm)
-   end if
-   if (allocated(ParamData%rSAerCenn1)) then
-      deallocate(ParamData%rSAerCenn1)
-   end if
-   if (allocated(ParamData%rSAerCenn2)) then
-      deallocate(ParamData%rSAerCenn2)
    end if
    if (allocated(ParamData%SAeroTwst)) then
       deallocate(ParamData%SAeroTwst)
@@ -6142,7 +6058,6 @@ subroutine ED_PackParam(RF, Indata)
    call RegPack(RF, InData%TwrTpMass)
    call RegPack(RF, InData%YawBrMass)
    call RegPack(RF, InData%Gravity)
-   call RegPackAlloc(RF, InData%PitchAxis)
    call RegPackAlloc(RF, InData%AeroTwst)
    call RegPackAlloc(RF, InData%AxRedBld)
    call RegPackAlloc(RF, InData%BldEDamp)
@@ -6160,8 +6075,6 @@ subroutine ED_PackParam(RF, Indata)
    call RegPackAlloc(RF, InData%MassB)
    call RegPackAlloc(RF, InData%RNodes)
    call RegPackAlloc(RF, InData%RNodesNorm)
-   call RegPackAlloc(RF, InData%rSAerCenn1)
-   call RegPackAlloc(RF, InData%rSAerCenn2)
    call RegPackAlloc(RF, InData%SAeroTwst)
    call RegPackAlloc(RF, InData%StiffBE)
    call RegPackAlloc(RF, InData%StiffBF)
@@ -6416,7 +6329,6 @@ subroutine ED_UnPackParam(RF, OutData)
    call RegUnpack(RF, OutData%TwrTpMass); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%YawBrMass); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%Gravity); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%PitchAxis); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%AeroTwst); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%AxRedBld); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%BldEDamp); if (RegCheckErr(RF, RoutineName)) return
@@ -6434,8 +6346,6 @@ subroutine ED_UnPackParam(RF, OutData)
    call RegUnpackAlloc(RF, OutData%MassB); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%RNodes); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%RNodesNorm); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%rSAerCenn1); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%rSAerCenn2); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%SAeroTwst); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%StiffBE); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%StiffBF); if (RegCheckErr(RF, RoutineName)) return
