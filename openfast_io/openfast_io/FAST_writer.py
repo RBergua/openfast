@@ -631,16 +631,15 @@ class InputWriter_OpenFAST(object):
         f.write('{:<22} {:<11} {:}'.format(EDbld_dict['AdjFlSt'], 'AdjFlSt', '- Factor to adjust blade flap stiffness (-)\n'))
         f.write('{:<22} {:<11} {:}'.format(EDbld_dict['AdjEdSt'], 'AdjEdSt', '- Factor to adjust blade edge stiffness (-)\n'))
         f.write('---------------------- DISTRIBUTED BLADE PROPERTIES ----------------------------\n')
-        f.write('    BlFract      PitchAxis      StrcTwst       BMassDen        FlpStff        EdgStff\n')
-        f.write('      (-)           (-)          (deg)          (kg/m)         (Nm^2)         (Nm^2)\n')
+        f.write('    BlFract      StrcTwst       BMassDen        FlpStff        EdgStff\n')
+        f.write('      (-)         (deg)          (kg/m)         (Nm^2)         (Nm^2)\n')
         BlFract   = EDbld_dict['BlFract']
-        PitchAxis = EDbld_dict['PitchAxis']
         StrcTwst  = EDbld_dict['StrcTwst']
         BMassDen  = EDbld_dict['BMassDen']
         FlpStff   = EDbld_dict['FlpStff']
         EdgStff   = EDbld_dict['EdgStff']
-        for BlFracti, PitchAxisi, StrcTwsti, BMassDeni, FlpStffi, EdgStffi in zip(BlFract, PitchAxis, StrcTwst, BMassDen, FlpStff, EdgStff):
-            f.write('{: 2.15e} {: 2.15e} {: 2.15e} {: 2.15e} {: 2.15e} {: 2.15e}\n'.format(BlFracti, PitchAxisi, StrcTwsti, BMassDeni, FlpStffi, EdgStffi))
+        for BlFracti, StrcTwsti, BMassDeni, FlpStffi, EdgStffi in zip(BlFract, StrcTwst, BMassDen, FlpStff, EdgStff):
+            f.write('{: 2.15e} {: 2.15e} {: 2.15e} {: 2.15e} {: 2.15e}\n'.format(BlFracti, StrcTwsti, BMassDeni, FlpStffi, EdgStffi))
         f.write('---------------------- BLADE MODE SHAPES ---------------------------------------\n')
         f.write('{:<22} {:<11} {:}'.format(EDbld_dict['BldFl1Sh'][0], 'BldFl1Sh(2)', '- Flap mode 1, coeff of x^2\n'))
         f.write('{:<22} {:<11} {:}'.format(EDbld_dict['BldFl1Sh'][1], 'BldFl1Sh(3)', '-            , coeff of x^3\n'))
@@ -775,11 +774,6 @@ class InputWriter_OpenFAST(object):
         f.write('{:<22d} {:<11} {:}'.format(bd_dict['order_elem'], 'order_elem', '- Order of interpolation (basis) function (-)\n'))
         f.write('---------------------- MATERIAL PARAMETER --------------------------------------\n')
         f.write('{:<22} {:<11} {:}'.format('"'+bd_dict['BldFile']+'"', 'BldFile', '- Name of file containing properties for blade (quoted string)\n'))
-        f.write('---------------------- PITCH ACTUATOR PARAMETERS -------------------------------\n')
-        f.write('{!s:<22} {:<11} {:}'.format(bd_dict['UsePitchAct'], 'UsePitchAct', '- Whether a pitch actuator should be used (flag)\n'))
-        f.write('{:<22} {:<11} {:}'.format(bd_dict['PitchJ'], 'PitchJ', '- Pitch actuator inertia (kg-m^2) [used only when UsePitchAct is true]\n'))
-        f.write('{:<22} {:<11} {:}'.format(bd_dict['PitchK'], 'PitchK', '- Pitch actuator stiffness (kg-m^2/s^2) [used only when UsePitchAct is true]\n'))
-        f.write('{:<22} {:<11} {:}'.format(bd_dict['PitchC'], 'PitchC', '- Pitch actuator damping (kg-m^2/s) [used only when UsePitchAct is true]\n'))
         f.write('---------------------- OUTPUTS -------------------------------------------------\n')
         f.write('{!s:<22} {:<11} {:}'.format(bd_dict['SumPrint'], 'SumPrint', '- Print summary data to "<RootName>.sum" (flag)\n'))
         f.write('{:<22} {:<11} {:}'.format('"'+bd_dict['OutFmt']+'"', 'OutFmt', '- Format used for text tabular output, excluding the time channel.\n'))

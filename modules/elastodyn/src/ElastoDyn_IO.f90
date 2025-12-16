@@ -1789,20 +1789,7 @@ SUBROUTINE ReadBladeFile ( BldFile, BladeKInputFileData, UnEc, ErrStat, ErrMsg )
    call ParseCom( InFileInfo, CurLine, TmpComment, ErrStat2, ErrMsg2, UnEc ); if (Failed()) return;   ! Separator
    call ParseCom( InFileInfo, CurLine, TmpComment, ErrStat2, ErrMsg2, UnEc ); if (Failed()) return;   ! Col Names
    call ParseCom( InFileInfo, CurLine, TmpComment, ErrStat2, ErrMsg2, UnEc ); if (Failed()) return;   ! Col Units
-
-   ! The table may contain 6 columns if it includes PitchAxis (older format), otherwise it should only contain 5 columns
-   ! Attempt to read 6 columns:
-   call ParseAry( InFileInfo, CurLine, 'Blade input station table', TmpRAry, 6, ErrStat2, ErrMsg2)   ! Don't write to echo
-
-!FIXME: remove the deprecated format at some point in the future!!!
-   ! 6 Columns -- deprecated format
-   if (ErrStat2 == ErrID_None) then    ! contains PitchAxis input
-      CurLine = CurLine - 1   ! Backup one line to read entire table
-      call ParseTable6Col(ErrStat2, ErrMsg2); if (Failed()) return;
-   else                                ! no PitchAxis input
-      ! NOTE: don't backup a line as a failed ParesAry above won't increment the current line
-      call ParseTable5Col(ErrStat2, ErrMsg2); if (Failed()) return;
-   endif
+   call ParseTable5Col(ErrStat2, ErrMsg2); if (Failed()) return;
 
    !  -------------- BLADE MODE SHAPES --------------------------------------------
    ! NOTE: there is no coefficient for mode 0, so starts at BldFl1Sh(2), hence using (i+1)
@@ -1853,25 +1840,6 @@ CONTAINS
          BladeKInputFileData%FlpStff( I) = TmpRAry(4)*AdjFlSt  ! Apply the correction factors to the elemental data.
          BladeKInputFileData%EdgStff( I) = TmpRAry(5)*AdjEdSt  ! Apply the correction factors to the elemental data.
       enddo
-   end subroutine
-   subroutine ParseTable6Col(ErrStat3, ErrMsg3)
-      integer(IntKi),       intent(out) :: ErrStat3
-      character(ErrMsgLen), intent(out) :: ErrMsg3
-      integer(IntKi),       parameter   :: NInputCols = 6
-      do I=1,BladeKInputFileData%NBlInpSt
-         call ParseAry( InFileInfo, CurLine, 'Blade input station table', TmpRAry, NInputCols, ErrStat3, ErrMsg3, UnEc)
-         if (ErrStat3 >= AbortErrLev) return;
-         BladeKInputFileData%BlFract( I) = TmpRAry(1)
-         BladeKInputFileData%PitchAx( I) = TmpRAry(2)
-         BladeKInputFileData%StrcTwst(I) = TmpRAry(3)*D2R      ! Input in degrees; converted to radians here
-         BladeKInputFileData%BMassDen(I) = TmpRAry(4)*AdjBlMs  ! Apply the correction factors to the elemental data.
-         BladeKInputFileData%FlpStff( I) = TmpRAry(5)*AdjFlSt  ! Apply the correction factors to the elemental data.
-         BladeKInputFileData%EdgStff( I) = TmpRAry(6)*AdjEdSt  ! Apply the correction factors to the elemental data.
-      enddo
-      ! Set warning that this is a depricated format (grab filename corresponding to the main blade file in case the table is separate)
-      ErrStat3 = ErrID_Warn
-      ErrMsg3  = "The ElastoDyn Blade file, "//trim(InFileInfo%FileList(1))//   &
-                 ", DISTRIBUTED BLADE PROPERTIES table contains the PitchAxis column.  This column is unused and will be removed in future releases"
    end subroutine
    !> write out the blade file contents to screen (use in debugging only)
    subroutine PrintBladeFileContents()
@@ -3805,8 +3773,6 @@ SUBROUTINE Alloc_BladeInputProperties( BladeKInputFileData, ErrStat, ErrMsg )
 
    CALL AllocAry  ( BladeKInputFileData%BlFract,  BladeKInputFileData%NBlInpSt, 'BlFract'  , ErrStat, ErrMsg )
    IF ( ErrStat /= ErrID_None ) RETURN
-   CALL AllocAry  ( BladeKInputFileData%PitchAx,  BladeKInputFileData%NBlInpSt, 'PitchAx'  , ErrStat, ErrMsg )
-   IF ( ErrStat /= ErrID_None ) RETURN
    CALL AllocAry  ( BladeKInputFileData%StrcTwst, BladeKInputFileData%NBlInpSt, 'StrcTwst' , ErrStat, ErrMsg )
    IF ( ErrStat /= ErrID_None ) RETURN
    CALL AllocAry  ( BladeKInputFileData%BMassDen, BladeKInputFileData%NBlInpSt, 'BMassDen' , ErrStat, ErrMsg )
@@ -3932,11 +3898,6 @@ SUBROUTINE ValidateBladeData ( BladeKInputFileData, ErrStat, ErrMsg )
 
 
    DO I = 1,BladeKInputFileData%NBlInpSt
-
-         ! Check that PitchAx is contained in [0.0, 1.0]:
-      IF ( ( BladeKInputFileData%PitchAx(I) ) < 0.0_ReKi .OR. ( BladeKInputFileData%PitchAx(I) > 1.0_ReKi ) )  THEN
-         CALL SetErrStat( ErrID_Fatal,'PitchAx('//TRIM( Num2LStr( I ) )//') must be between 0 and 1 (inclusive).',ErrStat,ErrMsg,RoutineName)
-      END IF
 
          ! Check that StrcTwst is contained in (-pi,pi] radians ( i.e., (-180.0, 180.0] degrees):
       IF ( ( BladeKInputFileData%StrcTwst(I) <= -pi ) .OR. ( BladeKInputFileData%StrcTwst(I) > pi ) )  THEN

@@ -90,9 +90,7 @@ SUBROUTINE BD_Init( InitInp, u, p, x, xd, z, OtherState, y, MiscVar, Interval, I
 
    ! local variables
    TYPE(BD_InputFile)      :: InputFileData     ! Data stored in the module's input file
-   REAL(BDKi)              :: temp_CRV(3)
    REAL(BDKi),ALLOCATABLE  :: GLL_nodes(:)
-   REAL(BDKi)              :: TmpDCM(3,3)
    LOGICAL                 :: QuasiStaticInitialized      !< True if quasi-static solution was found
 
 
@@ -159,17 +157,6 @@ SUBROUTINE BD_Init( InitInp, u, p, x, xd, z, OtherState, y, MiscVar, Interval, I
       
       ! compute blade mass, CG, and IN for summary file:
    CALL BD_ComputeBladeMassNew( p, ErrStat2, ErrMsg2 ); if (Failed()) return !computes p%blade_mass,p%blade_CG,p%blade_IN
-
-
-   if (p%UsePitchAct) then
-
-         ! Calculate the pitch angle
-      TmpDCM(:,:) = MATMUL(u%RootMotion%Orientation(:,:,1),TRANSPOSE(u%HubMotion%Orientation(:,:,1)))
-      temp_CRV(:) = EulerExtract(TmpDCM)
-      xd%thetaP = -temp_CRV(3)
-      xd%thetaPD = 0.0_BDKi
-   end if
-
 
       ! Define and initialize system inputs (set up and initialize input meshes) here:
    call Init_u(InitInp, p, OtherState, u, ErrStat2, ErrMsg2); if (Failed()) return
@@ -889,7 +876,6 @@ subroutine SetParameters(InitInp, InputFileData, p, OtherState, ErrStat, ErrMsg)
    INTEGER(IntKi)                               :: i, j              ! generic counter index
    INTEGER(IntKi)                               :: indx              ! counter into index array (p%NdIndx)
    INTEGER(IntKi)                               :: nUniqueQP         ! number of unique quadrature points (not double-counting nodes at element boundaries)
-   REAL(BDKi)                                   :: denom
    integer(intKi)                               :: ErrStat2          ! temporary Error status
    character(ErrMsgLen)                         :: ErrMsg2           ! temporary Error message
    character(*), parameter                      :: RoutineName = 'SetParameters'
@@ -1119,31 +1105,6 @@ subroutine SetParameters(InitInp, InputFileData, p, OtherState, ErrStat, ErrMsg)
    p%beta       = InputFileData%InpBl%beta
 
    !...............................................
-   ! set parameters for pitch actuator:
-   !...............................................
-
-      ! Actuator
-   p%UsePitchAct = InputFileData%UsePitchAct
-   if (p%UsePitchAct) then
-      p%pitchK = InputFileData%pitchK
-      p%pitchC = InputFileData%pitchC
-      p%pitchJ = InputFileData%pitchJ
-
-         ! calculate (I-hA)^-1
-      p%torqM(1,1) =  p%pitchJ + p%pitchC*p%dt
-      p%torqM(2,1) = -p%pitchK * p%dt
-      p%torqM(1,2) =  p%pitchJ * p%dt
-      p%torqM(2,2) =  p%pitchJ
-      denom        =  p%pitchJ + p%pitchC*p%dt + p%pitchK*p%dt**2
-      if (EqualRealNos(denom,0.0_BDKi)) then
-         call SetErrStat(ErrID_Fatal, "Cannot invert matrix for pitch actuator: J+c*dt+k*dt^2 is zero.", ErrStat, ErrMsg, RoutineName)
-         return
-      else
-         p%torqM(:,:) =  p%torqM / denom
-      end if
-   end if
-
-   !...............................................
    ! set parameters for File I/O data:
    !...............................................
    p%OutFmt    = InputFileData%OutFmt
@@ -1154,7 +1115,7 @@ subroutine SetParameters(InitInp, InputFileData, p, OtherState, ErrStat, ErrMsg)
 
    p%OutInputs = .false.  ! will get set to true in SetOutParam if we request the inputs as output values
 
-   call SetOutParam(InputFileData%OutList, p, ErrStat2, ErrMsg2 ) ! requires: p%NumOuts, p%NNodeOuts, p%UsePitchAct; sets: p%OutParam.
+   call SetOutParam(InputFileData%OutList, p, ErrStat2, ErrMsg2 ) ! requires: p%NumOuts, p%NNodeOuts; sets: p%OutParam.
       call setErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
       if (ErrStat >= AbortErrLev) return
 
@@ -1339,44 +1300,6 @@ subroutine Init_u( InitInp, p, OtherState, u, ErrStat, ErrMsg )
    ErrStat = ErrID_None
    ErrMsg  = ""
 
-   !.................................
-   ! u%HubMotion (from ElastoDyn for pitch actuator)
-   !.................................
-
-   CALL MeshCreate( BlankMesh        = u%HubMotion        &
-                   ,IOS              = COMPONENT_INPUT    &
-                   ,NNodes           = 1                  &
-                   , TranslationDisp = .TRUE.             &
-                   , Orientation     = .TRUE.             &
-                   ,ErrStat          = ErrStat2           &
-                   ,ErrMess          = ErrMsg2            )
-      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-      if (ErrStat>=AbortErrLev) return
-
-      ! possible type conversions here:
-   DCM = InitInp%HubRot
-   Pos = InitInp%HubPos
-   CALL MeshPositionNode ( Mesh    = u%HubMotion          &
-                         , INode   = 1                    &
-                         , Pos     = Pos                  &
-                         , ErrStat = ErrStat2             &
-                         , ErrMess = ErrMsg2              &
-                         , Orient  = DCM                  )
-      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-
-   CALL MeshConstructElement ( Mesh = u%HubMotion         &
-                             , Xelement = ELEMENT_POINT   &
-                             , P1       = 1               &
-                             , ErrStat  = ErrStat2        &
-                             , ErrMess  = ErrMsg2         )
-      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-
-   CALL MeshCommit(u%HubMotion, ErrStat2, ErrMsg2)
-      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-
-      ! initial guesses
-   u%HubMotion%TranslationDisp(1:3,1) = 0.0_ReKi
-   u%HubMotion%Orientation(1:3,1:3,1) = InitInp%HubRot
 
    !.................................
    ! u%RootMotion (for coupling with ElastoDyn)
@@ -1744,9 +1667,6 @@ subroutine Init_MiscVars( p, u, y, m, ErrStat, ErrMsg )
    CALL BD_CopyInput(u, m%u, MESH_NEWCOPY, ErrStat2, ErrMsg2)
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-   CALL BD_CopyInput(u, m%u2, MESH_NEWCOPY, ErrStat2, ErrMsg2)
-      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-
    ! compute mapping of applied distributed loads to the root location
    ! NOTE: PtLoads are not handled at present. See comments in BeamDyn_IO.f90 for changes required.
    if (p%CompAppliedLdAtRoot .and. p%BldMotionNodeLoc == BD_MESH_QP) then
@@ -2005,26 +1925,14 @@ SUBROUTINE BD_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg, 
    CALL BD_CopyContState(x, x_tmp, MESH_NEWCOPY, ErrStat2, ErrMsg2)
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-      ! we may change the inputs (u) by applying the pitch actuator, so we will use m%u in this routine
+      ! We need to convert the inputs (u) to BD coordinates, so we will use m%u in this routine
    CALL BD_CopyInput(u, m%u, MESH_UPDATECOPY, ErrStat2, ErrMsg2)
-      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-
-   ! Actuator
-   IF( p%UsePitchAct ) THEN
-       CALL PitchActuator_SetBC(p, m%u, xd, AllOuts)
-   ENDIF
-   ! END Actuator
-
-
-   CALL BD_CopyInput(m%u, m%u2, MESH_UPDATECOPY, ErrStat2, ErrMsg2) ! this is a copy of the inputs after the pitch actuator has been applied, but before converting to BD coordinates. will use this for computing WriteOutput values.
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
       if (ErrStat >= AbortErrLev) then
          call cleanup()
          return
       end if
-
-
 
       ! We are trying to use quasistatic solve with loads, but do not know the input loads during initialization (no mesh yet).
       ! So, we need to rerun the solve routine to set the states at T=0 for the outputs to make sense.
@@ -2093,13 +2001,13 @@ SUBROUTINE BD_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg, 
 
 
        ! set y%BldMotion fields:
-   CALL Set_BldMotion_Mesh( p, m%u2, x_tmp, OtherState, m, y)
+   CALL Set_BldMotion_Mesh( p, u, x_tmp, OtherState, m, y)
 
    !-------------------------------------------------------
    !  compute RootMxr and RootMyr for ServoDyn and
    !  get values to output to file:
    !-------------------------------------------------------
-   call Calc_WriteOutput( p, AllOuts, y, m, ErrStat2, ErrMsg2, IsFullLin )  !uses m%u2
+   call Calc_WriteOutput( u, p, AllOuts, y, m, ErrStat2, ErrMsg2, IsFullLin )
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
    y%RootMxr = AllOuts( RootMxr )
@@ -2120,7 +2028,7 @@ SUBROUTINE BD_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg, 
          y%WriteOutput(p%NumOuts+1:) = 0.0_ReKi
 
             ! Now we need to populate the blade node outputs here
-          call Calc_WriteBldNdOutput( p, OtherState, m, y, ErrStat2, ErrMsg2 )   ! Call after normal writeoutput.  Will just postpend data on here.
+          call Calc_WriteBldNdOutput( u, p, OtherState, m, y, ErrStat2, ErrMsg2 )   ! Call after normal writeoutput.  Will just postpend data on here.
             CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       ENDIF
    end if
@@ -2167,12 +2075,6 @@ SUBROUTINE BD_CalcContStateDeriv( t, u, p, x, xd, z, OtherState, m, dxdt, ErrSta
    CALL BD_CopyInput(u, m%u, MESH_UPDATECOPY, ErrStat2, ErrMsg2)
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       if (ErrStat >= AbortErrLev) return
-
-   ! Actuator
-   !!!IF( p%UsePitchAct ) THEN
-   !!!    CALL PitchActuator_SetBC(p, m%u, xd, AllOuts)
-   !!!ENDIF
-   ! END Actuator
 
       ! convert to BD coordinates and apply boundary conditions 
    CALL BD_InputGlobalLocal(p,OtherState,m%u)
@@ -2236,9 +2138,6 @@ SUBROUTINE BD_UpdateDiscState( t, n, u, p, x, xd, z, OtherState, m, ErrStat, Err
    CHARACTER(*),                      INTENT(  OUT)  :: ErrMsg      !< Error message if ErrStat /= ErrID_None
 
    ! local variables
-   REAL(BDKi)                                        :: temp_R(3,3)
-   REAL(BDKi)                                        :: Hub_theta_Root(3)
-   REAL(BDKi)                                        :: u_theta_pitch
 
       ! Initialize ErrStat
 
@@ -2246,20 +2145,6 @@ SUBROUTINE BD_UpdateDiscState( t, n, u, p, x, xd, z, OtherState, m, ErrStat, Err
       ErrMsg  = ""
 
       ! Update discrete states here:
-
-! Actuator
-   IF( p%UsePitchAct ) THEN
-      !bjj: note that we've cheated a bit here because we have inputs at t+dt
-       temp_R = MATMUL(u%RootMotion%Orientation(:,:,1),TRANSPOSE(u%HubMotion%Orientation(:,:,1)))
-       Hub_theta_Root = EulerExtract(temp_R)
-       u_theta_pitch = -Hub_theta_Root(3)
-
-       xd%thetaP  = p%torqM(1,1)*xd%thetaP + p%torqM(1,2)*xd%thetaPD + p%torqM(1,2)*(p%pitchK*p%dt/p%pitchJ)*(-Hub_theta_Root(3))
-       xd%thetaPD = p%torqM(2,1)*xd%thetaP + p%torqM(2,2)*xd%thetaPD + p%torqM(2,2)*(p%pitchK*p%dt/p%pitchJ)*(-Hub_theta_Root(3))
-
-
-   ENDIF
-! END Actuator
 
 END SUBROUTINE BD_UpdateDiscState
 
@@ -4573,14 +4458,6 @@ SUBROUTINE BD_GA2(t,n,u,utimes,p,x,xd,z,OtherState,m,ErrStat,ErrMsg)
    call BD_Input_extrapinterp( u, utimes, u_interp, t+p%dt, ErrStat2, ErrMsg2 )
       call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
 
-   CALL BD_UpdateDiscState( t, n, u_interp, p, x, xd, z, OtherState, m, ErrStat2, ErrMsg2 )
-      call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
-
-      ! Actuator
-   IF( p%UsePitchAct ) THEN
-      CALL PitchActuator_SetBC(p, u_interp, xd)
-   ENDIF
-
       ! Transform quantities from global frame to local (blade in BD coords) frame
    CALL BD_InputGlobalLocal(p,OtherState,u_interp)
 
@@ -5817,50 +5694,6 @@ SUBROUTINE BD_ComputeElementMass(nelem,p,NQPpos,EMass0_GL,elem_mass,elem_CG,elem
 END SUBROUTINE BD_ComputeElementMass
 
 
-!-----------------------------------------------------------------------------------------------------------------------------------
-!> This routine alters the RootMotion inputs based on the pitch-actuator parameters and discrete states
-SUBROUTINE PitchActuator_SetBC(p, u, xd, AllOuts)
-
-   TYPE(BD_ParameterType),    INTENT(IN   )  :: p                                 !< The module parameters
-   TYPE(BD_InputType),        INTENT(INOUT)  :: u                                 !< inputs
-   TYPE(BD_DiscreteStateType),INTENT(IN   )  :: xd                                !< The module discrete states
-   REAL(ReKi),       OPTIONAL,INTENT(INOUT)  :: AllOuts(0:)                       !< all output array for writing to file
-   ! local variables
-   REAL(BDKi)                                :: temp_R(3,3)
-   REAL(BDKi)                                :: temp_cc(3)
-   REAL(BDKi)                                :: u_theta_pitch
-   REAL(BDKi)                                :: thetaP
-   REAL(BDKi)                                :: omegaP
-   REAL(BDKi)                                :: alphaP
-
-
-   temp_R = MATMUL(u%RootMotion%Orientation(:,:,1),TRANSPOSE(u%HubMotion%Orientation(:,:,1)))
-   temp_cc = EulerExtract(temp_R)   != Hub_theta_Root
-   u_theta_pitch = -temp_cc(3)
-
-   thetaP = xd%thetaP
-   omegaP = xd%thetaPD
-   alphaP = -(p%pitchK/p%pitchJ) * xd%thetaP - (p%pitchC/p%pitchJ) * xd%thetaPD + (p%pitchK/p%pitchJ) * u_theta_pitch
-
-   ! Calculate new root motions for use as BeamDyn boundary conditions:
-   !note: we alter the orientation last because we need the input (before actuator) root orientation for the rotational velocity and accelerations
-   u%RootMotion%RotationVel(:,1) = u%RootMotion%RotationVel(:,1) - omegaP * u%RootMotion%Orientation(3,:,1)
-   u%RootMotion%RotationAcc(:,1) = u%RootMotion%RotationAcc(:,1) - alphaP * u%RootMotion%Orientation(3,:,1)
-
-   temp_cc(3) = -thetaP
-   temp_R = EulerConstruct(temp_cc)
-   u%RootMotion%Orientation(:,:,1) = MATMUL(temp_R,u%HubMotion%Orientation(:,:,1))
-
-   if (present(AllOuts)) then
-      AllOuts(PAngInp) = u_theta_pitch
-      AllOuts(PAngAct) = thetaP
-      AllOuts(PRatAct) = omegaP
-      AllOuts(PAccAct) = alphaP
-   end if
-
-END SUBROUTINE PitchActuator_SetBC
-
-
 subroutine BD_InitVars(u, p, x, y, m, InitOut, Linearize, ErrStat, ErrMsg)
    type(BD_InputType),           intent(inout)  :: u           !< An initial guess for the input; input mesh must be defined
    type(BD_ParameterType),       intent(inout)  :: p           !< Parameters
@@ -5965,17 +5798,6 @@ subroutine BD_InitVars(u, p, x, y, m, InitOut, Linearize, ErrStat, ErrMsg)
                       Mesh=u%DistrLoad, &
                       Perturbs=[MaxThrust/(100.0_R8Ki*3.0_R8Ki*u%PointLoad%Nnodes), &  ! FieldForce
                                 MaxTorque/(100.0_R8Ki*3.0_R8Ki*u%PointLoad%Nnodes)])   ! FieldMoment
-
-   ! call MV_AddMeshVar(InitOut%Vars%u, "HubMotion", MotionFields, &
-   !                    DatLoc(BD_u_HubMotion), &
-   !                    Mesh=u%HubMotion, &
-   !                    Flags=VF_NoLin, &
-   !                    Perturbs=[0.2_R8Ki*D2R_D * p%blade_length, &    ! FieldTransDisp
-   !                              0.2_R8Ki*D2R_D, &                     ! FieldOrientation
-   !                              0.2_R8Ki*D2R_D * p%blade_length, &    ! FieldTransVel
-   !                              0.2_R8Ki*D2R_D, &                     ! FieldAngularVel
-   !                              0.2_R8Ki*D2R_D * p%blade_length, &    ! FieldTransAcc
-   !                              0.2_R8Ki*D2R_D])                      ! FieldAngularAcc
 
    !----------------------------------------------------------------------------
    ! Output variables

@@ -723,12 +723,11 @@ class InputReader_OpenFAST(object):
         self.fst_vt['ElastoDynBlade'][BladeNumber]['AdjFlSt'] = float_read(f.readline().split()[0])
         self.fst_vt['ElastoDynBlade'][BladeNumber]['AdjEdSt'] = float_read(f.readline().split()[0])
         
-        # Distrilbuted Blade Properties
+        # Distributed Blade Properties
         f.readline()
         f.readline()
         f.readline()
         self.fst_vt['ElastoDynBlade'][BladeNumber]['BlFract'] = [None] * self.fst_vt['ElastoDynBlade'][BladeNumber]['NBlInpSt']
-        self.fst_vt['ElastoDynBlade'][BladeNumber]['PitchAxis'] = [None] * self.fst_vt['ElastoDynBlade'][BladeNumber]['NBlInpSt']
         self.fst_vt['ElastoDynBlade'][BladeNumber]['StrcTwst'] = [None] * self.fst_vt['ElastoDynBlade'][BladeNumber]['NBlInpSt']
         self.fst_vt['ElastoDynBlade'][BladeNumber]['BMassDen'] = [None] * self.fst_vt['ElastoDynBlade'][BladeNumber]['NBlInpSt']
         self.fst_vt['ElastoDynBlade'][BladeNumber]['FlpStff'] = [None] * self.fst_vt['ElastoDynBlade'][BladeNumber]['NBlInpSt']
@@ -737,11 +736,10 @@ class InputReader_OpenFAST(object):
         for i in range(self.fst_vt['ElastoDynBlade'][BladeNumber]['NBlInpSt']):
             data = f.readline().split()          
             self.fst_vt['ElastoDynBlade'][BladeNumber]['BlFract'][i]  = float_read(data[0])
-            self.fst_vt['ElastoDynBlade'][BladeNumber]['PitchAxis'][i]  = float_read(data[1])
-            self.fst_vt['ElastoDynBlade'][BladeNumber]['StrcTwst'][i]  = float_read(data[2])
-            self.fst_vt['ElastoDynBlade'][BladeNumber]['BMassDen'][i]  = float_read(data[3])
-            self.fst_vt['ElastoDynBlade'][BladeNumber]['FlpStff'][i]  = float_read(data[4])
-            self.fst_vt['ElastoDynBlade'][BladeNumber]['EdgStff'][i]  = float_read(data[5])
+            self.fst_vt['ElastoDynBlade'][BladeNumber]['StrcTwst'][i]  = float_read(data[1])
+            self.fst_vt['ElastoDynBlade'][BladeNumber]['BMassDen'][i]  = float_read(data[2])
+            self.fst_vt['ElastoDynBlade'][BladeNumber]['FlpStff'][i]  = float_read(data[3])
+            self.fst_vt['ElastoDynBlade'][BladeNumber]['EdgStff'][i]  = float_read(data[4])
 
         f.readline()
         self.fst_vt['ElastoDynBlade'][BladeNumber]['BldFl1Sh'] = [None] * 5
@@ -871,12 +869,6 @@ class InputReader_OpenFAST(object):
         #---------------------- MATERIAL PARAMETER --------------------------------------
         f.readline()
         self.fst_vt['BeamDyn'][BladeNumber]['BldFile']     = f.readline().split()[0].replace('"','').replace("'",'')
-        #---------------------- PITCH ACTUATOR PARAMETERS -------------------------------
-        f.readline()
-        self.fst_vt['BeamDyn'][BladeNumber]['UsePitchAct'] = bool_read(f.readline().split()[0])
-        self.fst_vt['BeamDyn'][BladeNumber]['PitchJ']      = float_read(f.readline().split()[0])
-        self.fst_vt['BeamDyn'][BladeNumber]['PitchK']      = float_read(f.readline().split()[0])
-        self.fst_vt['BeamDyn'][BladeNumber]['PitchC']      = float_read(f.readline().split()[0])
         #---------------------- OUTPUTS -------------------------------------------------
         f.readline()
         self.fst_vt['BeamDyn'][BladeNumber]['SumPrint']    = bool_read(f.readline().split()[0])

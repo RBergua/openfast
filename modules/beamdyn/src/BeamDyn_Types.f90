@@ -49,8 +49,6 @@ IMPLICIT NONE
     REAL(R8Ki) , DIMENSION(1:3)  :: RootDisp = 0.0_R8Ki      !< Initial root displacement [-]
     REAL(R8Ki) , DIMENSION(1:3,1:3)  :: RootOri = 0.0_R8Ki      !< Initial root orientation [-]
     REAL(ReKi) , DIMENSION(1:6)  :: RootVel = 0.0_ReKi      !< Initial root velocities and angular veolcities [-]
-    REAL(ReKi) , DIMENSION(1:3)  :: HubPos = 0.0_ReKi      !< Initial Hub position vector [-]
-    REAL(R8Ki) , DIMENSION(1:3,1:3)  :: HubRot = 0.0_R8Ki      !< Initial Hub direction cosine matrix [-]
     LOGICAL  :: Linearize = .FALSE.      !< Flag that tells this module if the glue code wants to linearize. [-]
     LOGICAL  :: DynamicSolve = .TRUE.      !< Use dynamic solve option.  Set to False for static solving (handled by glue code or driver code). [-]
     LOGICAL  :: CompAeroMaps = .FALSE.      !< flag to determine if BeamDyn is computing aero maps (true) or running a normal simulation (false) [-]
@@ -90,15 +88,11 @@ IMPLICIT NONE
     REAL(DbKi)  :: DTBeam = 0.0_R8Ki      !< Time interval for BeamDyn  calculations {or default} (s) [-]
     TYPE(BladeInputData)  :: InpBl      !< Input data for individual blades [see BladeInputData Type]
     CHARACTER(1024)  :: BldFile      !< Name of blade input file [-]
-    LOGICAL  :: UsePitchAct = .false.      !< Whether to use a pitch actuator inside BeamDyn [(flag)]
     LOGICAL  :: QuasiStaticInit = .false.      !< Use quasistatic pre-conditioning with centripetal accelerations in initialization (flag) [dynamic solve and enFAST only] [-]
     REAL(R8Ki)  :: stop_tol = 0.0_R8Ki      !< Tolerance for stopping criterion [-]
     REAL(R8Ki)  :: tngt_stf_pert = 0.0_R8Ki      !< Perturbation size for computing finite differenced tangent stiffness [-]
     REAL(R8Ki)  :: tngt_stf_difftol = 0.0_R8Ki      !< When comparing tangent stiffness matrix, stop simulation if error greater than this [-]
     REAL(R8Ki) , DIMENSION(:,:), ALLOCATABLE  :: kp_coordinate      !< Key point coordinates array [-]
-    REAL(R8Ki)  :: pitchJ = 0.0_R8Ki      !< Pitch actuator inertia [(kg-m^2)]
-    REAL(R8Ki)  :: pitchK = 0.0_R8Ki      !< Pitch actuator stiffness [(kg-m^2/s^2)]
-    REAL(R8Ki)  :: pitchC = 0.0_R8Ki      !< Pitch actuator damping [-]
     LOGICAL  :: Echo = .false.      !< Echo [-]
     LOGICAL  :: RotStates = .TRUE.      !< Orient states in rotating frame during linearization? (flag) [-]
     LOGICAL  :: tngt_stf_fd = .false.      !< Flag to compute tangent stifness matrix via finite difference [-]
@@ -123,8 +117,7 @@ IMPLICIT NONE
 ! =======================
 ! =========  BD_DiscreteStateType  =======
   TYPE, PUBLIC :: BD_DiscreteStateType
-    REAL(ReKi)  :: thetaP = 0.0_ReKi      !< Pitch angle state [-]
-    REAL(ReKi)  :: thetaPD = 0.0_ReKi      !< Pitch rate state [-]
+    REAL(ReKi)  :: DummyDiscState = 0.0_ReKi      !< A variable, Replace if you have discrete states [-]
   END TYPE BD_DiscreteStateType
 ! =======================
 ! =========  BD_ConstraintStateType  =======
@@ -199,11 +192,6 @@ IMPLICIT NONE
     INTEGER(IntKi) , DIMENSION(:), ALLOCATABLE  :: NdIndxInverse      !< Index from BldMotion mesh to unique nodes (to number the nodes for output without using collocated nodes) [-]
     INTEGER(IntKi) , DIMENSION(:,:), ALLOCATABLE  :: OutNd2NdElem      !< To go from an output node number to a node/elem pair [-]
     CHARACTER(20)  :: OutFmt      !< Format specifier [-]
-    LOGICAL  :: UsePitchAct = .false.      !< Whether to use a pitch actuator inside BeamDyn [(flag)]
-    REAL(ReKi)  :: pitchJ = 0.0_ReKi      !< Pitch actuator inertia [(kg-m^2)]
-    REAL(ReKi)  :: pitchK = 0.0_ReKi      !< Pitch actuator stiffness [(kg-m^2/s^2)]
-    REAL(ReKi)  :: pitchC = 0.0_ReKi      !< Pitch actuator damping [-]
-    REAL(ReKi) , DIMENSION(1:2,1:2)  :: torqM = 0.0_ReKi      !< Pitch actuator matrix: (I-hA)^-1 [-]
     TYPE(qpParam)  :: qp      !< Quadrature point info that does not change during simulation [-]
     INTEGER(IntKi)  :: qp_indx_offset = 0_IntKi      !< Offset for computing index of the quadrature arrays (gauss skips the first [end-point] node) [-]
     INTEGER(IntKi)  :: BldMotionNodeLoc = 0_IntKi      !< switch to determine where the nodes on the blade motion mesh should be located 1=FE (GLL) nodes; 2=quadrature nodes; 3=blade input stations [-]
@@ -231,7 +219,6 @@ IMPLICIT NONE
     TYPE(MeshType)  :: RootMotion      !< contains motion [-]
     TYPE(MeshType)  :: PointLoad      !< Applied point forces along beam axis [-]
     TYPE(MeshType)  :: DistrLoad      !< Applied distributed forces along beam axis [-]
-    TYPE(MeshType)  :: HubMotion      !< motion (orientation) at the hub [-]
   END TYPE BD_InputType
 ! =======================
 ! =========  BD_OutputType  =======
@@ -320,7 +307,6 @@ IMPLICIT NONE
     REAL(R8Ki) , DIMENSION(:), ALLOCATABLE  :: LP_RHS_LU      !< Right-hand-side vector for LU [-]
     INTEGER(IntKi) , DIMENSION(:), ALLOCATABLE  :: LP_indx      !< Index vector for LU [-]
     TYPE(BD_InputType)  :: u      !< Inputs converted to the internal BD coordinate system [-]
-    TYPE(BD_InputType)  :: u2      !< Inputs in the FAST coordinate system, possibly modified by pitch actuator [-]
     TYPE(ModJacType)  :: Jac      !< Jacobian matrices and arrays corresponding to module variables [-]
     TYPE(BD_ContinuousStateType)  :: x_perturb      !<  [-]
     TYPE(BD_ContinuousStateType)  :: dxdt_lin      !<  [-]
@@ -333,12 +319,11 @@ IMPLICIT NONE
    integer(IntKi), public, parameter :: BD_u_RootMotion                  =   3 ! BD%RootMotion
    integer(IntKi), public, parameter :: BD_u_PointLoad                   =   4 ! BD%PointLoad
    integer(IntKi), public, parameter :: BD_u_DistrLoad                   =   5 ! BD%DistrLoad
-   integer(IntKi), public, parameter :: BD_u_HubMotion                   =   6 ! BD%HubMotion
-   integer(IntKi), public, parameter :: BD_y_ReactionForce               =   7 ! BD%ReactionForce
-   integer(IntKi), public, parameter :: BD_y_BldMotion                   =   8 ! BD%BldMotion
-   integer(IntKi), public, parameter :: BD_y_RootMxr                     =   9 ! BD%RootMxr
-   integer(IntKi), public, parameter :: BD_y_RootMyr                     =  10 ! BD%RootMyr
-   integer(IntKi), public, parameter :: BD_y_WriteOutput                 =  11 ! BD%WriteOutput
+   integer(IntKi), public, parameter :: BD_y_ReactionForce               =   6 ! BD%ReactionForce
+   integer(IntKi), public, parameter :: BD_y_BldMotion                   =   7 ! BD%BldMotion
+   integer(IntKi), public, parameter :: BD_y_RootMxr                     =   8 ! BD%RootMxr
+   integer(IntKi), public, parameter :: BD_y_RootMyr                     =   9 ! BD%RootMyr
+   integer(IntKi), public, parameter :: BD_y_WriteOutput                 =  10 ! BD%WriteOutput
 
 contains
 
@@ -359,8 +344,6 @@ subroutine BD_CopyInitInput(SrcInitInputData, DstInitInputData, CtrlCode, ErrSta
    DstInitInputData%RootDisp = SrcInitInputData%RootDisp
    DstInitInputData%RootOri = SrcInitInputData%RootOri
    DstInitInputData%RootVel = SrcInitInputData%RootVel
-   DstInitInputData%HubPos = SrcInitInputData%HubPos
-   DstInitInputData%HubRot = SrcInitInputData%HubRot
    DstInitInputData%Linearize = SrcInitInputData%Linearize
    DstInitInputData%DynamicSolve = SrcInitInputData%DynamicSolve
    DstInitInputData%CompAeroMaps = SrcInitInputData%CompAeroMaps
@@ -388,8 +371,6 @@ subroutine BD_PackInitInput(RF, Indata)
    call RegPack(RF, InData%RootDisp)
    call RegPack(RF, InData%RootOri)
    call RegPack(RF, InData%RootVel)
-   call RegPack(RF, InData%HubPos)
-   call RegPack(RF, InData%HubRot)
    call RegPack(RF, InData%Linearize)
    call RegPack(RF, InData%DynamicSolve)
    call RegPack(RF, InData%CompAeroMaps)
@@ -409,8 +390,6 @@ subroutine BD_UnPackInitInput(RF, OutData)
    call RegUnpack(RF, OutData%RootDisp); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%RootOri); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%RootVel); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%HubPos); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%HubRot); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%Linearize); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%DynamicSolve); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%CompAeroMaps); if (RegCheckErr(RF, RoutineName)) return
@@ -648,7 +627,6 @@ subroutine BD_CopyInputFile(SrcInputFileData, DstInputFileData, CtrlCode, ErrSta
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (ErrStat >= AbortErrLev) return
    DstInputFileData%BldFile = SrcInputFileData%BldFile
-   DstInputFileData%UsePitchAct = SrcInputFileData%UsePitchAct
    DstInputFileData%QuasiStaticInit = SrcInputFileData%QuasiStaticInit
    DstInputFileData%stop_tol = SrcInputFileData%stop_tol
    DstInputFileData%tngt_stf_pert = SrcInputFileData%tngt_stf_pert
@@ -665,9 +643,6 @@ subroutine BD_CopyInputFile(SrcInputFileData, DstInputFileData, CtrlCode, ErrSta
       end if
       DstInputFileData%kp_coordinate = SrcInputFileData%kp_coordinate
    end if
-   DstInputFileData%pitchJ = SrcInputFileData%pitchJ
-   DstInputFileData%pitchK = SrcInputFileData%pitchK
-   DstInputFileData%pitchC = SrcInputFileData%pitchC
    DstInputFileData%Echo = SrcInputFileData%Echo
    DstInputFileData%RotStates = SrcInputFileData%RotStates
    DstInputFileData%tngt_stf_fd = SrcInputFileData%tngt_stf_fd
@@ -763,15 +738,11 @@ subroutine BD_PackInputFile(RF, Indata)
    call RegPack(RF, InData%DTBeam)
    call BD_PackBladeInputData(RF, InData%InpBl) 
    call RegPack(RF, InData%BldFile)
-   call RegPack(RF, InData%UsePitchAct)
    call RegPack(RF, InData%QuasiStaticInit)
    call RegPack(RF, InData%stop_tol)
    call RegPack(RF, InData%tngt_stf_pert)
    call RegPack(RF, InData%tngt_stf_difftol)
    call RegPackAlloc(RF, InData%kp_coordinate)
-   call RegPack(RF, InData%pitchJ)
-   call RegPack(RF, InData%pitchK)
-   call RegPack(RF, InData%pitchC)
    call RegPack(RF, InData%Echo)
    call RegPack(RF, InData%RotStates)
    call RegPack(RF, InData%tngt_stf_fd)
@@ -810,15 +781,11 @@ subroutine BD_UnPackInputFile(RF, OutData)
    call RegUnpack(RF, OutData%DTBeam); if (RegCheckErr(RF, RoutineName)) return
    call BD_UnpackBladeInputData(RF, OutData%InpBl) ! InpBl 
    call RegUnpack(RF, OutData%BldFile); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%UsePitchAct); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%QuasiStaticInit); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%stop_tol); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%tngt_stf_pert); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%tngt_stf_difftol); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%kp_coordinate); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%pitchJ); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%pitchK); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%pitchC); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%Echo); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%RotStates); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%tngt_stf_fd); if (RegCheckErr(RF, RoutineName)) return
@@ -918,8 +885,7 @@ subroutine BD_CopyDiscState(SrcDiscStateData, DstDiscStateData, CtrlCode, ErrSta
    character(*), parameter        :: RoutineName = 'BD_CopyDiscState'
    ErrStat = ErrID_None
    ErrMsg  = ''
-   DstDiscStateData%thetaP = SrcDiscStateData%thetaP
-   DstDiscStateData%thetaPD = SrcDiscStateData%thetaPD
+   DstDiscStateData%DummyDiscState = SrcDiscStateData%DummyDiscState
 end subroutine
 
 subroutine BD_DestroyDiscState(DiscStateData, ErrStat, ErrMsg)
@@ -936,8 +902,7 @@ subroutine BD_PackDiscState(RF, Indata)
    type(BD_DiscreteStateType), intent(in) :: InData
    character(*), parameter         :: RoutineName = 'BD_PackDiscState'
    if (RF%ErrStat >= AbortErrLev) return
-   call RegPack(RF, InData%thetaP)
-   call RegPack(RF, InData%thetaPD)
+   call RegPack(RF, InData%DummyDiscState)
    if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
@@ -946,8 +911,7 @@ subroutine BD_UnPackDiscState(RF, OutData)
    type(BD_DiscreteStateType), intent(inout) :: OutData
    character(*), parameter            :: RoutineName = 'BD_UnPackDiscState'
    if (RF%ErrStat /= ErrID_None) return
-   call RegUnpack(RF, OutData%thetaP); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%thetaPD); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%DummyDiscState); if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
 subroutine BD_CopyConstrState(SrcConstrStateData, DstConstrStateData, CtrlCode, ErrStat, ErrMsg)
@@ -1414,11 +1378,6 @@ subroutine BD_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg)
       DstParamData%OutNd2NdElem = SrcParamData%OutNd2NdElem
    end if
    DstParamData%OutFmt = SrcParamData%OutFmt
-   DstParamData%UsePitchAct = SrcParamData%UsePitchAct
-   DstParamData%pitchJ = SrcParamData%pitchJ
-   DstParamData%pitchK = SrcParamData%pitchK
-   DstParamData%pitchC = SrcParamData%pitchC
-   DstParamData%torqM = SrcParamData%torqM
    call BD_CopyqpParam(SrcParamData%qp, DstParamData%qp, CtrlCode, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (ErrStat >= AbortErrLev) return
@@ -1703,11 +1662,6 @@ subroutine BD_PackParam(RF, Indata)
    call RegPackAlloc(RF, InData%NdIndxInverse)
    call RegPackAlloc(RF, InData%OutNd2NdElem)
    call RegPack(RF, InData%OutFmt)
-   call RegPack(RF, InData%UsePitchAct)
-   call RegPack(RF, InData%pitchJ)
-   call RegPack(RF, InData%pitchK)
-   call RegPack(RF, InData%pitchC)
-   call RegPack(RF, InData%torqM)
    call BD_PackqpParam(RF, InData%qp) 
    call RegPack(RF, InData%qp_indx_offset)
    call RegPack(RF, InData%BldMotionNodeLoc)
@@ -1808,11 +1762,6 @@ subroutine BD_UnPackParam(RF, OutData)
    call RegUnpackAlloc(RF, OutData%NdIndxInverse); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%OutNd2NdElem); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%OutFmt); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%UsePitchAct); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%pitchJ); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%pitchK); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%pitchC); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpack(RF, OutData%torqM); if (RegCheckErr(RF, RoutineName)) return
    call BD_UnpackqpParam(RF, OutData%qp) ! qp 
    call RegUnpack(RF, OutData%qp_indx_offset); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%BldMotionNodeLoc); if (RegCheckErr(RF, RoutineName)) return
@@ -1867,9 +1816,6 @@ subroutine BD_CopyInput(SrcInputData, DstInputData, CtrlCode, ErrStat, ErrMsg)
    call MeshCopy(SrcInputData%DistrLoad, DstInputData%DistrLoad, CtrlCode, ErrStat2, ErrMsg2 )
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (ErrStat >= AbortErrLev) return
-   call MeshCopy(SrcInputData%HubMotion, DstInputData%HubMotion, CtrlCode, ErrStat2, ErrMsg2 )
-   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-   if (ErrStat >= AbortErrLev) return
 end subroutine
 
 subroutine BD_DestroyInput(InputData, ErrStat, ErrMsg)
@@ -1887,8 +1833,6 @@ subroutine BD_DestroyInput(InputData, ErrStat, ErrMsg)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    call MeshDestroy( InputData%DistrLoad, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-   call MeshDestroy( InputData%HubMotion, ErrStat2, ErrMsg2)
-   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
 end subroutine
 
 subroutine BD_PackInput(RF, Indata)
@@ -1899,7 +1843,6 @@ subroutine BD_PackInput(RF, Indata)
    call MeshPack(RF, InData%RootMotion) 
    call MeshPack(RF, InData%PointLoad) 
    call MeshPack(RF, InData%DistrLoad) 
-   call MeshPack(RF, InData%HubMotion) 
    if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
@@ -1911,7 +1854,6 @@ subroutine BD_UnPackInput(RF, OutData)
    call MeshUnpack(RF, OutData%RootMotion) ! RootMotion 
    call MeshUnpack(RF, OutData%PointLoad) ! PointLoad 
    call MeshUnpack(RF, OutData%DistrLoad) ! DistrLoad 
-   call MeshUnpack(RF, OutData%HubMotion) ! HubMotion 
 end subroutine
 
 subroutine BD_CopyOutput(SrcOutputData, DstOutputData, CtrlCode, ErrStat, ErrMsg)
@@ -2975,9 +2917,6 @@ subroutine BD_CopyMisc(SrcMiscData, DstMiscData, CtrlCode, ErrStat, ErrMsg)
    call BD_CopyInput(SrcMiscData%u, DstMiscData%u, CtrlCode, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (ErrStat >= AbortErrLev) return
-   call BD_CopyInput(SrcMiscData%u2, DstMiscData%u2, CtrlCode, ErrStat2, ErrMsg2)
-   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-   if (ErrStat >= AbortErrLev) return
    call NWTC_Library_CopyModJacType(SrcMiscData%Jac, DstMiscData%Jac, CtrlCode, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (ErrStat >= AbortErrLev) return
@@ -3110,8 +3049,6 @@ subroutine BD_DestroyMisc(MiscData, ErrStat, ErrMsg)
    end if
    call BD_DestroyInput(MiscData%u, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-   call BD_DestroyInput(MiscData%u2, ErrStat2, ErrMsg2)
-   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    call NWTC_Library_DestroyModJacType(MiscData%Jac, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    call BD_DestroyContState(MiscData%x_perturb, ErrStat2, ErrMsg2)
@@ -3168,7 +3105,6 @@ subroutine BD_PackMisc(RF, Indata)
    call RegPackAlloc(RF, InData%LP_RHS_LU)
    call RegPackAlloc(RF, InData%LP_indx)
    call BD_PackInput(RF, InData%u) 
-   call BD_PackInput(RF, InData%u2) 
    call NWTC_Library_PackModJacType(RF, InData%Jac) 
    call BD_PackContState(RF, InData%x_perturb) 
    call BD_PackContState(RF, InData%dxdt_lin) 
@@ -3224,7 +3160,6 @@ subroutine BD_UnPackMisc(RF, OutData)
    call RegUnpackAlloc(RF, OutData%LP_RHS_LU); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%LP_indx); if (RegCheckErr(RF, RoutineName)) return
    call BD_UnpackInput(RF, OutData%u) ! u 
-   call BD_UnpackInput(RF, OutData%u2) ! u2 
    call NWTC_Library_UnpackModJacType(RF, OutData%Jac) ! Jac 
    call BD_UnpackContState(RF, OutData%x_perturb) ! x_perturb 
    call BD_UnpackContState(RF, OutData%dxdt_lin) ! dxdt_lin 
@@ -3333,8 +3268,6 @@ SUBROUTINE BD_Input_ExtrapInterp1(u1, u2, tin, u_out, tin_out, ErrStat, ErrMsg )
       CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
    CALL MeshExtrapInterp1(u1%DistrLoad, u2%DistrLoad, tin, u_out%DistrLoad, tin_out, ErrStat2, ErrMsg2)
       CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
-   CALL MeshExtrapInterp1(u1%HubMotion, u2%HubMotion, tin, u_out%HubMotion, tin_out, ErrStat2, ErrMsg2)
-      CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
 END SUBROUTINE
 
 SUBROUTINE BD_Input_ExtrapInterp2(u1, u2, u3, tin, u_out, tin_out, ErrStat, ErrMsg )
@@ -3395,8 +3328,6 @@ SUBROUTINE BD_Input_ExtrapInterp2(u1, u2, u3, tin, u_out, tin_out, ErrStat, ErrM
    CALL MeshExtrapInterp2(u1%PointLoad, u2%PointLoad, u3%PointLoad, tin, u_out%PointLoad, tin_out, ErrStat2, ErrMsg2)
       CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
    CALL MeshExtrapInterp2(u1%DistrLoad, u2%DistrLoad, u3%DistrLoad, tin, u_out%DistrLoad, tin_out, ErrStat2, ErrMsg2)
-      CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
-   CALL MeshExtrapInterp2(u1%HubMotion, u2%HubMotion, u3%HubMotion, tin, u_out%HubMotion, tin_out, ErrStat2, ErrMsg2)
       CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg,RoutineName)
 END SUBROUTINE
 
@@ -3586,8 +3517,6 @@ function BD_InputMeshPointer(u, DL) result(Mesh)
        Mesh => u%PointLoad
    case (BD_u_DistrLoad)
        Mesh => u%DistrLoad
-   case (BD_u_HubMotion)
-       Mesh => u%HubMotion
    end select
 end function
 
@@ -3723,8 +3652,6 @@ subroutine BD_VarPackInput(V, u, ValAry)
          call MV_PackMesh(V, u%PointLoad, ValAry)                             ! Mesh
       case (BD_u_DistrLoad)
          call MV_PackMesh(V, u%DistrLoad, ValAry)                             ! Mesh
-      case (BD_u_HubMotion)
-         call MV_PackMesh(V, u%HubMotion, ValAry)                             ! Mesh
       case default
          VarVals = 0.0_R8Ki
       end select
@@ -3753,8 +3680,6 @@ subroutine BD_VarUnpackInput(V, ValAry, u)
          call MV_UnpackMesh(V, ValAry, u%PointLoad)                           ! Mesh
       case (BD_u_DistrLoad)
          call MV_UnpackMesh(V, ValAry, u%DistrLoad)                           ! Mesh
-      case (BD_u_HubMotion)
-         call MV_UnpackMesh(V, ValAry, u%HubMotion)                           ! Mesh
       end select
    end associate
 end subroutine
@@ -3769,8 +3694,6 @@ function BD_InputFieldName(DL) result(Name)
        Name = "u%PointLoad"
    case (BD_u_DistrLoad)
        Name = "u%DistrLoad"
-   case (BD_u_HubMotion)
-       Name = "u%HubMotion"
    case default
        Name = "Unknown Field"
    end select

@@ -2677,7 +2677,6 @@ SUBROUTINE SetBladeParameters( p, BladeInData, BladeMeshData, ErrStat, ErrMsg )
       !    Input      Interp    Description
       !    -----      ------    -----------
       !    BlFract    RNodesNorm Fractional radius (0 at root, 1 at tip)
-      !    PitchAx    PitchAxis  Pitch axis (0 at LE, 1 at TE)
       !    StrcTwst   ThetaS     Structural twist
       !    BMassDen   MassB      Lineal mass density
       !    FlpStff    StiffBF    Flapwise stiffness
@@ -2702,11 +2701,8 @@ SUBROUTINE SetBladeParameters( p, BladeInData, BladeMeshData, ErrStat, ErrMsg )
          DO J=1,p%BldNodes
 
                ! Get the index into BlFract for all of the arrays, using the NWTC Subroutine Library
-            !p%ThetaS  (K,J) = InterpStp( p%RNodesNorm(J), BladeInData(K)%BlFract, BladeInData(K)%StrcTwst, &
-            !                             InterpInd, BladeInData(K)%NBlInpSt )
-            p%PitchAxis(K,J) = InterpStp( p%RNodesNorm(J), BladeInData(K)%BlFract, BladeInData(K)%PitchAx, &
-                                         InterpInd, BladeInData(K)%NBlInpSt )
-
+            p%ThetaS   (K,J) = InterpStp( p%RNodesNorm(J), BladeInData(K)%BlFract, BladeInData(K)%StrcTwst, &
+                                          InterpInd, BladeInData(K)%NBlInpSt )
 
                ! The remaining arrays will have the same x value for the linear interpolation,
                ! so we'll do it manually (with a local subroutine) instead of calling the InterpStp routine again
@@ -2718,7 +2714,6 @@ SUBROUTINE SetBladeParameters( p, BladeInData, BladeMeshData, ErrStat, ErrMsg )
                    ( BladeInData(K)%BlFract(InterpInd+1) - BladeInData(K)%BlFract(InterpInd) )
             END IF
 
-            p%ThetaS  (K,J) = InterpAry( x, BladeInData(K)%StrcTwst, InterpInd )
             p%MassB   (K,J) = InterpAry( x, BladeInData(K)%BMassDen, InterpInd )
             p%StiffBF (K,J) = InterpAry( x, BladeInData(K)%FlpStff , InterpInd )
             p%StiffBE (K,J) = InterpAry( x, BladeInData(K)%EdgStff , InterpInd )
@@ -2809,8 +2804,7 @@ SUBROUTINE Alloc_BladeParameters( p, ErrStat, ErrMsg )
 
       ! Allocate arrays to hold blade data at the analysis nodes.
    CALL AllocAry  ( p%RNodesNorm,              p%BldNodes, 'RNodesNorm' , ErrStat, ErrMsg ); IF ( ErrStat /= ErrID_None ) RETURN
-   CALL AllocAry  ( p%PitchAxis,   p%NumBl,    p%BldNodes, 'PitchAxis'  , ErrStat, ErrMsg ); IF ( ErrStat /= ErrID_None ) RETURN
-   
+
    ALLOCATE( p%ThetaS( p%NumBl,0:P%TipNode) &
            , p%CThetaS(p%NumBl,0:P%TipNode) &
            , p%SThetaS(p%NumBl,0:P%TipNode), STAT=ErrStat ) 
@@ -2922,8 +2916,6 @@ SUBROUTINE SetOtherParameters( p, InputFileData, ErrStat, ErrMsg )
    CALL AllocAry( p%FreqBE,   p%NumBl, NumBE, 3_IntKi,              'FreqBE',    ErrStat, ErrMsg ); IF ( ErrStat /= ErrID_None ) RETURN
    CALL AllocAry( p%FreqBF,   p%NumBl, NumBF, 3_IntKi,              'FreqBF',    ErrStat, ErrMsg ); IF ( ErrStat /= ErrID_None ) RETURN
    CALL AllocAry( p%BldMass,  p%NumBl,                              'BldMass',   ErrStat, ErrMsg ); IF ( ErrStat /= ErrID_None ) RETURN
-   CALL AllocAry( p%rSAerCenn1,p%NumBl,p%BldNodes,  'rSAerCenn1',  ErrStat, ErrMsg ); IF ( ErrStat /= ErrID_None ) RETURN
-   CALL AllocAry( p%rSAerCenn2,p%NumBl,p%BldNodes,  'rSAerCenn2',  ErrStat, ErrMsg ); IF ( ErrStat /= ErrID_None ) RETURN
    CALL AllocAry(p%BElmntMass, p%BldNodes, p%NumBl, 'BElmntMass', ErrStat, ErrMsg ); IF ( ErrStat /= ErrID_None ) RETURN
    CALL AllocAry(p%TElmntMass, p%TwrNodes,          'TElmntMass', ErrStat, ErrMsg ); IF ( ErrStat /= ErrID_None ) RETURN
 
@@ -2982,7 +2974,6 @@ SUBROUTINE Alloc_RtHS( RtHS, p, ErrStat, ErrMsg  )
   !call AllocAry( RtHS%rS,        Dims, p%NumBl,p%TipNode, 'rS',       ErrStat2, ErrMsg2 );  if (Failed()) return;  RtHS%rS       = 0.0_ReKi
    call AllocAry( RtHS%rS0S,      Dims, p%NumBl,p%TipNode, 'rS0S',     ErrStat2, ErrMsg2 );  if (Failed()) return;  RtHS%rS0S     = 0.0_ReKi
    call AllocAry( RtHS%rPS0,      Dims, p%NumBl,           'rPS0',     ErrStat2, ErrMsg2 );  if (Failed()) return;  RtHS%rPS0     = 0.0_ReKi
-   call AllocAry( RtHS%rSAerCen,  Dims, p%TipNode, p%NumBl,'rSAerCen', ErrStat2, ErrMsg2 );  if (Failed()) return;  RtHS%rSAerCen = 0.0_ReKi
   
    ! tower
    allocate(RtHS%rZT(      Dims, 0:p%TwrNodes), STAT=ErrStat2); if (Failed0('rZT      ')) return;   RtHS%rZT       = 0.0_ReKi
@@ -4652,8 +4643,7 @@ END SUBROUTINE SetOutParam
 !> This routine is used to compute rotor (blade and hub) properties:
 !!   KBF(), KBE(), CBF(), CBE(), FreqBF(), FreqBE(), AxRedBld(),
 !!   TwistedSF(), BldMass(), FirstMom(), SecondMom(), BldCG(),
-!!   RotMass, RotIner, Hubg1Iner, Hubg2Iner, rSAerCenn1(), and
-!!   rSAerCenn2(), BElmtMass()
+!!   RotMass, RotIner, Hubg1Iner, Hubg2Iner, and BElmtMass()
 !! tower properties:
 !!   KTFA(), KTSS(), CTFA(), CTSS(), FreqTFA(), FreqTSS(),
 !!   AxRedTFA(), AxRedTSS(), TwrFASF(), TwrSSSF(), TwrMass, and
@@ -4683,9 +4673,6 @@ SUBROUTINE Coeff(p,InputFileData, ErrStat, ErrMsg)
    REAL(ReKi)                   :: AxRdTFAOld(2,2)                                 ! Previous AxRdTFA (i.e., AxRdTFA from the previous node)
    REAL(ReKi)                   :: AxRdTSS   (2,2)                                 ! Temporary result holding the current addition to the AxRedTSS() array.
    REAL(ReKi)                   :: AxRdTSSOld(2,2)                                 ! Previous AxRdTSS (i.e., AxRdTSS from the previous node)
-   REAL(ReKi)                   :: TmpDist                                         ! Temporary distance used in the calculation of the aero center locations.
-   REAL(ReKi)                   :: TmpDistj1                                       ! Temporary distance used in the calculation of the aero center locations.
-   REAL(ReKi)                   :: TmpDistj2                                       ! Temporary distance used in the calculation of the aero center locations.
    REAL(ReKi)                   :: ElmntStff                                       ! (Temporary) stiffness of an element.
    REAL(ReKi)                   :: ElStffFA                                        ! (Temporary) tower fore-aft stiffness of an element
    REAL(ReKi)                   :: ElStffSS                                        ! (Temporary) tower side-to-side  stiffness of an element
@@ -4713,25 +4700,6 @@ SUBROUTINE Coeff(p,InputFileData, ErrStat, ErrMsg)
 
    ErrStat = ErrID_None
    ErrMsg  = ''
-
-   !...............................................................................................................................
-   ! Calculate the distances from point S on a blade to the aerodynamic center in the j1 and j2 directions:
-   !...............................................................................................................................
-
-   DO K = 1,p%NumBl          ! Loop through the blades
-
-      DO J = 1,p%BldNodes    ! Loop through the blade nodes / elements
-
-         TmpDist           = ( 0.25 - p%PitchAxis(K,J) )*p%Chord(J)   ! Distance along the chordline from point S (25% chord) to the aerodynamic center of the blade element J--positive towards the trailing edge.
-         TmpDistj1         = TmpDist*p%SAeroTwst(J)                   ! Distance along the j1-axis   from point S (25% chord) to the aerodynamic center of the blade element J
-         TmpDistj2         = TmpDist*p%CAeroTwst(J)                   ! Distance along the j2-axis   from point S (25% chord) to the aerodynamic center of the blade element J
-         p%rSAerCenn1(K,J) = TmpDistj1*p%CThetaS(K,J) - TmpDistj2*p%SThetaS(K,J)
-         p%rSAerCenn2(K,J) = TmpDistj1*p%SThetaS(K,J) + TmpDistj2*p%CThetaS(K,J)
-
-      ENDDO ! J - Blade nodes / elements
-
-   ENDDO    ! K - Blades
-
 
    !...............................................................................................................................
    ! Calculate the structure that furls with the rotor inertia term:
@@ -7617,16 +7585,6 @@ SUBROUTINE CalculateForcesMoments( p, x, CoordSys, u, RtHSdat )
       
       DO J = 1,p%BldNodes ! Loop through the blade nodes / elements
 
-
-   ! Calculate the aerodynamic pitching moment arm (i.e., the position vector
-   !   from point S on the blade to the aerodynamic center of the element):
-
-         RtHSdat%rSAerCen(:,J,K) = p%rSAerCenn1(K,J)*CoordSys%n1(K,J,:) + p%rSAerCenn2(K,J)*CoordSys%n2(K,J,:)   
-
-!        rPAerCen     = m%RtHS%rPQ + m%RtHS%rQS(:,K,J) + m%RtHS%rSAerCen(:,J,K)     ! Position vector from teeter pin (point P)  to blade analysis node aerodynamic center.
-!        rAerCen      =                       m%RtHS%rS (:,K,J) + m%RtHS%rSAerCen(:,J,K)     ! Position vector from inertial frame origin to blade analysis node aerodynamic center.
-         
-
    ! fill FSAero() and MMAero() with the forces resulting from inputs u%BladeLn2Mesh(K)%Force(1:2,:) and u%BladeLn2Mesh(K)%Moment(3,:):
    ! [except, we're ignoring the additional nodes we added on the mesh end points]
    
@@ -10114,12 +10072,12 @@ IF (.NOT. p%BD4Blades) THEN
 
       WRITE (UnSu,'(//,A,I1,A,/)')  'Interpolated blade ', K, ' properties:'
 
-      WRITE (UnSu,'(A)')  'Node  BlFract   RNodes  DRNodes PitchAxis  StrcTwst  BMassDen    FlpStff    EdgStff'
-      WRITE (UnSu,'(A)')  ' (-)      (-)      (m)      (m)       (-)     (deg)    (kg/m)     (Nm^2)     (Nm^2)'
+      WRITE (UnSu,'(A)')  'Node  BlFract   RNodes  DRNodes  StrcTwst  BMassDen    FlpStff    EdgStff'
+      WRITE (UnSu,'(A)')  ' (-)      (-)      (m)      (m)     (deg)    (kg/m)     (Nm^2)     (Nm^2)'
 
       DO I=1,p%BldNodes
          WRITE(UnSu,'(I4,3F9.3,3F10.3,2ES11.3)')  I, p%RNodesNorm(I), p%RNodes(I) + p%HubRad, p%DRNodes(I), &
-                                                      p%PitchAxis(K,I),p%ThetaS(K,I)*R2D, p%MassB(K,I), &
+                                                      p%ThetaS(K,I)*R2D, p%MassB(K,I), &
                                                       p%StiffBF(K,I), p%StiffBE(K,I)
       ENDDO ! I
 

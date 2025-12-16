@@ -55,7 +55,6 @@ typedef	^	InitOutputType	ModVarsType	Vars	-	-	-	"Module Variables"
 # ..... Blade Input file data ...........................................................................................................
 typedef	ElastoDyn/ED	BladeInputData	IntKi	NBlInpSt	-	-	-	"Number of blade input stations"	-
 typedef	^	BladeInputData	ReKi	BlFract	{:}	-	-	"Blade fractional radius for distributed input data"	-
-typedef	^	BladeInputData	ReKi	PitchAx	{:}	-	-	"Pitch axis for distributed input data"	-
 typedef	^	BladeInputData	ReKi	StrcTwst	{:}	-	-	"Structural twist for distributed input data"	radians
 typedef	^	BladeInputData	ReKi	BMassDen	{:}	-	-	"Blade mass density for distributed input data"
 typedef	^	BladeInputData	ReKi	FlpStff	{:}	-	-	"Blade flap stiffness for distributed input data"
@@ -511,7 +510,6 @@ typedef	^	ED_RtHndSide	ReKi	TeetMom	-	-	-	"The total moment supplied by the stop
 typedef	^	ED_RtHndSide	ReKi	TFrlMom	-	-	-	"The total tail-furl spring and damper moment"
 typedef	^	ED_RtHndSide	ReKi	RFrlMom	-	-	-	"The total rotor-furl spring and damper moment"
 typedef	^	ED_RtHndSide	ReKi	GBoxEffFac	-	-	-	"The factor used to apply the gearbox efficiency effects to the equation associated with the generator DOF"
-typedef	^	ED_RtHndSide	ReKi	rSAerCen	{:}{:}{:}	-	-	"aerodynamic pitching moment arm (i.e., the position vector from point S on the blade to the aerodynamic center of the element)"
 typedef ^       ED_RtHndSide    ReKi    YawFriMom       -       -       -       "Yaw Friction Moment"   kN-m
 
 # ..... States ....................................................................................................................
@@ -681,7 +679,6 @@ typedef	^	ParameterType	ReKi	TwrTpMass	-	-	-	"Tower-top mass (rotor + nacelle)"
 typedef	^	ParameterType	ReKi	YawBrMass	-	-	-	"Yaw bearing mass"
 #typedef	^	ParameterType	ReKi	AirDens	-	-	-	"Air density = RHO"
 typedef	^	ParameterType	ReKi	Gravity	-	-	-	"Gravitational acceleration"	m/s^2
-typedef	^	ParameterType	ReKi	PitchAxis	{:}{:}	-	-	"Pitch axis for analysis nodes"	-
 typedef	^	ParameterType	ReKi	AeroTwst	{:}	-	-	"Aerodynamic twist of the blade at the analysis nodes"
 typedef	^	ParameterType	ReKi	AxRedBld	{:}{:}{:}{:}	-	-	"The axial-reduction terms of the blade shape function"
 typedef	^	ParameterType	ReKi	BldEDamp	{:}{:}	-	-	"Blade edgewise damping coefficients"
@@ -699,8 +696,6 @@ typedef	^	ParameterType	ReKi	KBF	{:}{:}{:}	-	-	"Generalized flapwise stiffness o
 typedef	^	ParameterType	ReKi	MassB	{:}{:}	-	-	"Interpolated lineal blade mass density"
 typedef	^	ParameterType	ReKi	RNodes	{:}	-	-	"Radius to analysis nodes relative to hub ( 0 < RNodes(:) < BldFlexL )"
 typedef	^	ParameterType	ReKi	RNodesNorm	{:}	-	-	"Normalized radius to analysis nodes relative to hub ( 0 < RNodesNorm(:) < 1 )"
-typedef	^	ParameterType	ReKi	rSAerCenn1	{:}{:}	-	-	"Distance from point S on a blade to the aerodynamic center in the n1 direction (m)"
-typedef	^	ParameterType	ReKi	rSAerCenn2	{:}{:}	-	-	"Distance from point S on a blade to the aerodynamic center in the n2 direction (m)"
 typedef	^	ParameterType	ReKi	SAeroTwst	{:}	-	-	"Sine of the aerodynamic twist of the blade at the analysis nodes"
 typedef	^	ParameterType	ReKi	StiffBE	{:}{:}	-	-	"Interpolated edgewise blade stiffness"
 typedef	^	ParameterType	ReKi	StiffBF	{:}{:}	-	-	"Interpolated flapwise blade stiffness"
