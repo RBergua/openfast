@@ -323,8 +323,8 @@ Advanced options (typically used for developers or beta features) can be placed 
 - They can be placed in arbitrary order.
 - They can be commented out with a `!` character at the beginning of the line.
 - Blank lines or unsupported options are ignored (display to screen).
-- If not provided their default value is being used, but the keyword "default" is not available.
-- We recall that these are **beta features** and should mostly be used by developers.
+- If not provided, a default value will be used, but the "DEFAULT" keyword is not supported for the advanced options.
+- These are **beta features** and should mostly be used by developers.
 
 
 The end of the OLAF input file would look as follows:
@@ -343,7 +343,7 @@ The end of the OLAF input file would look as follows:
    ! Lines starting with `!` are ignored, empty lines are ignored
    [...] etc
 
-Currently, the advanced options supported as as follows:
+Currently, the advanced options supported are as follows:
 
 .. code::
 
@@ -352,14 +352,14 @@ Currently, the advanced options supported as as follows:
    ===============================================================================================
    "Panels.vtk"  SrcPnlFile     - Name of VTK file containing source panels {default: ""}
    1             nSrcPnlUpdate  - How often do src panel updates (in time steps of OLAF), {default: 1}
-   True          Induction      - Compute induction, {default: True} 
+   True          Induction      - Compute induced velocities from wake to blade and wake to wake, {default: True} 
    True          InductionAtCP  - Compute induced velocities at nodes or CP, {default: True} 
    True          WakeAtTE       - Start the wake at the trailing edge, or at the LL, {default: True} 
    False         DStallOnWake   - Dynamic stall has influence on wake, {default: False} 
    0.75          kFrozenNWStart - Fraction of wake induced velocity at start of frozen wake, {default: 0.75} 
    0.5           kFrozenNWEnd   - Fraction of wake induced velocity at end of frozen wake, {default: 0.5} 
-   0.0           zGround        - Ground height {default: 0.0}
-   0.1           zGroundPush    - Ground push back {default: 0.1}
+   0.0           zGround        - Ground height, used to enforce that no vortices go into the ground {default: 0.0}
+   0.1           zGroundPush    - Ground push back, vortices that are lower than zGround are placed back at zGroundPush {default: 0.1}
 
 
 
@@ -367,9 +367,9 @@ Currently, the advanced options supported as as follows:
 The VTK file should be a legacy ASCII VTK file, with DATASET POLYDATA POINTS and POLYGONS.
 A sample VTK file is provided below for two panels forming a regular grid in the XY plane. 
 The connectivity of the polygons needs to be such that the normal points away from the body and
-into the fluid. In the example below, the normals are in the z direction which would be typical 
-for a bottom wall with fluid above. 
-When use **WrVTK**, OLAF will write separate VTK files containing various information related to the source panels, such as the pressure coefficient, area, force per area, normals. Looking at the orientation of the normals is extremely important (In Paraview, select 3D Glyph, Arrows, and select the `Normals` output, scaled by the `Normals`). 
+into the fluid. 
+In the example below, the polygons are defined clockwise when viewed from above, which results in the normals internally defined by OLAF pointing in the `+z` direction. This configuration is typical of a bottom wall with fluid above it: the OLAF normals point from the wall toward the fluid. However, when applying the right-hand-rule convention, the resulting normals point from the fluid toward the interior of the body.
+When using **WrVTK**, OLAF will write separate VTK files containing various information related to the source panels, such as the pressure coefficient, area, force per area, normals. Looking at the orientation of the normals is extremely important (In Paraview, select 3D Glyph, Arrows, and select the `Normals` output, scaled by the `Normals`). 
 The BodyID CELL_DATA can be used to separate different patches, which can help the post processing. This is optional, OLAF doesn't use it currently, but it is written back in the output files of OLAF.
 
 Curious readers may look at the unittest `Test_SrcPnl_Sphere` of OLAF that test the pressure coefficient
@@ -415,7 +415,7 @@ about a sphere.
 
 **kFrozenNWEnd** [float] Fraction of wake induced velocity at end of frozen wake, default is `0.5`. See OLAF theory related to Frozen NW, :numref:`sec:vortconvfrozen`.
 
-**zGround** [float] Height below which vortex points are not allowed to be and if any are present they will be pushed back above the ground at the height defined by **zGroundPush**. Default is `0.0`.
+**zGround** [float] Height in meters below which vortex points are not allowed to be and if any are present they will be pushed back above the ground at the height defined by **zGroundPush** (in meters). Default is `0.0`.
 For MHK, the sea bed location, based on the water depth is added to **zGround**.
 
 **zGroundPush** [float] Ground push back, see **zGround**. Default is `0.1`.
