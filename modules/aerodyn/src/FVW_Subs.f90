@@ -1796,6 +1796,12 @@ end subroutine AlphaVrel_Generic
 !> Initialize / allocated main variables for source panels. 
 !! If an non empty input file is provided, the panels points and connectivity are read
 !! Otherwise, Points and IDs should be provided in "p"
+!! 
+!! Acknowledgements: 
+!!   The original implementation of the source panel method was funded by Accelerate Wind,
+!!   and implemented by E. Branlard.
+!!   For more acknowledgements, visit: https://openfast.readthedocs.io/en/main/source/acknowledgements.html
+!! 
 subroutine srcPnl_init(p, m, z, errStat, errMsg, filename)
    use VTK !, only: ReadVTK_PD_info, ReadVTK_PD_fields
    type(T_SrcPanlParam), intent(inout)        :: p
