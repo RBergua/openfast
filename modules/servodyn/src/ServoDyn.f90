@@ -48,12 +48,6 @@ MODULE ServoDyn
    LOGICAL, PARAMETER, PUBLIC           :: Cmpl4LV    = .FALSE.                           ! Is the module being compiled for Labview?
 #endif
 
-
-      ! indices into linearization arrays
-
-   INTEGER, PARAMETER, PUBLIC :: SrvD_Indx_Y_BlPitchCom(3)  = (/1,2,3/)       ! sometime remove this and calculate by p%NumBl (requires mods to FAST_Lin that I'm too lazy to deal with right now -- ADP)
-
-
       ! Parameters for type of control
 
    INTEGER(IntKi), PARAMETER :: ControlMode_NONE      = 0          !< The (ServoDyn-universal) control code for not using a particular type of control
@@ -133,13 +127,12 @@ SUBROUTINE SrvD_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitO
    INTEGER(IntKi)                                 :: i              ! loop counter
    INTEGER(IntKi)                                 :: j              ! loop counter
    INTEGER(IntKi)                                 :: K              ! loop counter
+   INTEGER(IntKi)                                 :: nPts           ! number of linear wind-speed points
    INTEGER(IntKi)                                 :: UnSum          ! Summary file unit
    INTEGER(IntKi)                                 :: ErrStat2       ! temporary Error status of the operation
    CHARACTER(ErrMsgLen)                           :: ErrMsg2        ! temporary Error message if ErrStat /= ErrID_None
    
    character(*), parameter                        :: RoutineName = 'SrvD_Init'
-
-
 
       ! Initialize variables
 
@@ -270,6 +263,10 @@ SUBROUTINE SrvD_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitO
    CALL AllocAry( m%xd_BlPitchFilter,  p%NumBl, 'BlPitchFilter',  ErrStat2, ErrMsg2 )
       if (Failed())  return;
    m%xd_BlPitchFilter = p%BlPitchInit
+
+   CALL AllocAry( m%xd_BlPRateFilter,  p%NumBl, 'BlPRateFilter',  ErrStat2, ErrMsg2 )
+      if (Failed())  return;
+   m%xd_BlPitchFilter = 0.0_ReKi
    
       !.......................
       ! Other states for pitch maneuver
@@ -312,6 +309,9 @@ SUBROUTINE SrvD_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitO
    CALL AllocAry( u%BlPitch, p%NumBl, 'BlPitch', ErrStat2, ErrMsg2 )
       if (Failed())  return;
 
+   CALL AllocAry( u%BlPRate, p%NumBl, 'BlPRate', ErrStat2, ErrMsg2 )
+      if (Failed())  return;
+
    CALL AllocAry( u%ExternalBlPitchCom, p%NumBl, 'ExternalBlPitchCom', ErrStat2, ErrMsg2 )
       if (Failed())  return;
         
@@ -321,6 +321,19 @@ SUBROUTINE SrvD_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitO
       if (Failed())  return;
         
 
+   nPts = InitInp%NumBeam * InitInp%NumPulseGate
+   if (nPts > 0  .and. p%UseBladedInterface) then
+      CALL AllocAry( u%LidSpeed,      nPts, 'u%LidSpeed',      ErrStat2, ErrMsg2 ); if (Failed())  return;
+      CALL AllocAry( u%MsrPositionsX, nPts, 'u%MsrPositionsX', ErrStat2, ErrMsg2 ); if (Failed())  return;
+      CALL AllocAry( u%MsrPositionsY, nPts, 'u%MsrPositionsY', ErrStat2, ErrMsg2 ); if (Failed())  return;
+      CALL AllocAry( u%MsrPositionsZ, nPts, 'u%MsrPositionsZ', ErrStat2, ErrMsg2 ); if (Failed())  return;
+      
+      u%LidSpeed = 0.0_SiKi
+      u%MsrPositionsX = 0.0_ReKi
+      u%MsrPositionsY = 0.0_ReKi
+      u%MsrPositionsZ = 0.0_ReKi
+   end if
+   
    u%BlPitch = p%BlPitchInit(1:p%NumBl)
    
    u%Yaw = p%YawNeut
@@ -361,22 +374,7 @@ SUBROUTINE SrvD_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitO
    u%RotPwr = 0.
    u%HorWindV = 0.
    u%YawAngle = 0.
-   if (allocated(InitInp%LidSpeed)) then   ! Must allocate
-      allocate(u%LidSpeed(size(InitInp%LidSpeed)))
-      u%LidSpeed  = 0.
-   endif
-   if (allocated(InitInp%MsrPositionsX)) then
-      allocate(u%MsrPositionsX(size(InitInp%MsrPositionsX)))
-      u%MsrPositionsX  = 0.
-   endif
-   if (allocated(InitInp%MsrPositionsY)) then
-      allocate(u%MsrPositionsY(size(InitInp%MsrPositionsY)))
-      u%MsrPositionsY  = 0.
-   endif
-   if (allocated(InitInp%MsrPositionsZ)) then
-      allocate(u%MsrPositionsZ(size(InitInp%MsrPositionsZ)))
-      u%MsrPositionsZ  = 0.
-   endif
+
    m%dll_data%ElecPwr_prev = 0.
    m%dll_data%GenTrq_prev = 0.
 
@@ -385,6 +383,15 @@ SUBROUTINE SrvD_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitO
       !............................................................................................
    CALL AllocAry( y%BlPitchCom, p%NumBl, 'BlPitchCom', ErrStat2, ErrMsg2 )
       if (Failed())  return;
+   y%BlPitchCom = InputFileData%PitNeut(1:p%NumBl)
+
+   CALL AllocAry( y%BlPRateCom, p%NumBl, 'BlPRateCom', ErrStat2, ErrMsg2 )
+      if (Failed())  return;
+   y%BlPRateCom = 0.0_ReKi
+
+   CALL AllocAry( y%BlPitchMom, p%NumBl, 'BlPitchMom', ErrStat2, ErrMsg2 )
+      if (Failed())  return;
+   y%BlPitchMom = 0.0_ReKi
 
       ! Commanded Airfoil UserProp for blade.  Must be same units as given in AD15 airfoil tables
       !  This is passed to AD15 to be interpolated with the airfoil table userprop column
@@ -473,8 +480,6 @@ SUBROUTINE SrvD_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitO
       p%SensorType   = InitInp%SensorType
       p%NumBeam      = InitInp%NumBeam
       p%NumPulseGate = InitInp%NumPulseGate
-      p%PulseSpacing = InitInp%PulseSpacing
-      p%URefLid      = InitInp%URefLid
       
       CALL BladedInterface_Init(u, p, m, xd, y, InputFileData, InitInp, StC_CtrlChanInitInfo, UnSum, ErrStat2, ErrMsg2 )
          if (Failed())  return;
@@ -689,6 +694,18 @@ subroutine SrvD_InitVars(InitInp, u, p, x, y, m, InitOut, Linearize, ErrStat, Er
    uPerturbAng = 0.2_R8Ki * Pi_R8 / 180.0_R8Ki
    uPerturbs = [uPerturbTrans, uPerturbAng, uPerturbTrans, uPerturbAng, uPerturbTrans, uPerturbAng]
 
+   call MV_AddVar(InitOut%Vars%u, "BlPitch", FieldScalar, &
+                  DatLoc(SrvD_u_BlPitch), &
+                  Flags=VF_RotFrame + VF_2PI, &
+                  Num=size(u%BlPitch), &
+                  LinNames=[('BlPitch('//trim(Num2LStr(i))//'), rad', i = 1, size(u%BlPitch))])
+
+   call MV_AddVar(InitOut%Vars%u, "BlPRate", FieldScalar, &
+                  DatLoc(SrvD_u_BlPRate), &
+                  Flags=VF_RotFrame, &
+                  Num=size(u%BlPRate), &
+                  LinNames=[('BlPRate('//trim(Num2LStr(i))//'), rad/s', i = 1, size(u%BlPRate))])
+
    call MV_AddVar(InitOut%Vars%u, "Yaw", FieldScalar, DatLoc(SrvD_u_Yaw), Flags=VF_2PI, LinNames=['Yaw, rad'])
 
    call MV_AddVar(InitOut%Vars%u, "YawRate", FieldScalar, DatLoc(SrvD_u_YawRate), LinNames=['YawRate, rad/s'])
@@ -726,6 +743,11 @@ subroutine SrvD_InitVars(InitInp, u, p, x, y, m, InitOut, Linearize, ErrStat, Er
                            Perturbs=uPerturbs)
    enddo
 
+   call MV_AddMeshVar(InitOut%Vars%u, 'PtfmMotionMesh ', MotionFields, &
+                              DatLoc(SrvD_u_PtfmMotionMesh), &
+                              Mesh=u%PtfmMotionMesh, &
+                              Perturbs=uPerturbs)
+
    !----------------------------------------------------------------------------
    ! Output variables
    !----------------------------------------------------------------------------
@@ -735,6 +757,18 @@ subroutine SrvD_InitVars(InitInp, u, p, x, y, m, InitOut, Linearize, ErrStat, Er
                   Flags=VF_RotFrame + VF_2PI, &
                   Num=size(y%BlPitchCom), &
                   LinNames=[('BlPitchCom('//trim(Num2LStr(i))//'), rad', i = 1, size(y%BlPitchCom))])
+
+   call MV_AddVar(InitOut%Vars%y, "BlPRateCom", FieldScalar, &
+                  DatLoc(SrvD_y_BlPRateCom), &
+                  Flags=VF_RotFrame, &
+                  Num=size(y%BlPRateCom), &
+                  LinNames=[('BlPRateCom('//trim(Num2LStr(i))//'), rad/s', i = 1, size(y%BlPRateCom))])
+
+   call MV_AddVar(InitOut%Vars%y, "BlPitchMom", FieldScalar, &
+                  DatLoc(SrvD_y_BlPitchMom), &
+                  Flags=VF_RotFrame, &
+                  Num=size(y%BlPitchMom), &
+                  LinNames=[('BlPitchMom('//trim(Num2LStr(i))//'), Nm', i = 1, size(y%BlPitchMom))])
 
    call MV_AddVar(InitOut%Vars%y, "YawMom", FieldScalar, &
                   DatLoc(SrvD_y_YawMom), &
@@ -874,6 +908,8 @@ contains
       ! outputs always passed
       p%Jac_ny = p%Jac_ny              &
             + size(y%BlPitchCom)       &  ! y%BlPitchCom(:)
+            + size(y%BlPRateCom)       &  ! y%BlPRateCom(:)
+            + size(y%BlPitchMom)       &  ! y%BlPitchMom(:)
             + 1                        &  ! y%YawMom
             + 1                        &  ! y%GenTrq
             + 1                           ! y%ElecPwr
@@ -900,6 +936,20 @@ contains
       ! y%BlPitchCom -- NOTE: assumed order of these outputs
       do i=1,size(y%BlPitchCom)
          InitOut%LinNames_y(index_next) = 'BlPitchCom('//trim(num2lstr(i))//'), rad'
+         InitOut%RotFrame_y(index_next) = .true.
+         index_next = index_next + 1
+      end do
+
+      ! y%BlPRateCom -- NOTE: assumed order of these outputs
+      do i=1,size(y%BlPRateCom)
+         InitOut%LinNames_y(index_next) = 'BlPRateCom('//trim(num2lstr(i))//'), rad/s'
+         InitOut%RotFrame_y(index_next) = .true.
+         index_next = index_next + 1
+      end do
+
+      ! y%BlPitchMom -- NOTE: assumed order of these outputs
+      do i=1,size(y%BlPitchMom)
+         InitOut%LinNames_y(index_next) = 'BlPitchMom('//trim(num2lstr(i))//'), Nm'
          InitOut%RotFrame_y(index_next) = .true.
          index_next = index_next + 1
       end do
@@ -962,6 +1012,9 @@ contains
       do i=1,p%NumOuts
          InitOut%LinNames_y(index_next) = trim(p%OutParam(i)%Name)//', '//p%OutParam(i)%Units
          if (ANY( p%OutParam(i)%Indx == BlPitchC ))   InitOut%RotFrame_y(index_next) = .true.   ! WriteOutput BlPitch commands
+         if (ANY( p%OutParam(i)%Indx == BlPRateC ))   InitOut%RotFrame_y(index_next) = .true.   ! WriteOutput BlPRate commands
+         if (ANY( p%OutParam(i)%Indx == BlPitchM ))   InitOut%RotFrame_y(index_next) = .true.   ! WriteOutput BlPitch moments
+
          ! Blade StC local output channels
          if (ANY( p%OutParam(i)%Indx == BStC_XQ  ))   InitOut%RotFrame_y(index_next) = .true.   ! Blade StC X displacements
          if (ANY( p%OutParam(i)%Indx == BStC_XQD ))   InitOut%RotFrame_y(index_next) = .true.   ! Blade StC X displacement velocities
@@ -1098,7 +1151,7 @@ contains
       integer(IntKi)             :: i, j, k, index_next
       integer(IntKi)             :: i_meshField    ! Counter for mesh fields
       ! Standard inputs
-      p%Jac_nu = 3                           ! Yaw, YawRate, HSS_Spd
+      p%Jac_nu = 2*p%NumBl + 3               ! BlPitch, BlPRate, Yaw, YawRate, HSS_Spd
       ! StC related inputs
       p%Jac_nu = p%Jac_nu                 &
             + p%NumBStC  * 18 * p%NumBl   &  ! 3 Translation Displacements + 3 orientations + 6 velocities + 6 accelerations at each BStC instance on each blade
@@ -1138,6 +1191,21 @@ contains
       ! linearization input names
       !--------------------------------
       index_next = 1
+
+      ! u%BlPitch   -- rotating frame
+      do i=1,p%NumBl
+         InitOut%LinNames_u(index_next) = 'BlPitch('//trim(Num2LStr(i))//'), rad'
+         InitOut%RotFrame_u(index_next) = .true.
+         index_next = index_next + 1
+      enddo
+
+      ! u%BlPRate   -- rotating frame
+      do i=1,p%NumBl
+         InitOut%LinNames_u(index_next)  = 'BlPRate('//trim(Num2LStr(i))//'), rad'
+         InitOut%RotFrame_u(index_next) = .true.
+         index_next = index_next + 1
+      enddo
+
       ! u%Yaw     -- not in rotating frame
       InitOut%LinNames_u(index_next)  = 'Yaw, rad';         index_next = index_next + 1
  
@@ -1193,6 +1261,8 @@ contains
       ! linearization perturbation size
       !--------------------------------
       index_next = 1
+      !! u%BlPitch -- in rotating frame         NOTE: this is calculated exactly, so not necessary to track
+      !! u%BlPRate -- in rotating frame         NOTE: this is calculated exactly, so not necessary to track
       !! u%Yaw     -- not in rotating frame     NOTE: this is calculated exactly, so not necessary to track
       !! u%YawRate -- not in rotating frame     NOTE: this is calculated exactly, so not necessary to track
       !! u%HSS_Spd -- not in rotating frame     NOTE: this is calculated exactly, so not necessary to track
@@ -1385,7 +1455,7 @@ subroutine StC_Nacelle_Setup(SrvD_InitInp,SrvD_p,InputFileData,SrvD_u,SrvD_y,Srv
 
       do j=1,SrvD_p%NumNStC
          StC_InitInp%InputFile      =  InputFileData%NStCfiles(j)
-         StC_InitInp%RootName       =  TRIM(SrvD_p%RootName)//'.NStC'
+         StC_InitInp%RootName       =  TRIM(SrvD_p%RootName)//'.NStC'//trim(Num2LStr(j))
          StC_InitInp%Gravity        =  SrvD_InitInp%gravity
          StC_InitInp%NumMeshPts     =  1_IntKi        ! single point mesh for Nacelle
          Interval                   =  SrvD_p%DT      ! Pass the ServoDyn DT
@@ -1513,7 +1583,7 @@ subroutine StC_Tower_Setup(SrvD_InitInp,SrvD_p,InputFileData,SrvD_u,SrvD_y,SrvD_
 
       do j=1,SrvD_p%NumTStC
          StC_InitInp%InputFile      =  InputFileData%TStCfiles(j)
-         StC_InitInp%RootName       =  TRIM(SrvD_p%RootName)//'.TStC'
+         StC_InitInp%RootName       =  TRIM(SrvD_p%RootName)//'.TStC'//trim(Num2LStr(j))
          StC_InitInp%Gravity        =  SrvD_InitInp%gravity
          StC_InitInp%NumMeshPts     =  1_IntKi        ! single point mesh for Tower
          Interval                   =  SrvD_p%DT      ! Pass the ServoDyn DT
@@ -1639,7 +1709,7 @@ subroutine StC_Blade_Setup(SrvD_InitInp,SrvD_p,InputFileData,SrvD_u,SrvD_y,SrvD_
 
       do j=1,SrvD_p%NumBStC
          StC_InitInp%InputFile      =  InputFileData%BStCfiles(j)
-         StC_InitInp%RootName       =  TRIM(SrvD_p%RootName)//'.BStC'
+         StC_InitInp%RootName       =  TRIM(SrvD_p%RootName)//'.BStC'//trim(Num2LStr(j))
          StC_InitInp%Gravity        =  SrvD_InitInp%gravity
          StC_InitInp%NumMeshPts     =  SrvD_p%NumBl        ! p%NumBl points for blades
          Interval                   =  SrvD_p%DT      ! Pass the ServoDyn DT
@@ -1772,7 +1842,7 @@ subroutine StC_Substruc_Setup(SrvD_InitInp,SrvD_p,InputFileData,SrvD_u,SrvD_y,Sr
 
       do j=1,SrvD_p%NumSStC
          StC_InitInp%InputFile      =  InputFileData%SStCfiles(j)
-         StC_InitInp%RootName       =  TRIM(SrvD_p%RootName)//'.SStC'
+         StC_InitInp%RootName       =  TRIM(SrvD_p%RootName)//'.SStC'//trim(Num2LStr(j))
          StC_InitInp%Gravity        =  SrvD_InitInp%gravity
          StC_InitInp%NumMeshPts     =  1_IntKi        ! single point mesh for Platform
          Interval                   =  SrvD_p%DT      ! Pass the ServoDyn DT
@@ -1868,7 +1938,7 @@ subroutine StC_CtrlChan_Setup(m,p,CtrlChanInitInfo,UnSum,ErrStat,ErrMsg)
    ErrMsg   = ""
 
    ! NOTE:  For now we only have the option of the StC requesting the bladed interface
-   !        at the the ServoDyn level.  If we later add a Simulink interface, the logic
+   !        at the ServoDyn level.  If we later add a Simulink interface, the logic
    !        below for checking if the DLL interface was requested will need updating.
    !        At that point it might be necessary to set an array for the p%StCCMode so
    !        it is possible to tell which channel is from Simulink and which is from
@@ -2387,7 +2457,7 @@ SUBROUTINE SrvD_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg
    CHARACTER(*),                   INTENT(  OUT)  :: ErrMsg      !< Error message if ErrStat /= ErrID_None
 
       ! Local variables
-   REAL(ReKi)                                     :: AllOuts(0:MaxOutPts)   ! All the the available output channels
+   REAL(ReKi)                                     :: AllOuts(0:MaxOutPts)   ! All the available output channels
    INTEGER(IntKi)                                 :: I                      ! Generic loop index
    INTEGER(IntKi)                                 :: K                      ! Blade index
    INTEGER(IntKi)                                 :: J                      ! Structural control instance at location
@@ -2433,7 +2503,7 @@ SUBROUTINE SrvD_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg
       if (Failed()) return;
 
       ! Pitch control:
-   CALL Pitch_CalcOutput( t, u, p, x, xd, z, OtherState, y%BlPitchCom, y%ElecPwr, m, ErrStat2, ErrMsg2 )
+   CALL Pitch_CalcOutput( t, u, p, x, xd, z, OtherState, y%BlPitchCom, y%BlPRateCom, y%BlPitchMom, y%ElecPwr, m, ErrStat2, ErrMsg2 )
       if (Failed()) return;
 
       ! Yaw control:
@@ -2868,7 +2938,7 @@ subroutine Jac_dYdu( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg, dYdu 
    !     This is an analytical calculation.
    !     First 3 columns in dY/du
    !-------------------------------------------------------------
-   call dYdu_YawGen();  if (ErrStat > AbortErrLev)  return;
+   call dYdu_PitYawGen();  if (ErrStat > AbortErrLev)  return;
 
    !-------------------------------------------------------------
    ! Perturb each StC instance individually and place in appropriate location in dYdu
@@ -2975,39 +3045,61 @@ contains
 
    !> Subroutine for the yaw and generator portions of the dYdu matrix (first three rows of dYdu)
    !!    This is part of dYdu uses analytical results
-   subroutine dYdu_YawGen()
+   subroutine dYdu_PitYawGen()
       integer(IntKi)          :: i                       ! Generic indices
       real(R8Ki)              :: GenTrq_du, ElecPwr_du   ! derivatives of generator torque and electrical power w.r.t. u%HSS_SPD
-      integer,parameter       :: Indx_u_Yaw     = 1
-      integer,parameter       :: Indx_u_YawRate = 2
-      integer,parameter       :: Indx_u_HSS_Spd = 3
+      integer                 :: Indx_u_BlPitch(3)
+      integer                 :: Indx_u_BlPRate(3)
+      integer                 :: Indx_u_Yaw
+      integer                 :: Indx_u_YawRate
+      integer                 :: Indx_u_HSS_Spd
+      integer                 :: SrvD_Indx_Y_BlPitchMom(3)
       integer                 :: SrvD_Indx_Y_YawMom
       integer                 :: SrvD_Indx_Y_GenTrq
       integer                 :: SrvD_Indx_Y_ElecPwr
       integer                 :: SrvD_Indx_Y_WrOutput
-      real(R8Ki)              :: AllOuts(3,MaxOutPts)             ! Extra precision here since analytical
+      real(R8Ki)              :: AllOuts(9,MaxOutPts)             ! Extra precision here since analytical
 
-      SrvD_Indx_Y_YawMom   = size(SrvD_Indx_Y_BlPitchCom) + 1     ! sometime change this to p%NumBl
-      SrvD_Indx_Y_GenTrq   = SrvD_Indx_Y_YawMom + 1
-      SrvD_Indx_Y_ElecPwr  = SrvD_Indx_Y_GenTrq + 1
-      SrvD_Indx_Y_WrOutput = p%Jac_ny - p%NumOuts                 ! Index to location before user requested outputs
+      SrvD_Indx_Y_BlPitchMom = 2*p%NumBl + (/1,2,3/)              ! Only the first p%NumBl entries are used
+      SrvD_Indx_Y_YawMom     = 3*p%NumBl + 1
+      SrvD_Indx_Y_GenTrq     = SrvD_Indx_Y_YawMom + 1
+      SrvD_Indx_Y_ElecPwr    = SrvD_Indx_Y_GenTrq + 1
+      SrvD_Indx_Y_WrOutput   = p%Jac_ny - p%NumOuts               ! Index to location before user requested outputs
+
+      Indx_u_BlPitch = (/1,2,3/)                                  ! Only the first p%NumBl entries are used
+      Indx_u_BlPRate = p%NumBl + (/1,2,3/)                        ! Only the first p%NumBl entries are used
+      Indx_u_Yaw     = 2*p%NumBl + 1
+      Indx_u_YawRate = Indx_u_Yaw + 1
+      Indx_u_HSS_Spd = Indx_u_YawRate + 1
 
       !> \f{equation}{ \frac{\partial Y}{\partial u} = \begin{bmatrix}
-      !! \frac{\partial Y_{BlPitchCom_1}}{\partial u_{Yaw}}  & \frac{\partial Y_{BlPitchCom_1}}{\partial u_{YawRate}}  & \frac{\partial Y_{BlPitchCom_1}}{\partial u_{HSS\_Spd}} \\
-      !! \frac{\partial Y_{BlPitchCom_2}}{\partial u_{Yaw}}  & \frac{\partial Y_{BlPitchCom_2}}{\partial u_{YawRate}}  & \frac{\partial Y_{BlPitchCom_2}}{\partial u_{HSS\_Spd}} \\
-      !! \frac{\partial Y_{BlPitchCom_3}}{\partial u_{Yaw}}  & \frac{\partial Y_{BlPitchCom_3}}{\partial u_{YawRate}}  & \frac{\partial Y_{BlPitchCom_3}}{\partial u_{HSS\_Spd}} \\
-      !! \frac{\partial Y_{YawMom}}{\partial u_{Yaw}}        & \frac{\partial Y_{YawMom}}{\partial u_{YawRate}}        & \frac{\partial Y_{YawMom}}{\partial u_{HSS\_Spd}} \\
-      !! \frac{\partial Y_{GenTrq}}{\partial u_{Yaw}}        & \frac{\partial Y_{GenTrq}}{\partial u_{YawRate}}        & \frac{\partial Y_{GenTrq}}{\partial u_{HSS\_Spd}} \\
-      !! \frac{\partial Y_{ElecPwr}}{\partial u_{Yaw}}       & \frac{\partial Y_{ElecPwr}}{\partial u_{YawRate}}       & \frac{\partial Y_{ElecPwr}}{\partial u_{HSS\_Spd}} \\
-      !! \frac{\partial Y_{WriteOutput_i}}{\partial u_{Yaw}} & \frac{\partial Y_{WriteOutput_i}}{\partial u_{YawRate}} & \frac{\partial Y_{WriteOutput_i}}{\partial u_{HSS\_Spd}} \end{bmatrix}
+      !! \frac{\partial Y_{BlPitchCom_1}}{\partial u_{BlPitch_1}}  & \frac{\partial Y_{BlPitchCom_1}}{\partial u_{BlPitch_2}}  & \frac{\partial Y_{BlPitchCom_1}}{\partial u_{BlPitch_3}}  & \frac{\partial Y_{BlPitchCom_1}}{\partial u_{BlPRate_1}}  & \frac{\partial Y_{BlPitchCom_1}}{\partial u_{BlPRate_2}}  & \frac{\partial Y_{BlPitchCom_1}}{\partial u_{BlPRate_3}}  & \frac{\partial Y_{BlPitchCom_1}}{\partial u_{Yaw}}   & \frac{\partial Y_{BlPitchCom_1}}{\partial u_{YawRate}}   & \frac{\partial Y_{BlPitchCom_1}}{\partial u_{HSS\_Spd}}  \\
+      !! \frac{\partial Y_{BlPitchCom_2}}{\partial u_{BlPitch_1}}  & \frac{\partial Y_{BlPitchCom_2}}{\partial u_{BlPitch_2}}  & \frac{\partial Y_{BlPitchCom_2}}{\partial u_{BlPitch_3}}  & \frac{\partial Y_{BlPitchCom_2}}{\partial u_{BlPRate_1}}  & \frac{\partial Y_{BlPitchCom_2}}{\partial u_{BlPRate_2}}  & \frac{\partial Y_{BlPitchCom_2}}{\partial u_{BlPRate_3}}  & \frac{\partial Y_{BlPitchCom_2}}{\partial u_{Yaw}}   & \frac{\partial Y_{BlPitchCom_2}}{\partial u_{YawRate}}   & \frac{\partial Y_{BlPitchCom_2}}{\partial u_{HSS\_Spd}}  \\
+      !! \frac{\partial Y_{BlPitchCom_3}}{\partial u_{BlPitch_1}}  & \frac{\partial Y_{BlPitchCom_3}}{\partial u_{BlPitch_2}}  & \frac{\partial Y_{BlPitchCom_3}}{\partial u_{BlPitch_3}}  & \frac{\partial Y_{BlPitchCom_3}}{\partial u_{BlPRate_1}}  & \frac{\partial Y_{BlPitchCom_3}}{\partial u_{BlPRate_2}}  & \frac{\partial Y_{BlPitchCom_3}}{\partial u_{BlPRate_3}}  & \frac{\partial Y_{BlPitchCom_3}}{\partial u_{Yaw}}   & \frac{\partial Y_{BlPitchCom_3}}{\partial u_{YawRate}}   & \frac{\partial Y_{BlPitchCom_3}}{\partial u_{HSS\_Spd}}  \\
+      !! \frac{\partial Y_{BlPRateCom_1}}{\partial u_{BlPitch_1}}  & \frac{\partial Y_{BlPRateCom_1}}{\partial u_{BlPitch_2}}  & \frac{\partial Y_{BlPRateCom_1}}{\partial u_{BlPitch_3}}  & \frac{\partial Y_{BlPRateCom_1}}{\partial u_{BlPRate_1}}  & \frac{\partial Y_{BlPRateCom_1}}{\partial u_{BlPRate_2}}  & \frac{\partial Y_{BlPRateCom_1}}{\partial u_{BlPRate_3}}  & \frac{\partial Y_{BlPRateCom_1}}{\partial u_{Yaw}}   & \frac{\partial Y_{BlPRateCom_1}}{\partial u_{YawRate}}   & \frac{\partial Y_{BlPRateCom_1}}{\partial u_{HSS\_Spd}}  \\
+      !! \frac{\partial Y_{BlPRateCom_2}}{\partial u_{BlPitch_1}}  & \frac{\partial Y_{BlPRateCom_2}}{\partial u_{BlPitch_2}}  & \frac{\partial Y_{BlPRateCom_2}}{\partial u_{BlPitch_3}}  & \frac{\partial Y_{BlPRateCom_2}}{\partial u_{BlPRate_1}}  & \frac{\partial Y_{BlPRateCom_2}}{\partial u_{BlPRate_2}}  & \frac{\partial Y_{BlPRateCom_2}}{\partial u_{BlPRate_3}}  & \frac{\partial Y_{BlPRateCom_2}}{\partial u_{Yaw}}   & \frac{\partial Y_{BlPRateCom_2}}{\partial u_{YawRate}}   & \frac{\partial Y_{BlPRateCom_2}}{\partial u_{HSS\_Spd}}  \\
+      !! \frac{\partial Y_{BlPRateCom_3}}{\partial u_{BlPitch_1}}  & \frac{\partial Y_{BlPRateCom_3}}{\partial u_{BlPitch_2}}  & \frac{\partial Y_{BlPRateCom_3}}{\partial u_{BlPitch_3}}  & \frac{\partial Y_{BlPRateCom_3}}{\partial u_{BlPRate_1}}  & \frac{\partial Y_{BlPRateCom_3}}{\partial u_{BlPRate_2}}  & \frac{\partial Y_{BlPRateCom_3}}{\partial u_{BlPRate_3}}  & \frac{\partial Y_{BlPRateCom_3}}{\partial u_{Yaw}}   & \frac{\partial Y_{BlPRateCom_3}}{\partial u_{YawRate}}   & \frac{\partial Y_{BlPRateCom_3}}{\partial u_{HSS\_Spd}}  \\
+      !! \frac{\partial Y_{BlPitchMom_1}}{\partial u_{BlPitch_1}}  & \frac{\partial Y_{BlPitchMom_1}}{\partial u_{BlPitch_2}}  & \frac{\partial Y_{BlPitchMom_1}}{\partial u_{BlPitch_3}}  & \frac{\partial Y_{BlPitchMom_1}}{\partial u_{BlPRate_1}}  & \frac{\partial Y_{BlPitchMom_1}}{\partial u_{BlPRate_2}}  & \frac{\partial Y_{BlPitchMom_1}}{\partial u_{BlPRate_3}}  & \frac{\partial Y_{BlPitchMom_1}}{\partial u_{Yaw}}   & \frac{\partial Y_{BlPitchMom_1}}{\partial u_{YawRate}}   & \frac{\partial Y_{BlPitchMom_1}}{\partial u_{HSS\_Spd}}  \\
+      !! \frac{\partial Y_{BlPitchMom_2}}{\partial u_{BlPitch_1}}  & \frac{\partial Y_{BlPitchMom_2}}{\partial u_{BlPitch_2}}  & \frac{\partial Y_{BlPitchMom_2}}{\partial u_{BlPitch_3}}  & \frac{\partial Y_{BlPitchMom_2}}{\partial u_{BlPRate_1}}  & \frac{\partial Y_{BlPitchMom_2}}{\partial u_{BlPRate_2}}  & \frac{\partial Y_{BlPitchMom_2}}{\partial u_{BlPRate_3}}  & \frac{\partial Y_{BlPitchMom_2}}{\partial u_{Yaw}}   & \frac{\partial Y_{BlPitchMom_2}}{\partial u_{YawRate}}   & \frac{\partial Y_{BlPitchMom_2}}{\partial u_{HSS\_Spd}}  \\
+      !! \frac{\partial Y_{BlPitchMom_3}}{\partial u_{BlPitch_1}}  & \frac{\partial Y_{BlPitchMom_3}}{\partial u_{BlPitch_2}}  & \frac{\partial Y_{BlPitchMom_3}}{\partial u_{BlPitch_3}}  & \frac{\partial Y_{BlPitchMom_3}}{\partial u_{BlPRate_1}}  & \frac{\partial Y_{BlPitchMom_3}}{\partial u_{BlPRate_2}}  & \frac{\partial Y_{BlPitchMom_3}}{\partial u_{BlPRate_3}}  & \frac{\partial Y_{BlPitchMom_3}}{\partial u_{Yaw}}   & \frac{\partial Y_{BlPitchMom_3}}{\partial u_{YawRate}}   & \frac{\partial Y_{BlPitchMom_3}}{\partial u_{HSS\_Spd}}  \\
+      !! \frac{\partial Y_{YawMom}}{\partial u_{BlPitch_1}}        & \frac{\partial Y_{YawMom}}{\partial u_{BlPitch_2}}        & \frac{\partial Y_{YawMom}}{\partial u_{BlPitch_3}}        & \frac{\partial Y_{YawMom}}{\partial u_{BlPRate_1}}        & \frac{\partial Y_{YawMom}}{\partial u_{BlPRate_2}}        & \frac{\partial Y_{YawMom}}{\partial u_{BlPRate_3}}        & \frac{\partial Y_{YawMom}}{\partial u_{Yaw}}         & \frac{\partial Y_{YawMom}}{\partial u_{YawRate}}         & \frac{\partial Y_{YawMom}}{\partial u_{HSS\_Spd}}        \\
+      !! \frac{\partial Y_{GenTrq}}{\partial u_{BlPitch_1}}        & \frac{\partial Y_{GenTrq}}{\partial u_{BlPitch_2}}        & \frac{\partial Y_{GenTrq}}{\partial u_{BlPitch_3}}        & \frac{\partial Y_{GenTrq}}{\partial u_{BlPRate_1}}        & \frac{\partial Y_{GenTrq}}{\partial u_{BlPRate_2}}        & \frac{\partial Y_{GenTrq}}{\partial u_{BlPRate_3}}        & \frac{\partial Y_{GenTrq}}{\partial u_{Yaw}}         & \frac{\partial Y_{GenTrq}}{\partial u_{YawRate}}         & \frac{\partial Y_{GenTrq}}{\partial u_{HSS\_Spd}}        \\
+      !! \frac{\partial Y_{ElecPwr}}{\partial u_{BlPitch_1}}       & \frac{\partial Y_{ElecPwr}}{\partial u_{BlPitch_2}}       & \frac{\partial Y_{ElecPwr}}{\partial u_{BlPitch_3}}       & \frac{\partial Y_{ElecPwr}}{\partial u_{BlPRate_1}}       & \frac{\partial Y_{ElecPwr}}{\partial u_{BlPRate_2}}       & \frac{\partial Y_{ElecPwr}}{\partial u_{BlPRate_3}}       & \frac{\partial Y_{ElecPwr}}{\partial u_{Yaw}}        & \frac{\partial Y_{ElecPwr}}{\partial u_{YawRate}}        & \frac{\partial Y_{ElecPwr}}{\partial u_{HSS\_Spd}}       \\
+      !! \frac{\partial Y_{WriteOutput_i}}{\partial u_{BlPitch_1}} & \frac{\partial Y_{WriteOutput_i}}{\partial u_{BlPitch_2}} & \frac{\partial Y_{WriteOutput_i}}{\partial u_{BlPitch_3}} & \frac{\partial Y_{WriteOutput_i}}{\partial u_{BlPRate_1}} & \frac{\partial Y_{WriteOutput_i}}{\partial u_{BlPRate_2}} & \frac{\partial Y_{WriteOutput_i}}{\partial u_{BlPRate_3}} & \frac{\partial Y_{WriteOutput_i}}{\partial u_{Yaw}}  & \frac{\partial Y_{WriteOutput_i}}{\partial u_{YawRate}}  & \frac{\partial Y_{WriteOutput_i}}{\partial u_{HSS\_Spd}} \\
       !! = \begin{bmatrix}
-      !! 0 & 0 & 0 \\
-      !! 0 & 0 & 0 \\
-      !! 0 & 0 & 0 \\
-      !! \frac{\partial Y_{YawMom}}{\partial u_{Yaw}} & \frac{\partial Y_{YawMom}}{\partial u_{YawRate}} & 0 \\
-      !! 0 & 0 & \frac{\partial Y_{GenTrq}}{\partial u_{HSS\_Spd}} \\
-      !! 0 & 0 & \frac{\partial Y_{ElecPwr}}{\partial u_{HSS\_Spd}} \\
-      !! \frac{\partial Y_{WriteOutput_i}}{\partial u_{Yaw}} & \frac{\partial Y_{WriteOutput_i}}{\partial u_{YawRate}} & \frac{\partial Y_{WriteOutput_i}}{\partial u_{HSS\_Spd}} \end{bmatrix}
+      !! 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\  ! \frac{\partial Y_{BlPitchCom_1}}{\partial u_{*}}
+      !! 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\  ! \frac{\partial Y_{BlPitchCom_2}}{\partial u_{*}}
+      !! 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\  ! \frac{\partial Y_{BlPitchCom_3}}{\partial u_{*}}
+      !! 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\  ! \frac{\partial Y_{BlPRateCom_1}}{\partial u_{*}}
+      !! 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\  ! \frac{\partial Y_{BlPRateCom_2}}{\partial u_{*}}
+      !! 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\  ! \frac{\partial Y_{BlPRateCom_3}}{\partial u_{*}}
+      !! \frac{\partial Y_{BlPitchMom_1}}{\partial u_{BlPitch_1}} & 0 & 0 & \frac{\partial Y_{BlPitchMom_1}}{\partial u_{BlPRate_1}} & 0 & 0 & 0 & 0 & 0 \\  ! \frac{\partial Y_{BlPitchMom_1}}{\partial u_{*}}
+      !! 0 & \frac{\partial Y_{BlPitchMom_2}}{\partial u_{BlPitch_2}} & 0 & 0 & \frac{\partial Y_{BlPitchMom_2}}{\partial u_{BlPRate_2}} & 0 & 0 & 0 & 0 \\  ! \frac{\partial Y_{BlPitchMom_2}}{\partial u_{*}}
+      !! 0 & 0 & \frac{\partial Y_{BlPitchMom_3}}{\partial u_{BlPitch_3}} & 0 & 0 & \frac{\partial Y_{BlPitchMom_3}}{\partial u_{BlPRate_3}} & 0 & 0 & 0 \\  ! \frac{\partial Y_{BlPitchMom_3}}{\partial u_{*}}
+      !! 0 & 0 & 0 & 0 & 0 & 0 & \frac{\partial Y_{YawMom}}{\partial u_{Yaw}} & \frac{\partial Y_{YawMom}}{\partial u_{YawRate}} & 0 \\
+      !! 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & \frac{\partial Y_{GenTrq}}{\partial u_{HSS\_Spd}} \\
+      !! 0 & 0 & 0 & 0 & 0 & 0 & 0 & 0 & \frac{\partial Y_{ElecPwr}}{\partial u_{HSS\_Spd}} \\
+      !! \frac{\partial Y_{WriteOutput_i}}{\partial u_{BlPitch_1}} & \frac{\partial Y_{WriteOutput_i}}{\partial u_{BlPitch_2}} & \frac{\partial Y_{WriteOutput_i}}{\partial u_{BlPitch_3}} & \frac{\partial Y_{WriteOutput_i}}{\partial u_{BlPRate_1}} & \frac{\partial Y_{WriteOutput_i}}{\partial u_{BlPRate_2}} & \frac{\partial Y_{WriteOutput_i}}{\partial u_{BlPRate_3}} & \frac{\partial Y_{WriteOutput_i}}{\partial u_{Yaw}}  & \frac{\partial Y_{WriteOutput_i}}{\partial u_{YawRate}}  & \frac{\partial Y_{WriteOutput_i}}{\partial u_{HSS\_Spd}} \\
       !!\f}
 
       !   ! Torque control:
@@ -3021,6 +3113,12 @@ contains
 
          ! Pitch control:
       !> \f$ \frac{\partial Y_{BlPitchCom_k}}{\partial u} = 0 \f$
+      do i=1,p%NumBl
+         !> \f$ \frac{\partial Y_{BlPitchMom_k}}{\partial u_{BlPitch_k}} = -p\%PitSpr \f$
+         dYdu(SrvD_Indx_Y_BlPitchMom(i),Indx_u_BlPitch(i)) = -p%PitSpr(i)      ! from Pitch_CalcOutput
+         !> \f$ \frac{\partial Y_{BlPitchMom_k}}{\partial u_{BlPRate_k}} = -p\%PitDamp \f$
+         dYdu(SrvD_Indx_Y_BlPitchMom(i),Indx_u_BlPRate(i)) = -p%PitDamp(i)     ! from Pitch_CalcOutput
+      enddo
 
          ! Yaw control:
       !> \f$ \frac{\partial Y_{YawMom}}{\partial u_{Yaw}} = -p\%YawSpr \f$
@@ -3028,14 +3126,18 @@ contains
       !> \f$ \frac{\partial Y_{YawMom}}{\partial u_{YawRate}} = -p\%YawDamp \f$
       dYdu(SrvD_Indx_Y_YawMom,Indx_u_YawRate) = -p%YawDamp     ! from Yaw_CalcOutput
 
+      !< The section below needs to be updated after introducing new output channels
       !...............................................................................
       ! Calculate the output channels that will be affected by u%{Yaw,YawRate,HSS_Spd}
       !     These terms are analytically calculated
       !...............................................................................
       AllOuts = 0.0_R8Ki ! all variables not specified below are zeros (either constant or disabled):
-      AllOuts(1:3, GenTq)     =  0.001_R8Ki*dYdu(SrvD_Indx_Y_GenTrq,1:3)
-      AllOuts(1:3, GenPwr)    =  0.001_R8Ki*dYdu(SrvD_Indx_Y_ElecPwr,1:3)
-      AllOuts(1:3, YawMomCom) = -0.001_R8Ki*dYdu(SrvD_Indx_Y_YawMom,1:3)
+      do I = 1,p%NumBl
+         AllOuts((/Indx_u_BlPitch(I),Indx_u_BlPRate(I)/), BlPitchM(I)) =  0.001_R8Ki*dYdu(SrvD_Indx_Y_BlPitchMom(I), (/Indx_u_BlPitch(I),Indx_u_BlPRate(I)/))
+      enddo
+      AllOuts(  Indx_u_HSS_Spd,                  GenTq) =  0.001_R8Ki*dYdu(SrvD_Indx_Y_GenTrq,              Indx_u_HSS_Spd  )
+      AllOuts(  Indx_u_HSS_Spd,                 GenPwr) =  0.001_R8Ki*dYdu(SrvD_Indx_Y_ElecPwr,             Indx_u_HSS_Spd  )
+      AllOuts((/Indx_u_Yaw,Indx_u_YawRate/), YawMomCom) = -0.001_R8Ki*dYdu(SrvD_Indx_Y_YawMom, (/Indx_u_Yaw,Indx_u_YawRate/))
 
       !...............................................................................
       ! Place the selected output channels into the WriteOutput(:) portion of the
@@ -3043,12 +3145,12 @@ contains
       !...............................................................................
       do I = 1,p%NumOuts  ! Loop through all selected output channels
          if (p%OutParam(I)%Indx > 0_IntKi) then
-            dYdu(I+SrvD_Indx_Y_WrOutput,1:3) = p%OutParam(I)%SignM * AllOuts( 1:3, p%OutParam(I)%Indx )
+            dYdu(I+SrvD_Indx_Y_WrOutput,1:9) = p%OutParam(I)%SignM * AllOuts( 1:9, p%OutParam(I)%Indx )
          else
-            dYdu(I+SrvD_Indx_Y_WrOutput,1:3) = 0.0_R8Ki
+            dYdu(I+SrvD_Indx_Y_WrOutput,1:9) = 0.0_R8Ki
          endif
       enddo             ! I - All selected output channels
-   end subroutine dYdu_YawGen
+   end subroutine dYdu_PitYawGen
 
    !> Calculated dYdu for BStC instance
    subroutine Jac_BStC_dYdu( n, sgn, u_perturb, delta, y_perturb, ErrStat3, ErrMsg3)
@@ -3062,7 +3164,7 @@ contains
       integer(IntKi)                            :: i,j,k                ! Generic indices
       type(StC_InputType)                       :: u_StC                ! copy of the StC inputs  for StC_CalcOutput call
       type(StC_OutputType)                      :: y_StC                ! copy of the StC outputs for StC_CalcOutput call
-      real(ReKi)                                :: AllOuts(0:MaxOutPts) ! All the the available output channels - perturbed (ReKi since WriteOutput is ReKi)
+      real(ReKi)                                :: AllOuts(0:MaxOutPts) ! All the available output channels - perturbed (ReKi since WriteOutput is ReKi)
       ! Since this is acting on only a single blade within a single StC instance, we can look up exactly which one
       ! from the Jac_u_indx array.  This allows us to simplify the number of calls dramatically
       k = p%Jac_u_indx(n,4)   ! this blade
@@ -3106,7 +3208,7 @@ contains
       integer(IntKi)                            :: i,j,k                ! Generic indices
       type(StC_InputType)                       :: u_StC                ! copy of the StC inputs  for StC_CalcOutput call
       type(StC_OutputType)                      :: y_StC                ! copy of the StC outputs for StC_CalcOutput call
-      real(ReKi)                                :: AllOuts(0:MaxOutPts) ! All the the available output channels - perturbed (ReKi since WriteOutput is ReKi)
+      real(ReKi)                                :: AllOuts(0:MaxOutPts) ! All the available output channels - perturbed (ReKi since WriteOutput is ReKi)
        ! Since this is acting on only a single blade within a single StC instance, we can look up exactly which one
       ! from the Jac_u_indx array.  This allows us to simplify the number of calls dramatically
       j = p%Jac_u_indx(n,3)   ! this instance
@@ -3150,7 +3252,7 @@ contains
       integer(IntKi)                            :: i,j,k                ! Generic indices
       type(StC_InputType)                       :: u_StC                ! copy of the StC inputs  for StC_CalcOutput call
       type(StC_OutputType)                      :: y_StC                ! copy of the StC outputs for StC_CalcOutput call
-      real(ReKi)                                :: AllOuts(0:MaxOutPts) ! All the the available output channels - perturbed (ReKi since WriteOutput is ReKi)
+      real(ReKi)                                :: AllOuts(0:MaxOutPts) ! All the available output channels - perturbed (ReKi since WriteOutput is ReKi)
        ! Since this is acting on only a single blade within a single StC instance, we can look up exactly which one
       ! from the Jac_u_indx array.  This allows us to simplify the number of calls dramatically
       j = p%Jac_u_indx(n,3)   ! this instance
@@ -3194,7 +3296,7 @@ contains
       integer(IntKi)                            :: i,j,k                ! Generic indices
       type(StC_InputType)                       :: u_StC                ! copy of the StC inputs  for StC_CalcOutput call
       type(StC_OutputType)                      :: y_StC                ! copy of the StC outputs for StC_CalcOutput call
-      real(ReKi)                                :: AllOuts(0:MaxOutPts) ! All the the available output channels - perturbed (ReKi since WriteOutput is ReKi)
+      real(ReKi)                                :: AllOuts(0:MaxOutPts) ! All the available output channels - perturbed (ReKi since WriteOutput is ReKi)
        ! Since this is acting on only a single blade within a single StC instance, we can look up exactly which one
       ! from the Jac_u_indx array.  This allows us to simplify the number of calls dramatically
       j = p%Jac_u_indx(n,3)   ! this instance
@@ -3976,7 +4078,7 @@ contains
       character(ErrMsgLen),            intent(  out)  :: ErrMsg3
       integer(IntKi)                                  :: i,j,k                ! Generic indices
       type(StC_OutputType)                            :: y_StC                ! copy of the StC outputs for StC_CalcOutput call
-      real(ReKi)                                      :: AllOuts(0:MaxOutPts) ! All the the available output channels - perturbed (ReKi since WriteOutput is ReKi)
+      real(ReKi)                                      :: AllOuts(0:MaxOutPts) ! All the available output channels - perturbed (ReKi since WriteOutput is ReKi)
       ! Since this is acting on only a single blade within a single StC instance, we can look up exactly which one
       ! from the Jac_x_indx array.  This allows us to simplify the number of calls dramatically
       k = p%Jac_x_indx(n,4)   ! this blade
@@ -3986,7 +4088,7 @@ contains
       call SrvD_Perturb_x( p, n, sgn, x_perturb, delta )
       ! call Calc
       call StC_CopyOutput(m%y_BStC(  j), y_StC, MESH_NEWCOPY, ErrStat3, ErrMsg3); if (ErrStat3 > AbortErrLev) return
-      CALL StC_CalcOutput( t, m%u_BStC(1,j), p%BStC(j), x%BStC(j), xd%BStC(j), z%BStC(j), OtherState%BStC(j), y_StC, m%BStC(j), ErrStat3, ErrMsg3 ); if (ErrStat3 > AbortErrLev) return
+      CALL StC_CalcOutput( t, m%u_BStC(1,j), p%BStC(j), x_perturb%BStC(j), xd%BStC(j), z%BStC(j), OtherState%BStC(j), y_StC, m%BStC(j), ErrStat3, ErrMsg3 ); if (ErrStat3 > AbortErrLev) return
       CALL Transfer_Point_to_Point( y_StC%Mesh(k), y_perturb%BStCLoadMesh(k,j), m%SrvD_MeshMap%BStC_Frc2_y_BStC(k,j), ErrStat3, ErrMsg3, u%BStCMotionMesh(k,j), u%BStCMotionMesh(k,j) ); if (ErrStat3 > AbortErrLev) return
       ! collect relevant outputs
       AllOuts = 0.0_ReKi
@@ -4013,7 +4115,7 @@ contains
       character(ErrMsgLen),            intent(  out)  :: ErrMsg3
       integer(IntKi)                                  :: i,j                  ! Generic indices
       type(StC_OutputType)                            :: y_StC                ! copy of the StC outputs for StC_CalcOutput call
-      real(ReKi)                                      :: AllOuts(0:MaxOutPts) ! All the the available output channels - perturbed (ReKi since WriteOutput is ReKi)
+      real(ReKi)                                      :: AllOuts(0:MaxOutPts) ! All the available output channels - perturbed (ReKi since WriteOutput is ReKi)
       ! Since this is acting on only a single blade within a single StC instance, we can look up exactly which one
       ! from the Jac_x_indx array.  This allows us to simplify the number of calls dramatically
       j = p%Jac_x_indx(n,3)   ! this instance
@@ -4022,7 +4124,7 @@ contains
       call SrvD_Perturb_x( p, n, sgn, x_perturb, delta )
       ! call Calc
       call StC_CopyOutput(m%y_NStC(  j), y_StC, MESH_NEWCOPY, ErrStat3, ErrMsg3); if (ErrStat3 > AbortErrLev) return
-      CALL StC_CalcOutput( t, m%u_NStC(1,j), p%NStC(j), x%NStC(j), xd%NStC(j), z%NStC(j), OtherState%NStC(j), y_StC, m%NStC(j), ErrStat3, ErrMsg3 ); if (ErrStat3 > AbortErrLev) return
+      CALL StC_CalcOutput( t, m%u_NStC(1,j), p%NStC(j), x_perturb%NStC(j), xd%NStC(j), z%NStC(j), OtherState%NStC(j), y_StC, m%NStC(j), ErrStat3, ErrMsg3 ); if (ErrStat3 > AbortErrLev) return
       CALL Transfer_Point_to_Point( y_StC%Mesh(1), y_perturb%NStCLoadMesh(j), m%SrvD_MeshMap%NStC_Frc2_y_NStC(j), ErrStat3, ErrMsg3, u%NStCMotionMesh(j), u%NStCMotionMesh(j) ); if (ErrStat3 > AbortErrLev) return
       ! collect relevant outputs
       AllOuts = 0.0_ReKi
@@ -4049,7 +4151,7 @@ contains
       character(ErrMsgLen),            intent(  out)  :: ErrMsg3
       integer(IntKi)                                  :: i,j                  ! Generic indices
       type(StC_OutputType)                            :: y_StC                ! copy of the StC outputs for StC_CalcOutput call
-      real(ReKi)                                      :: AllOuts(0:MaxOutPts) ! All the the available output channels - perturbed (ReKi since WriteOutput is ReKi)
+      real(ReKi)                                      :: AllOuts(0:MaxOutPts) ! All the available output channels - perturbed (ReKi since WriteOutput is ReKi)
       ! Since this is acting on only a single blade within a single StC instance, we can look up exactly which one
       ! from the Jac_x_indx array.  This allows us to simplify the number of calls dramatically
       j = p%Jac_x_indx(n,3)   ! this instance
@@ -4058,7 +4160,7 @@ contains
       call SrvD_Perturb_x( p, n, sgn, x_perturb, delta )
       ! call Calc
       call StC_CopyOutput(m%y_TStC(  j), y_StC, MESH_NEWCOPY, ErrStat3, ErrMsg3); if (ErrStat3 > AbortErrLev) return
-      CALL StC_CalcOutput( t, m%u_TStC(1,j), p%TStC(j), x%TStC(j), xd%TStC(j), z%TStC(j), OtherState%TStC(j), y_StC, m%TStC(j), ErrStat3, ErrMsg3 ); if (ErrStat3 > AbortErrLev) return
+      CALL StC_CalcOutput( t, m%u_TStC(1,j), p%TStC(j), x_perturb%TStC(j), xd%TStC(j), z%TStC(j), OtherState%TStC(j), y_StC, m%TStC(j), ErrStat3, ErrMsg3 ); if (ErrStat3 > AbortErrLev) return
       CALL Transfer_Point_to_Point( y_StC%Mesh(1), y_perturb%TStCLoadMesh(j), m%SrvD_MeshMap%TStC_Frc2_y_TStC(j), ErrStat3, ErrMsg3, u%TStCMotionMesh(j), u%TStCMotionMesh(j) ); if (ErrStat3 > AbortErrLev) return
       ! collect relevant outputs
       AllOuts = 0.0_ReKi
@@ -4085,7 +4187,7 @@ contains
       character(ErrMsgLen),            intent(  out)  :: ErrMsg3
       integer(IntKi)                                  :: i,j                  ! Generic indices
       type(StC_OutputType)                            :: y_StC                ! copy of the StC outputs for StC_CalcOutput call
-      real(ReKi)                                      :: AllOuts(0:MaxOutPts) ! All the the available output channels - perturbed (ReKi since WriteOutput is ReKi)
+      real(ReKi)                                      :: AllOuts(0:MaxOutPts) ! All the available output channels - perturbed (ReKi since WriteOutput is ReKi)
       ! Since this is acting on only a single blade within a single StC instance, we can look up exactly which one
       ! from the Jac_x_indx array.  This allows us to simplify the number of calls dramatically
       j = p%Jac_x_indx(n,3)   ! this instance
@@ -4094,7 +4196,7 @@ contains
       call SrvD_Perturb_x( p, n, sgn, x_perturb, delta )
       ! call Calc
       call StC_CopyOutput(m%y_SStC(  j), y_StC, MESH_NEWCOPY, ErrStat3, ErrMsg3); if (ErrStat3 > AbortErrLev) return
-      CALL StC_CalcOutput( t, m%u_SStC(1,j), p%SStC(j), x%SStC(j), xd%SStC(j), z%SStC(j), OtherState%SStC(j), y_StC, m%SStC(j), ErrStat3, ErrMsg3 ); if (ErrStat3 > AbortErrLev) return
+      CALL StC_CalcOutput( t, m%u_SStC(1,j), p%SStC(j), x_perturb%SStC(j), xd%SStC(j), z%SStC(j), OtherState%SStC(j), y_StC, m%SStC(j), ErrStat3, ErrMsg3 ); if (ErrStat3 > AbortErrLev) return
       CALL Transfer_Point_to_Point( y_StC%Mesh(1), y_perturb%SStCLoadMesh(j), m%SrvD_MeshMap%SStC_Frc2_y_SStC(j), ErrStat3, ErrMsg3, u%SStCMotionMesh(j), u%SStCMotionMesh(j) ); if (ErrStat3 > AbortErrLev) return
       ! collect relevant outputs
       AllOuts = 0.0_ReKi
@@ -4805,14 +4907,19 @@ SUBROUTINE SrvD_SetParameters( InputFileData, p, UnSum, ErrStat, ErrMsg )
    p%PCMode   = InputFileData%PCMode
    p%TPCOn    = InputFileData%TPCOn
 
-   CALL AllocAry( p%TPitManS,  p%NumBl, 'TPitManS',  ErrStat2, ErrMsg2 ); CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName); p%TPitManS =0.0_DbKi 
-   CALL AllocAry( p%BlPitchF,  p%NumBl, 'BlPitchF',  ErrStat2, ErrMsg2 ); CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName); p%BlPitchF =0.0_ReKi
-   CALL AllocAry( p%PitManRat, p%NumBl, 'PitManRat', ErrStat2, ErrMsg2 ); CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName); p%PitManRat=0.0_ReKi
+   CALL AllocAry( p%PitNeut,   p%NumBl, 'PitNeut',   ErrStat2, ErrMsg2 ); CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName); p%PitNeut   = 0.0_ReKi
+   CALL AllocAry( p%PitSpr,    p%NumBl, 'PitSpr',    ErrStat2, ErrMsg2 ); CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName); p%PitSpr    = 0.0_ReKi
+   CALL AllocAry( p%PitDamp,   p%NumBl, 'PitDamp',   ErrStat2, ErrMsg2 ); CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName); p%PitDamp   = 0.0_ReKi
+   CALL AllocAry( p%TPitManS,  p%NumBl, 'TPitManS',  ErrStat2, ErrMsg2 ); CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName); p%TPitManS  = 0.0_DbKi 
+   CALL AllocAry( p%BlPitchF,  p%NumBl, 'BlPitchF',  ErrStat2, ErrMsg2 ); CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName); p%BlPitchF  = 0.0_ReKi
+   CALL AllocAry( p%PitManRat, p%NumBl, 'PitManRat', ErrStat2, ErrMsg2 ); CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName); p%PitManRat = 0.0_ReKi
       IF (ErrStat >= AbortErrLev) RETURN  
       
-
-   p%TPitManS  = InputFileData%TPitManS( 1:min(p%NumBl,size(InputFileData%TPitManS)))
-   p%BlPitchF  = InputFileData%BlPitchF( 1:min(p%NumBl,size(InputFileData%BlPitchF)))
+   p%PitNeut   = InputFileData%PitNeut(  1:min(p%NumBl,size(InputFileData%PitNeut  )))
+   p%PitSpr    = InputFileData%PitSpr(   1:min(p%NumBl,size(InputFileData%PitSpr   )))
+   p%PitDamp   = InputFileData%PitDamp(  1:min(p%NumBl,size(InputFileData%PitDamp  )))
+   p%TPitManS  = InputFileData%TPitManS( 1:min(p%NumBl,size(InputFileData%TPitManS )))
+   p%BlPitchF  = InputFileData%BlPitchF( 1:min(p%NumBl,size(InputFileData%BlPitchF )))
    p%PitManRat = InputFileData%PitManRat(1:min(p%NumBl,size(InputFileData%PitManRat)))
 
    if (UnSum >0) then
@@ -4821,6 +4928,10 @@ SUBROUTINE SrvD_SetParameters( InputFileData, p, UnSum, ErrStat, ErrMsg )
       write(UnSum, '(A)')                 ' Pitch control mode {0: none, 3: user-defined from routine PitchCntrl, 4: user-defined from Simulink/Labview, 5: user-defined from Bladed-style DLL} (switch)'
       write(UnSum, '(A43,I2)')            '   PCMode -- Pitch control mode:           ',p%PCMode
       write(UnSum, '(A43,ES20.12e3)')     '   TPCOn  -- pitch control start time:     ',p%TPCOn
+      write(UnSum, '(A)')                 '   -------------------'
+      write(UnSum, '(A43,3ES12.5e2)')     '   PitNeut   -- pitch neutral position: ',p%PitNeut(1:min(p%NumBl,size(InputFileData%PitNeut)))
+      write(UnSum, '(A43,3ES12.5e2)')     '   PitSpr    -- pitch spring constant:  ',p%PitSpr( 1:min(p%NumBl,size(InputFileData%PitSpr )))
+      write(UnSum, '(A43,3ES12.5e2)')     '   PitDamp   -- pitch damping constant: ',p%PitDamp(1:min(p%NumBl,size(InputFileData%PitDamp)))
       write(UnSum, '(A)')                 '   -------------------'
       write(UnSum, '(A43,3ES12.5e2)')     '   TPitManS  -- pitch override start time: ',p%TPitManS( 1:min(p%NumBl,size(InputFileData%TPitManS)))
       write(UnSum, '(A43,3ES12.5e2)')     '   BlPitchF  -- pitch override final pos:  ',p%BlPitchF( 1:min(p%NumBl,size(InputFileData%BlPitchF)))
@@ -5302,7 +5413,7 @@ SUBROUTINE Yaw_UpdateStates( t, u, p, x, xd, z, OtherState, m, ErrStat, ErrMsg )
 END SUBROUTINE Yaw_UpdateStates
 !----------------------------------------------------------------------------------------------------------------------------------
 !> Routine for computing the pitch output: blade pitch commands. This routine is used in both loose and tight coupling.
-SUBROUTINE Pitch_CalcOutput( t, u, p, x, xd, z, OtherState, BlPitchCom, ElecPwr, m, ErrStat, ErrMsg )
+SUBROUTINE Pitch_CalcOutput( t, u, p, x, xd, z, OtherState, BlPitchCom, BlPRateCom, BlPitchMom, ElecPwr, m, ErrStat, ErrMsg )
 !..................................................................................................................................
 
    REAL(DbKi),                     INTENT(IN   )  :: t           !< Current simulation time in seconds
@@ -5312,7 +5423,12 @@ SUBROUTINE Pitch_CalcOutput( t, u, p, x, xd, z, OtherState, BlPitchCom, ElecPwr,
    TYPE(SrvD_DiscreteStateType),   INTENT(IN   )  :: xd          !< Discrete states at t
    TYPE(SrvD_ConstraintStateType), INTENT(IN   )  :: z           !< Constraint states at t
    TYPE(SrvD_OtherStateType),      INTENT(IN   )  :: OtherState  !< Other states at t
-   REAL(ReKi),                     INTENT(INOUT)  :: BlPitchCom(:) !< pitch outputs computed at t (Input only so that mesh con-
+   REAL(ReKi),                     INTENT(INOUT)  :: BlPitchCom(:) !< pitch command outputs computed at t (Input only so that mesh con-
+                                                                 !!   nectivity information does not have to be recalculated)
+   REAL(ReKi),                     INTENT(INOUT)  :: BlPRateCom(:) !< pitch rate command outputs computed at t (Input only so that mesh con-
+                                                                 !!   nectivity information does not have to be recalculated)
+                                                                 !!   Not directly used currently. Only used to compute pitch moments.
+   REAL(ReKi),                     INTENT(INOUT)  :: BlPitchMom(:) !< pitch moment outputs computed at t (Input only so that mesh con-
                                                                  !!   nectivity information does not have to be recalculated)
    REAL(ReKi),                     INTENT(IN )    :: ElecPwr     !< Electrical power (watts)
    TYPE(SrvD_MiscVarType),         INTENT(INOUT)  :: m           !< Misc (optimization) variables
@@ -5321,7 +5437,6 @@ SUBROUTINE Pitch_CalcOutput( t, u, p, x, xd, z, OtherState, BlPitchCom, ElecPwr,
 
       ! local variables
    REAL(ReKi)                                     :: factor
-   REAL(ReKi)                                     :: PitManRat
    INTEGER(IntKi)                                 :: K           ! counter for blades
 
 
@@ -5349,10 +5464,12 @@ SUBROUTINE Pitch_CalcOutput( t, u, p, x, xd, z, OtherState, BlPitchCom, ElecPwr,
          CASE ( ControlMode_USER )              ! User-defined from routine PitchCntrl().
 
             CALL PitchCntrl ( u%BlPitch, ElecPwr, u%LSS_Spd, u%TwrAccel, p%NumBl, t, p%DT, p%PriPath, BlPitchCom )
+            BlPRateCom = 0.0_ReKi                 ! Enable this optionally in the future
 
          CASE ( ControlMode_EXTERN )              ! User-defined from Simulink or LabVIEW.
 
             BlPitchCom = u%ExternalBlPitchCom(1:p%NumBl)
+            BlPRateCom = 0.0_ReKi                 ! Enable this optionally in the future
          
          CASE ( ControlMode_DLL )                                ! User-defined pitch control from Bladed-style DLL
 
@@ -5365,13 +5482,18 @@ SUBROUTINE Pitch_CalcOutput( t, u, p, x, xd, z, OtherState, BlPitchCom, ElecPwr,
                BlPitchCom = m%dll_data%BlPitchCom(1:p%NumBl)
             end if
 
+            ! Estimate pitch rate command using finite differencing
+            BlPRateCom = ( m%dll_data%BlPitchCom(1:p%NumBl) - m%dll_data%PrevBlPitch(1:p%NumBl) ) / m%dll_data%DLL_DT
+
                ! update the filter state once per time step
             IF ( EqualRealNos( t - p%DT, m%LastTimeFiltered ) ) THEN
                m%xd_BlPitchFilter = p%BlAlpha * m%xd_BlPitchFilter + (1.0_ReKi - p%BlAlpha) * BlPitchCom
+               m%xd_BlPRateFilter = p%BlAlpha * m%xd_BlPRateFilter + (1.0_ReKi - p%BlAlpha) * BlPRateCom
                m%LastTimeFiltered = t
             END IF
 
             BlPitchCom = p%BlAlpha * m%xd_BlPitchFilter + (1.0_ReKi - p%BlAlpha) * BlPitchCom
+            BlPRateCom = p%BlAlpha * m%xd_BlPRateFilter + (1.0_ReKi - p%BlAlpha) * BlPRateCom
 
       END SELECT
 
@@ -5379,10 +5501,10 @@ SUBROUTINE Pitch_CalcOutput( t, u, p, x, xd, z, OtherState, BlPitchCom, ElecPwr,
 
       ! Use the initial blade pitch angles:
 
-      BlPitchCom = p%BlPitchInit
+      BlPitchCom = p%PitNeut(1:p%NumBl)
+      BlPRateCom = 0.0_ReKi
 
    ENDIF
-
 
    !...................................................................
    ! Override standard pitch control with a linear maneuver if necessary:
@@ -5396,11 +5518,12 @@ SUBROUTINE Pitch_CalcOutput( t, u, p, x, xd, z, OtherState, BlPitchCom, ElecPwr,
          IF ( t >= OtherState%TPitManE(K) )  THEN      ! Override pitch maneuver has ended, blade is locked at BlPitchF.
 
             BlPitchCom(K) = p%BlPitchF(K)
+            BlPRateCom(K) = 0.0_ReKi
 
          ELSE
 
-            PitManRat     = SIGN( p%PitManRat(K), p%BlPitchF(K) - OtherState%BlPitchI(K) )   ! Modify the sign of PitManRat based on the direction of the pitch maneuever
-            BlPitchCom(K) = OtherState%BlPitchI(K) + PitManRat*( t - p%TPitManS(K) )         ! Increment the blade pitch using PitManRat
+            BlPRateCom(K) = SIGN( p%PitManRat(K), p%BlPitchF(K) - OtherState%BlPitchI(K) )   ! Modify the sign of PitManRat based on the direction of the pitch maneuever
+            BlPitchCom(K) = OtherState%BlPitchI(K) + BlPRateCom(K)*( t - p%TPitManS(K) )     ! Increment the blade pitch using PitManRat
 
          END IF
 
@@ -5410,12 +5533,19 @@ SUBROUTINE Pitch_CalcOutput( t, u, p, x, xd, z, OtherState, BlPitchCom, ElecPwr,
    ENDDO ! K - blades
 
    !...................................................................
+   ! Calculate the pitch moment:
+   !...................................................................
+
+   BlPitchMom = - p%PitSpr  * ( u%BlPitch - BlPitchCom )  &
+                - p%PitDamp * ( u%BlPRate - BlPRateCom )
+
+   !...................................................................
    ! Apply trim case for linearization:
    !...................................................................
    if (p%TrimCase==TrimCase_pitch) then
       BlPitchCom = BlPitchCom + xd%CtrlOffset
+      BlPitchMom = BlPitchMom + xd%CtrlOffset * p%PitSpr
    end if
-
 
 END SUBROUTINE Pitch_CalcOutput
 !----------------------------------------------------------------------------------------------------------------------------------

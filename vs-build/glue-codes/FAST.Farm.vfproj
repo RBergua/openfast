@@ -4,7 +4,7 @@
 		<Platform Name="x64"/>
 	</Platforms>
 	<Configurations>
-		<Configuration IntermediateDirectory="..\..\build\$(Configuration)_$(Platform)\$(ProjectName)\" Name="Debug|x64" OutputDirectory="..\..\build\bin" UseCompiler="ifxCompiler">
+		<Configuration IntermediateDirectory="..\..\build\$(Configuration)_$(Platform)\$(ProjectName)\" Name="Debug|x64" OutputDirectory="..\..\build\bin">
 			<Tool BoundsCheck="true" DebugInformationFormat="debugEnabled" FloatingPointExceptionHandling="fpe0" MultiProcessorCompilation="true" Name="VFFortranCompilerTool" Optimization="optimizeDisabled" Preprocess="preprocessYes" PreprocessorDefinitions="" RuntimeLibrary="rtMultiThreadedDebug" StackFrameCheck="true" SuppressStartupBanner="true" Traceback="true" UseMkl="mklSequential" WarnInterfaces="true" WarnUnusedVariables="false"/>
 			<Tool GenerateDebugInformation="true" GenerateManifest="false" LinkIncremental="linkIncrementalNo" Name="VFLinkerTool" StackReserveSize="9999999" SubSystem="subSystemConsole" SuppressStartupBanner="true"/>
 			<Tool Name="VFResourceCompilerTool"/>
@@ -15,7 +15,7 @@
 			<Tool Name="VFPostBuildEventTool"/>
 			<Tool Name="VFManifestTool" SuppressStartupBanner="true"/>
 		</Configuration>
-		<Configuration IntermediateDirectory="..\..\build\$(Configuration)_$(Platform)\$(ProjectName)\" Name="Debug_Double|x64" OutputDirectory="..\..\build\bin" UseCompiler="ifxCompiler">
+		<Configuration IntermediateDirectory="..\..\build\$(Configuration)_$(Platform)\$(ProjectName)\" Name="Debug_Double|x64" OutputDirectory="..\..\build\bin">
 			<Tool BoundsCheck="true" DebugInformationFormat="debugEnabled" DoublePrecisionKIND="doublePrecisionKIND8" FloatingPointExceptionHandling="fpe0" MultiProcessorCompilation="true" Name="VFFortranCompilerTool" Optimization="optimizeDisabled" Preprocess="preprocessYes" PreprocessorDefinitions="" RealKIND="realKIND8" RuntimeLibrary="rtMultiThreadedDebug" StackFrameCheck="true" SuppressStartupBanner="true" Traceback="true" UseMkl="mklSequential" WarnInterfaces="true" WarnUnusedVariables="false"/>
 			<Tool GenerateDebugInformation="true" GenerateManifest="false" LinkIncremental="linkIncrementalNo" Name="VFLinkerTool" StackReserveSize="9999999" SubSystem="subSystemConsole" SuppressStartupBanner="true"/>
 			<Tool Name="VFResourceCompilerTool"/>
@@ -26,7 +26,7 @@
 			<Tool Name="VFPostBuildEventTool"/>
 			<Tool Name="VFManifestTool" SuppressStartupBanner="true"/>
 		</Configuration>
-		<Configuration IntermediateDirectory="..\..\build\$(Configuration)_$(Platform)\$(ProjectName)\" Name="Debug_Matlab|x64" OutputDirectory="..\..\build\bin" UseCompiler="ifxCompiler">
+		<Configuration IntermediateDirectory="..\..\build\$(Configuration)_$(Platform)\$(ProjectName)\" Name="Debug_Matlab|x64" OutputDirectory="..\..\build\bin">
 			<Tool BoundsCheck="true" DebugInformationFormat="debugEnabled" FloatingPointExceptionHandling="fpe0" MultiProcessorCompilation="true" Name="VFFortranCompilerTool" Optimization="optimizeDisabled" Preprocess="preprocessYes" PreprocessorDefinitions="COMPILE_SIMULINK;CONSOLE_FILE" RuntimeLibrary="rtMultiThreadedDebug" StackFrameCheck="true" SuppressStartupBanner="true" Traceback="true" UseMkl="mklSequential" WarnInterfaces="true" WarnUnusedVariables="false"/>
 			<Tool GenerateDebugInformation="true" GenerateManifest="false" LinkIncremental="linkIncrementalNo" Name="VFLinkerTool" StackReserveSize="9999999" SubSystem="subSystemConsole" SuppressStartupBanner="true"/>
 			<Tool Name="VFResourceCompilerTool"/>
@@ -37,7 +37,7 @@
 			<Tool Name="VFPostBuildEventTool"/>
 			<Tool Name="VFManifestTool" SuppressStartupBanner="true"/>
 		</Configuration>
-		<Configuration IntermediateDirectory="..\..\build\$(Configuration)_$(Platform)\$(ProjectName)\" Name="Release|x64" OutputDirectory="..\..\build\bin" UseCompiler="ifxCompiler">
+		<Configuration IntermediateDirectory="..\..\build\$(Configuration)_$(Platform)\$(ProjectName)\" Name="Release|x64" OutputDirectory="..\..\build\bin">
 			<Tool DebugInformationFormat="debugEnabled" MultiProcessorCompilation="true" Name="VFFortranCompilerTool" Preprocess="preprocessYes" PreprocessorDefinitions="" RuntimeLibrary="rtMultiThreaded" SuppressStartupBanner="true" UseMkl="mklSequential" WarnUnusedVariables="false"/>
 			<Tool GenerateManifest="false" LinkIncremental="linkIncrementalNo" Name="VFLinkerTool" StackReserveSize="9999999" SubSystem="subSystemConsole" SuppressStartupBanner="true"/>
 			<Tool Name="VFResourceCompilerTool"/>
@@ -48,7 +48,7 @@
 			<Tool Name="VFPostBuildEventTool"/>
 			<Tool Name="VFManifestTool" SuppressStartupBanner="true"/>
 		</Configuration>
-		<Configuration IntermediateDirectory="..\..\build\$(Configuration)_$(Platform)\$(ProjectName)\" Name="Release_Double|x64" OutputDirectory="..\..\build\bin" UseCompiler="ifxCompiler">
+		<Configuration IntermediateDirectory="..\..\build\$(Configuration)_$(Platform)\$(ProjectName)\" Name="Release_Double|x64" OutputDirectory="..\..\build\bin">
 			<Tool DebugInformationFormat="debugEnabled" DoublePrecisionKIND="doublePrecisionKIND8" MultiProcessorCompilation="true" Name="VFFortranCompilerTool" Preprocess="preprocessYes" PreprocessorDefinitions="" RealKIND="realKIND8" RuntimeLibrary="rtMultiThreaded" SuppressStartupBanner="true" UseMkl="mklSequential" WarnUnusedVariables="false"/>
 			<Tool GenerateManifest="false" LinkIncremental="linkIncrementalNo" Name="VFLinkerTool" StackReserveSize="9999999" SubSystem="subSystemConsole" SuppressStartupBanner="true"/>
 			<Tool Name="VFResourceCompilerTool"/>
@@ -59,7 +59,7 @@
 			<Tool Name="VFPostBuildEventTool"/>
 			<Tool Name="VFManifestTool" SuppressStartupBanner="true"/>
 		</Configuration>
-		<Configuration IntermediateDirectory="..\..\build\$(Configuration)_$(Platform)\$(ProjectName)\" Name="Release_Matlab|x64" OutputDirectory="..\..\build\bin" UseCompiler="ifxCompiler">
+		<Configuration IntermediateDirectory="..\..\build\$(Configuration)_$(Platform)\$(ProjectName)\" Name="Release_Matlab|x64" OutputDirectory="..\..\build\bin">
 			<Tool DebugInformationFormat="debugEnabled" MultiProcessorCompilation="true" Name="VFFortranCompilerTool" Preprocess="preprocessYes" PreprocessorDefinitions="COMPILE_SIMULINK;CONSOLE_FILE" RuntimeLibrary="rtMultiThreaded" SuppressStartupBanner="true" UseMkl="mklSequential" WarnUnusedVariables="false"/>
 			<Tool GenerateManifest="false" LinkIncremental="linkIncrementalNo" Name="VFLinkerTool" StackReserveSize="9999999" SubSystem="subSystemConsole" SuppressStartupBanner="true"/>
 			<Tool Name="VFResourceCompilerTool"/>
@@ -70,7 +70,7 @@
 			<Tool Name="VFPostBuildEventTool"/>
 			<Tool Name="VFManifestTool" SuppressStartupBanner="true"/>
 		</Configuration>
-		<Configuration IntermediateDirectory="..\..\build\$(Configuration)_$(Platform)\$(ProjectName)\" Name="Release_OpenMP|x64" OutputDirectory="..\..\build\bin" UseCompiler="ifxCompiler">
+		<Configuration IntermediateDirectory="..\..\build\$(Configuration)_$(Platform)\$(ProjectName)\" Name="Release_OpenMP|x64" OutputDirectory="..\..\build\bin">
 			<Tool DebugInformationFormat="debugEnabled" EnableOpenMPSupport="OpenMPParallelCodeIFX" MultiProcessorCompilation="true" Name="VFFortranCompilerTool" OpenMP="OpenMPParallelCode" Preprocess="preprocessYes" PreprocessorDefinitions="" RuntimeLibrary="rtMultiThreaded" SuppressStartupBanner="true" UseMkl="mklSequential" WarnUnusedVariables="false"/>
 			<Tool GenerateManifest="false" LinkIncremental="linkIncrementalNo" Name="VFLinkerTool" StackReserveSize="9999999" SubSystem="subSystemConsole" SuppressStartupBanner="true"/>
 			<Tool Name="VFResourceCompilerTool"/>
@@ -81,7 +81,7 @@
 			<Tool Name="VFPostBuildEventTool"/>
 			<Tool Name="VFManifestTool" SuppressStartupBanner="true"/>
 		</Configuration>
-		<Configuration IntermediateDirectory="..\..\build\$(Configuration)_$(Platform)\$(ProjectName)\" Name="Release_Double_OpenMP|x64" OutputDirectory="..\..\build\bin" UseCompiler="ifxCompiler">
+		<Configuration IntermediateDirectory="..\..\build\$(Configuration)_$(Platform)\$(ProjectName)\" Name="Release_Double_OpenMP|x64" OutputDirectory="..\..\build\bin">
 			<Tool DebugInformationFormat="debugEnabled" DoublePrecisionKIND="doublePrecisionKIND8" EnableOpenMPSupport="OpenMPParallelCodeIFX" MultiProcessorCompilation="true" Name="VFFortranCompilerTool" OpenMP="OpenMPParallelCode" Preprocess="preprocessYes" PreprocessorDefinitions="" RealKIND="realKIND8" RuntimeLibrary="rtMultiThreaded" SuppressStartupBanner="true" UseMkl="mklSequential" WarnUnusedVariables="false"/>
 			<Tool GenerateManifest="false" LinkIncremental="linkIncrementalNo" Name="VFLinkerTool" StackReserveSize="9999999" SubSystem="subSystemConsole" SuppressStartupBanner="true"/>
 			<Tool Name="VFResourceCompilerTool"/>

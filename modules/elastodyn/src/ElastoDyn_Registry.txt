@@ -55,7 +55,6 @@ typedef	^	InitOutputType	ModVarsType	Vars	-	-	-	"Module Variables"
 # ..... Blade Input file data ...........................................................................................................
 typedef	ElastoDyn/ED	BladeInputData	IntKi	NBlInpSt	-	-	-	"Number of blade input stations"	-
 typedef	^	BladeInputData	ReKi	BlFract	{:}	-	-	"Blade fractional radius for distributed input data"	-
-typedef	^	BladeInputData	ReKi	PitchAx	{:}	-	-	"Pitch axis for distributed input data"	-
 typedef	^	BladeInputData	ReKi	StrcTwst	{:}	-	-	"Structural twist for distributed input data"	radians
 typedef	^	BladeInputData	ReKi	BMassDen	{:}	-	-	"Blade mass density for distributed input data"
 typedef	^	BladeInputData	ReKi	FlpStff	{:}	-	-	"Blade flap stiffness for distributed input data"
@@ -82,6 +81,7 @@ typedef	ElastoDyn/ED	ED_InputFile	DbKi	DT	-	-	-	"Requested integration time for 
 typedef	^	ED_InputFile	LOGICAL	FlapDOF1	-	-	-	"First flapwise blade mode DOF"	-
 typedef	^	ED_InputFile	LOGICAL	FlapDOF2	-	-	-	"Second flapwise blade mode DOF"	-
 typedef	^	ED_InputFile	LOGICAL	EdgeDOF	-	-	-	"Edgewise blade mode DOF"	-
+typedef	^	ED_InputFile	LOGICAL	PitchDOF	-	-	-	"Blade pitch DOF"	-
 typedef	^	ED_InputFile	LOGICAL	TeetDOF	-	-	-	"Rotor-teeter DOF"	-
 typedef	^	ED_InputFile	LOGICAL	DrTrDOF	-	-	-	"Drivetrain rotational-flexibility DOF"	-
 typedef	^	ED_InputFile	LOGICAL	GenDOF	-	-	-	"Generator DOF"	-
@@ -138,6 +138,8 @@ typedef	^	ED_InputFile	ReKi	PtfmRefxt	-	-	-	"Downwind distance from the ground l
 typedef	^	ED_InputFile	ReKi	PtfmRefyt	-	-	-	"Lateral distance from the ground level [onshore], MSL [offshore wind or floating MHK], or seabed [fixed MHK] to the platform reference point"	meters
 typedef	^	ED_InputFile	ReKi	PtfmRefzt	-	-	-	"Vertical distance from the ground level [onshore], MSL [offshore wind or floating MHK], or seabed [fixed MHK] to the platform reference point"	meters
 typedef	^	ED_InputFile	ReKi	TipMass	{:}	-	-	"Tip-brake masses"	kg
+typedef	^	ED_InputFile	ReKi	PBrIner	{:}	-	-	"Pitch bearing inertia about the pitch axis"	kg m^2
+typedef	^	ED_InputFile	ReKi	BlPIner	{:}	-	-	"Blade inertia about the pitch axis"	kg m^2
 typedef	^	ED_InputFile	ReKi	HubMass	-	-	-	"Hub mass"	kg
 typedef	^	ED_InputFile	ReKi	HubIner	-	-	-	"Hub inertia about teeter axis (2-blader) or rotor axis (3-blader)"	"kg m^2"
 typedef	^	ED_InputFile	ReKi	GenIner	-	-	-	"Generator inertia about HSS"	"kg m^2"
@@ -206,6 +208,9 @@ typedef	^	ED_InputFile	ReKi	TwFAM1Sh	{:}	-	-	"Tower fore-aft mode-1 shape coeffi
 typedef	^	ED_InputFile	ReKi	TwFAM2Sh	{:}	-	-	"Tower fore-aft mode-2 shape coefficients"	-
 typedef	^	ED_InputFile	ReKi	TwSSM1Sh	{:}	-	-	"Tower side-to-side mode-1 shape coefficients"	-
 typedef	^	ED_InputFile	ReKi	TwSSM2Sh	{:}	-	-	"Tower side-to-side mode-2 shape coefficients"	-
+typedef ^       ED_InputFile    IntKi   NTwCMass	-	-	-	"Number of tower concentrated masses"	-
+typedef ^       ED_InputFile    ReKi    TwCMassHtFract	{:}	-	-	"Fractional heights of tower concentrated masses"	-
+typedef ^       ED_InputFile    ReKi    TwCMass	{:}	-	-	"List of concentrated masses on the tower"	kg
 # ..... Furling Input file data ...........................................................................................................
 typedef	^	ED_InputFile	LOGICAL	RFrlDOF	-	-	-	"Rotor-furl DOF"	-
 typedef	^	ED_InputFile	LOGICAL	TFrlDOF	-	-	-	"Tail-furl DOF"	-
@@ -505,7 +510,6 @@ typedef	^	ED_RtHndSide	ReKi	TeetMom	-	-	-	"The total moment supplied by the stop
 typedef	^	ED_RtHndSide	ReKi	TFrlMom	-	-	-	"The total tail-furl spring and damper moment"
 typedef	^	ED_RtHndSide	ReKi	RFrlMom	-	-	-	"The total rotor-furl spring and damper moment"
 typedef	^	ED_RtHndSide	ReKi	GBoxEffFac	-	-	-	"The factor used to apply the gearbox efficiency effects to the equation associated with the generator DOF"
-typedef	^	ED_RtHndSide	ReKi	rSAerCen	{:}{:}{:}	-	-	"aerodynamic pitching moment arm (i.e., the position vector from point S on the blade to the aerodynamic center of the element)"
 typedef ^       ED_RtHndSide    ReKi    YawFriMom       -       -       -       "Yaw Friction Moment"   kN-m
 
 # ..... States ....................................................................................................................
@@ -668,13 +672,13 @@ typedef	^	ParameterType	ReKi	SecondMom	{:}	-	-	"Second mass moment of inertia of
 typedef	^	ParameterType	ReKi	TFinMass	-	-	-	"Tail fin mass"
 typedef	^	ParameterType	ReKi	TFrlIner	-	-	-	"Tail boom inertia about tail-furl axis"
 typedef	^	ParameterType	ReKi	TipMass	{:}	-	-	"Tip-brake masses"
+typedef	^	ParameterType	ReKi	PitchIner	{:}	-	-	"Blade inertia about the pitch axis"
 typedef	^	ParameterType	ReKi	TurbMass	-	-	-	"Mass of turbine (tower + rotor + nacelle)"
 typedef	^	ParameterType	ReKi	TwrMass	-	-	-	"Mass of tower"
 typedef	^	ParameterType	ReKi	TwrTpMass	-	-	-	"Tower-top mass (rotor + nacelle)"
 typedef	^	ParameterType	ReKi	YawBrMass	-	-	-	"Yaw bearing mass"
 #typedef	^	ParameterType	ReKi	AirDens	-	-	-	"Air density = RHO"
 typedef	^	ParameterType	ReKi	Gravity	-	-	-	"Gravitational acceleration"	m/s^2
-typedef	^	ParameterType	ReKi	PitchAxis	{:}{:}	-	-	"Pitch axis for analysis nodes"	-
 typedef	^	ParameterType	ReKi	AeroTwst	{:}	-	-	"Aerodynamic twist of the blade at the analysis nodes"
 typedef	^	ParameterType	ReKi	AxRedBld	{:}{:}{:}{:}	-	-	"The axial-reduction terms of the blade shape function"
 typedef	^	ParameterType	ReKi	BldEDamp	{:}{:}	-	-	"Blade edgewise damping coefficients"
@@ -692,8 +696,6 @@ typedef	^	ParameterType	ReKi	KBF	{:}{:}{:}	-	-	"Generalized flapwise stiffness o
 typedef	^	ParameterType	ReKi	MassB	{:}{:}	-	-	"Interpolated lineal blade mass density"
 typedef	^	ParameterType	ReKi	RNodes	{:}	-	-	"Radius to analysis nodes relative to hub ( 0 < RNodes(:) < BldFlexL )"
 typedef	^	ParameterType	ReKi	RNodesNorm	{:}	-	-	"Normalized radius to analysis nodes relative to hub ( 0 < RNodesNorm(:) < 1 )"
-typedef	^	ParameterType	ReKi	rSAerCenn1	{:}{:}	-	-	"Distance from point S on a blade to the aerodynamic center in the n1 direction (m)"
-typedef	^	ParameterType	ReKi	rSAerCenn2	{:}{:}	-	-	"Distance from point S on a blade to the aerodynamic center in the n2 direction (m)"
 typedef	^	ParameterType	ReKi	SAeroTwst	{:}	-	-	"Sine of the aerodynamic twist of the blade at the analysis nodes"
 typedef	^	ParameterType	ReKi	StiffBE	{:}{:}	-	-	"Interpolated edgewise blade stiffness"
 typedef	^	ParameterType	ReKi	StiffBF	{:}{:}	-	-	"Interpolated flapwise blade stiffness"
@@ -791,6 +793,7 @@ typedef	^	ParameterType	Integer	NActvDOF_Stride	-	-	-	"stride for active DOFs to
 typedef	^	InputType	MeshType	BladePtLoads	{:}	-	-	"A mesh on each blade, containing aerodynamic forces and moments (formerly AeroBladeForce and AeroBladeMoment)"
 typedef	^	InputType	MeshType	PlatformPtMesh	-	-	-	"A mesh at the platform reference (point Z), containing force: surge/xi (1), sway/yi (2), and heave/zi (3)-components; and moments: roll/xi (1), pitch/yi (2), and yaw/zi (3)-components acting at the platform (body X) / platform reference (point Z) associated with everything but the QD2T()s"	N
 typedef	^	InputType	MeshType	TowerPtLoads	-	-	-	"Tower line2 mesh with forces: surge/xi (1), sway/yi (2), and heave/zi (3)-components of the portion of the tower force at the current tower node (point T); and moments: roll/xi (1), pitch/yi (2), and yaw/zi (3)-components of the portion of the tower moment acting at the current tower node"	N/m
+typedef ^       InputType       MeshType        BladeRootLoads  {:}     -       -       "For BeamDyn: loads at the blade roots"
 typedef	^	InputType	MeshType	HubPtLoad	-	-	-	"A mesh at the teeter pin, containing forces: surge/xi (1), sway/yi (2), and heave/zi (3)-components; and moments: roll/xi (1), pitch/yi (2), and yaw/zi (3)-components acting at the hub. Passed from BeamDyn"
 typedef	^	InputType	MeshType	NacelleLoads	-	-	-	"From ServoDyn/TMD: loads on the nacelle."
 typedef	^	InputType	MeshType	TFinCMLoads 	-	-	-	"Aerodynamic forces and moments at the tail-fin center of mass point (point J)"
@@ -798,6 +801,7 @@ typedef	^	InputType	MeshType	TFinCMLoads 	-	-	-	"Aerodynamic forces and moments 
 typedef	^	InputType	ReKi	TwrAddedMass	{:}{:}{:}	-	-	"6-by-6 added mass matrix of the tower elements, per unit length-bjj: place on a mesh" 	"per unit length"
 typedef	^	InputType	ReKi	PtfmAddedMass	{6}{6}	-	-	"Platform added mass matrix"	"kg, kg-m, kg-m^2"
 typedef	^	InputType	ReKi	BlPitchCom	{:}	-	2pi	"Commanded blade pitch angles"	radians
+typedef	^	InputType	ReKi	BlPitchMom	{:}	-	-	"Blade pitch motor torque"	N-m
 typedef	^	InputType	ReKi	YawMom	-	-	-	"Torque transmitted through the yaw bearing"	N-m
 typedef	^	InputType	ReKi	GenTrq	-	-	-	"Electrical generator torque"	N-m
 typedef	^	InputType	ReKi	HSSBrTrqC	-	-	-	"Commanded HSS brake torque"	N-m
@@ -815,6 +819,7 @@ typedef	^	OutputType	MeshType	TFinCMMotion    	-	-	-	"For AeroDyn: motions of th
 # Define outputs that are not on this mesh here:
 typedef	^	OutputType	ReKi	WriteOutput	{:}	-	-	"Data to be written to an output file: see WriteOutputHdr for names of each variable"	"see WriteOutputUnt"
 typedef	^	OutputType	ReKi	BlPitch	{:}	-	2pi	"Current blade pitch angles"	radians
+typedef ^	OutputType	ReKi	BlPRate	{:}	-	-	"Current blade pitch rate"	rad/s
 typedef	^	OutputType	ReKi	Yaw	-	-	2pi	"Current nacelle yaw"	radians
 typedef	^	OutputType	ReKi	YawRate	-	-	-	"Current nacelle yaw rate"	rad/s
 typedef	^	OutputType	ReKi	LSS_Spd	-	-	-	"Low-speed shaft (LSS) speed at entrance to gearbox"	rad/s

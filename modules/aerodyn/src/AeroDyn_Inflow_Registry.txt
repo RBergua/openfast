@@ -45,6 +45,8 @@ typedef    ^        ^                  LOGICAL                          Lineariz
 typedef    ^        ^                  ReKi                             WtrDpth          -      -     -   "Water depth" m
 typedef    ^        ^                  ReKi                             MSL2SWL          -      -     -   "Offset between still-water level and mean sea level" m
 typedef    ^        ^                  Character(1024)                  RootName         -      -     -   "RootName for writing output files"	-
+typedef    ^        ^                  LOGICAL                          OutputAccel      -    .FALSE. -   "Flag to output wind acceleration" -
+
 
 
 # ..... InitIn ....................................................................................................................

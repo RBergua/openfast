@@ -90,9 +90,7 @@ SUBROUTINE BD_Init( InitInp, u, p, x, xd, z, OtherState, y, MiscVar, Interval, I
 
    ! local variables
    TYPE(BD_InputFile)      :: InputFileData     ! Data stored in the module's input file
-   REAL(BDKi)              :: temp_CRV(3)
    REAL(BDKi),ALLOCATABLE  :: GLL_nodes(:)
-   REAL(BDKi)              :: TmpDCM(3,3)
    LOGICAL                 :: QuasiStaticInitialized      !< True if quasi-static solution was found
 
 
@@ -159,17 +157,6 @@ SUBROUTINE BD_Init( InitInp, u, p, x, xd, z, OtherState, y, MiscVar, Interval, I
       
       ! compute blade mass, CG, and IN for summary file:
    CALL BD_ComputeBladeMassNew( p, ErrStat2, ErrMsg2 ); if (Failed()) return !computes p%blade_mass,p%blade_CG,p%blade_IN
-
-
-   if (p%UsePitchAct) then
-
-         ! Calculate the pitch angle
-      TmpDCM(:,:) = MATMUL(u%RootMotion%Orientation(:,:,1),TRANSPOSE(u%HubMotion%Orientation(:,:,1)))
-      temp_CRV(:) = EulerExtract(TmpDCM)
-      xd%thetaP = -temp_CRV(3)
-      xd%thetaPD = 0.0_BDKi
-   end if
-
 
       ! Define and initialize system inputs (set up and initialize input meshes) here:
    call Init_u(InitInp, p, OtherState, u, ErrStat2, ErrMsg2); if (Failed()) return
@@ -889,7 +876,6 @@ subroutine SetParameters(InitInp, InputFileData, p, OtherState, ErrStat, ErrMsg)
    INTEGER(IntKi)                               :: i, j              ! generic counter index
    INTEGER(IntKi)                               :: indx              ! counter into index array (p%NdIndx)
    INTEGER(IntKi)                               :: nUniqueQP         ! number of unique quadrature points (not double-counting nodes at element boundaries)
-   REAL(BDKi)                                   :: denom
    integer(intKi)                               :: ErrStat2          ! temporary Error status
    character(ErrMsgLen)                         :: ErrMsg2           ! temporary Error message
    character(*), parameter                      :: RoutineName = 'SetParameters'
@@ -1119,31 +1105,6 @@ subroutine SetParameters(InitInp, InputFileData, p, OtherState, ErrStat, ErrMsg)
    p%beta       = InputFileData%InpBl%beta
 
    !...............................................
-   ! set parameters for pitch actuator:
-   !...............................................
-
-      ! Actuator
-   p%UsePitchAct = InputFileData%UsePitchAct
-   if (p%UsePitchAct) then
-      p%pitchK = InputFileData%pitchK
-      p%pitchC = InputFileData%pitchC
-      p%pitchJ = InputFileData%pitchJ
-
-         ! calculate (I-hA)^-1
-      p%torqM(1,1) =  p%pitchJ + p%pitchC*p%dt
-      p%torqM(2,1) = -p%pitchK * p%dt
-      p%torqM(1,2) =  p%pitchJ * p%dt
-      p%torqM(2,2) =  p%pitchJ
-      denom        =  p%pitchJ + p%pitchC*p%dt + p%pitchK*p%dt**2
-      if (EqualRealNos(denom,0.0_BDKi)) then
-         call SetErrStat(ErrID_Fatal, "Cannot invert matrix for pitch actuator: J+c*dt+k*dt^2 is zero.", ErrStat, ErrMsg, RoutineName)
-         return
-      else
-         p%torqM(:,:) =  p%torqM / denom
-      end if
-   end if
-
-   !...............................................
    ! set parameters for File I/O data:
    !...............................................
    p%OutFmt    = InputFileData%OutFmt
@@ -1154,7 +1115,7 @@ subroutine SetParameters(InitInp, InputFileData, p, OtherState, ErrStat, ErrMsg)
 
    p%OutInputs = .false.  ! will get set to true in SetOutParam if we request the inputs as output values
 
-   call SetOutParam(InputFileData%OutList, p, ErrStat2, ErrMsg2 ) ! requires: p%NumOuts, p%NNodeOuts, p%UsePitchAct; sets: p%OutParam.
+   call SetOutParam(InputFileData%OutList, p, ErrStat2, ErrMsg2 ) ! requires: p%NumOuts, p%NNodeOuts; sets: p%OutParam.
       call setErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
       if (ErrStat >= AbortErrLev) return
 
@@ -1339,44 +1300,6 @@ subroutine Init_u( InitInp, p, OtherState, u, ErrStat, ErrMsg )
    ErrStat = ErrID_None
    ErrMsg  = ""
 
-   !.................................
-   ! u%HubMotion (from ElastoDyn for pitch actuator)
-   !.................................
-
-   CALL MeshCreate( BlankMesh        = u%HubMotion        &
-                   ,IOS              = COMPONENT_INPUT    &
-                   ,NNodes           = 1                  &
-                   , TranslationDisp = .TRUE.             &
-                   , Orientation     = .TRUE.             &
-                   ,ErrStat          = ErrStat2           &
-                   ,ErrMess          = ErrMsg2            )
-      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-      if (ErrStat>=AbortErrLev) return
-
-      ! possible type conversions here:
-   DCM = InitInp%HubRot
-   Pos = InitInp%HubPos
-   CALL MeshPositionNode ( Mesh    = u%HubMotion          &
-                         , INode   = 1                    &
-                         , Pos     = Pos                  &
-                         , ErrStat = ErrStat2             &
-                         , ErrMess = ErrMsg2              &
-                         , Orient  = DCM                  )
-      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-
-   CALL MeshConstructElement ( Mesh = u%HubMotion         &
-                             , Xelement = ELEMENT_POINT   &
-                             , P1       = 1               &
-                             , ErrStat  = ErrStat2        &
-                             , ErrMess  = ErrMsg2         )
-      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-
-   CALL MeshCommit(u%HubMotion, ErrStat2, ErrMsg2)
-      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-
-      ! initial guesses
-   u%HubMotion%TranslationDisp(1:3,1) = 0.0_ReKi
-   u%HubMotion%Orientation(1:3,1:3,1) = InitInp%HubRot
 
    !.................................
    ! u%RootMotion (for coupling with ElastoDyn)
@@ -1663,6 +1586,7 @@ subroutine Init_MiscVars( p, u, y, m, ErrStat, ErrMsg )
          ! E1, kappa -- used in force calculations
       CALL AllocAry(m%qp%E1,               p%dof_node/2,p%nqp,p%elem_total,                  'm%qp%E1    at quadrature point',ErrStat2,ErrMsg2); CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       CALL AllocAry(m%qp%kappa,            p%dof_node/2,p%nqp,p%elem_total,                  'm%qp%kappa at quadrature point',ErrStat2,ErrMsg2); CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+      CALL AllocAry(m%qp%strain,           p%dof_node  ,p%nqp,p%elem_total,                  'm%qp%strain at quadrature point',ErrStat2,ErrMsg2); CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       CALL AllocAry(m%qp%RR0,              3,3,         p%nqp,p%elem_total,                  'm%qp%RR0 at quadrature point',ErrStat2,ErrMsg2); CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       CALL AllocAry(m%qp%Stif,             6,6,         p%nqp,p%elem_total,                  'm%qp%Stif at quadrature point',ErrStat2,ErrMsg2); CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
@@ -1743,9 +1667,27 @@ subroutine Init_MiscVars( p, u, y, m, ErrStat, ErrMsg )
    CALL BD_CopyInput(u, m%u, MESH_NEWCOPY, ErrStat2, ErrMsg2)
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-   CALL BD_CopyInput(u, m%u2, MESH_NEWCOPY, ErrStat2, ErrMsg2)
-      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+   ! compute mapping of applied distributed loads to the root location
+   ! NOTE: PtLoads are not handled at present. See comments in BeamDyn_IO.f90 for changes required.
+   if (p%CompAppliedLdAtRoot .and. p%BldMotionNodeLoc == BD_MESH_QP) then
+      ! create point mesh at root (cousin of rootmotion) 
+      CALL MeshCopy( SrcMesh   = u%RootMotion     &
+                    , DestMesh = m%LoadsAtRoot    &
+                    , CtrlCode = MESH_COUSIN      &
+                    , IOS      = COMPONENT_OUTPUT &
+                    , Force    = .TRUE.           &
+                    , Moment   = .TRUE.           &
+                    , ErrStat  = ErrStat2         &
+                    , ErrMess  = ErrMsg2          )
+         CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+         if (ErrStat>=AbortErrLev) RETURN
 
+      ! mapping of distributed loads to LoadsAtRoot
+      CALL MeshMapCreate( u%DistrLoad, m%LoadsAtRoot, m%Map_u_DistrLoad_to_R, ErrStat2, ErrMsg2 )
+         CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+      m%LoadsAtRoot%remapFlag = .false.
+
+   endif
 
 end subroutine Init_MiscVars
 !-----------------------------------------------------------------------------------------------------------------------------------
@@ -1983,26 +1925,14 @@ SUBROUTINE BD_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg, 
    CALL BD_CopyContState(x, x_tmp, MESH_NEWCOPY, ErrStat2, ErrMsg2)
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
-      ! we may change the inputs (u) by applying the pitch actuator, so we will use m%u in this routine
+      ! We need to convert the inputs (u) to BD coordinates, so we will use m%u in this routine
    CALL BD_CopyInput(u, m%u, MESH_UPDATECOPY, ErrStat2, ErrMsg2)
-      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-
-   ! Actuator
-   IF( p%UsePitchAct ) THEN
-       CALL PitchActuator_SetBC(p, m%u, xd, AllOuts)
-   ENDIF
-   ! END Actuator
-
-
-   CALL BD_CopyInput(m%u, m%u2, MESH_UPDATECOPY, ErrStat2, ErrMsg2) ! this is a copy of the inputs after the pitch actuator has been applied, but before converting to BD coordinates. will use this for computing WriteOutput values.
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
       if (ErrStat >= AbortErrLev) then
          call cleanup()
          return
       end if
-
-
 
       ! We are trying to use quasistatic solve with loads, but do not know the input loads during initialization (no mesh yet).
       ! So, we need to rerun the solve routine to set the states at T=0 for the outputs to make sense.
@@ -2071,13 +2001,13 @@ SUBROUTINE BD_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg, 
 
 
        ! set y%BldMotion fields:
-   CALL Set_BldMotion_Mesh( p, m%u2, x_tmp, OtherState, m, y)
+   CALL Set_BldMotion_Mesh( p, u, x_tmp, OtherState, m, y)
 
    !-------------------------------------------------------
    !  compute RootMxr and RootMyr for ServoDyn and
    !  get values to output to file:
    !-------------------------------------------------------
-   call Calc_WriteOutput( p, AllOuts, y, m, ErrStat2, ErrMsg2, IsFullLin )  !uses m%u2
+   call Calc_WriteOutput( u, p, AllOuts, y, m, ErrStat2, ErrMsg2, IsFullLin )
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
    y%RootMxr = AllOuts( RootMxr )
@@ -2098,7 +2028,7 @@ SUBROUTINE BD_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg, 
          y%WriteOutput(p%NumOuts+1:) = 0.0_ReKi
 
             ! Now we need to populate the blade node outputs here
-          call Calc_WriteBldNdOutput( p, OtherState, m, y, ErrStat2, ErrMsg2 )   ! Call after normal writeoutput.  Will just postpend data on here.
+          call Calc_WriteBldNdOutput( u, p, OtherState, m, y, ErrStat2, ErrMsg2 )   ! Call after normal writeoutput.  Will just postpend data on here.
             CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       ENDIF
    end if
@@ -2145,12 +2075,6 @@ SUBROUTINE BD_CalcContStateDeriv( t, u, p, x, xd, z, OtherState, m, dxdt, ErrSta
    CALL BD_CopyInput(u, m%u, MESH_UPDATECOPY, ErrStat2, ErrMsg2)
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       if (ErrStat >= AbortErrLev) return
-
-   ! Actuator
-   !!!IF( p%UsePitchAct ) THEN
-   !!!    CALL PitchActuator_SetBC(p, m%u, xd, AllOuts)
-   !!!ENDIF
-   ! END Actuator
 
       ! convert to BD coordinates and apply boundary conditions 
    CALL BD_InputGlobalLocal(p,OtherState,m%u)
@@ -2214,9 +2138,6 @@ SUBROUTINE BD_UpdateDiscState( t, n, u, p, x, xd, z, OtherState, m, ErrStat, Err
    CHARACTER(*),                      INTENT(  OUT)  :: ErrMsg      !< Error message if ErrStat /= ErrID_None
 
    ! local variables
-   REAL(BDKi)                                        :: temp_R(3,3)
-   REAL(BDKi)                                        :: Hub_theta_Root(3)
-   REAL(BDKi)                                        :: u_theta_pitch
 
       ! Initialize ErrStat
 
@@ -2224,20 +2145,6 @@ SUBROUTINE BD_UpdateDiscState( t, n, u, p, x, xd, z, OtherState, m, ErrStat, Err
       ErrMsg  = ""
 
       ! Update discrete states here:
-
-! Actuator
-   IF( p%UsePitchAct ) THEN
-      !bjj: note that we've cheated a bit here because we have inputs at t+dt
-       temp_R = MATMUL(u%RootMotion%Orientation(:,:,1),TRANSPOSE(u%HubMotion%Orientation(:,:,1)))
-       Hub_theta_Root = EulerExtract(temp_R)
-       u_theta_pitch = -Hub_theta_Root(3)
-
-       xd%thetaP  = p%torqM(1,1)*xd%thetaP + p%torqM(1,2)*xd%thetaPD + p%torqM(1,2)*(p%pitchK*p%dt/p%pitchJ)*(-Hub_theta_Root(3))
-       xd%thetaPD = p%torqM(2,1)*xd%thetaP + p%torqM(2,2)*xd%thetaPD + p%torqM(2,2)*(p%pitchK*p%dt/p%pitchJ)*(-Hub_theta_Root(3))
-
-
-   ENDIF
-! END Actuator
 
 END SUBROUTINE BD_UpdateDiscState
 
@@ -2280,7 +2187,7 @@ SUBROUTINE BD_QuadraturePointDataAt0( p )
 
    DO nelem = 1,p%elem_total
        DO idx_qp = 1,p%nqp
-            !> ### Calculate the the initial displacement fields in an element
+            !> ### Calculate the initial displacement fields in an element
             !! Initial displacement field \n
             !!    \f$   \underline{u_0}\left( \xi \right) =
             !!                \sum_{k=1}^{p+1} h^k\left( \xi \right) \underline{\hat{u}_0}^k
@@ -2368,7 +2275,7 @@ SUBROUTINE BD_DisplacementQP( nelem, p, x, m )
    INTEGER(IntKi)                :: idx_qp            !< index to the current quadrature point
    INTEGER(IntKi)                :: elem_start        !< Node point of first node in current element
 
-   !> ### Calculate the the displacement fields in an element
+   !> ### Calculate the displacement fields in an element
    !! Using equations (27) and (28) \n
    !!    \f$   \underline{u}\left( \xi \right) =
    !!                \sum_{i=1}^{p+1} h^i\left( \xi \right) \underline{\hat{u}}^i
@@ -2710,6 +2617,7 @@ SUBROUTINE BD_ElasticForce(nelem,p,m,fact)
                          p%E10(:,idx_qp,nelem), &
                          m%qp%E1(:,idx_qp,nelem), &
                          m%qp%kappa(1:3,idx_qp,nelem), &
+                         m%qp%strain(:,idx_qp,nelem), &
                          p%Stif0_QP(:,:,(nelem-1)*p%nqp+idx_qp), &
                          m%qp%Stif(:,:,idx_qp,nelem), &
                          m%qp%Fc(:,idx_qp,nelem), &
@@ -2723,6 +2631,7 @@ SUBROUTINE BD_ElasticForce(nelem,p,m,fact)
                          p%E10(:,idx_qp,nelem), &
                          m%qp%E1(:,idx_qp,nelem), &
                          m%qp%kappa(1:3,idx_qp,nelem), &
+                         m%qp%strain(:,idx_qp,nelem), &
                          p%Stif0_QP(:,:,(nelem-1)*p%nqp+idx_qp), &
                          m%qp%Stif(:,:,idx_qp,nelem), &
                          m%qp%Fc(:,idx_qp,nelem), &
@@ -2808,11 +2717,10 @@ contains
       Qe(4:6,4:6) = -MATMUL(tildeE,Oe(1:3,4:6))
    end subroutine
 
-   subroutine Calc_Fc_Fd(RR0, uuu, E10, E1, kappa, Stif0, Stif, Fc, Fd, cet, k1s)
+   subroutine Calc_Fc_Fd(RR0, uuu, E10, E1, kappa, strain, Stif0, Stif, Fc, Fd, cet, k1s)
       REAL(BDKi), intent(in)     :: RR0(:,:), uuu(:), E10(:), E1(:), kappa(:), Stif0(:,:), Stif(:,:)
-      REAL(BDKi), intent(out)    :: Fc(:), Fd(:), cet, k1s
+      REAL(BDKi), intent(out)    :: strain(:), Fc(:), Fd(:), cet, k1s
       REAL(BDKi)                 :: e1s
-      REAL(BDKi)                 :: eee(6)      !< intermediate array for calculation Strain and curvature terms of Fc
       REAL(BDKi)                 :: fff(6)      !< intermediate array for calculation of the elastic force, Fc
       REAL(BDKi)                 :: R(3,3)      !< rotation matrix at quatrature point
       REAL(BDKi)                 :: Rx0p(3)     !< \f$ \underline{R} \underline{x}^\prime_0 \f$
@@ -2831,7 +2739,7 @@ contains
       ! eee(1:3) = m%qp%E1(1:3,idx_qp,nelem) - m%qp%RR0(1:3,3,idx_qp,nelem)     ! Using RR0 z direction in IEC coords
       call BD_CrvMatrixR(uuu(4:6), R)  ! Get rotation at QP as a matrix
       Rx0p = matmul(R,E10)             ! Calculate rotated initial tangent
-      eee(1:3) = E1(1:3) - Rx0p        ! Use rotated initial tangent in place of RR0*i1 to eliminate likely mismatch between R0*i1 and x0'
+      strain(1:3) = E1(1:3) - Rx0p     ! Use rotated initial tangent in place of RR0*i1 to eliminate likely mismatch between R0*i1 and x0'
       
          !> ### Set the 1D sectional curvature, \f$ \underline{\kappa} \f$, equation (5)
          !! \f$ \underline{\kappa} = \underline{k} + \underline{\underline{R}}\underline{k}_i \f$
@@ -2851,7 +2759,7 @@ contains
          !!    \f$
          !! In other words, \f$ \tilde{k} = \left(\underline{\underline{R}}^\prime\underline{\underline{R}}^T \right) \f$.
          !! Note: \f$ \underline{\kappa} \f$ was already calculated in the BD_DisplacementQP routine
-      eee(4:6) = kappa(1:3)
+      strain(4:6) = kappa(1:3)
 
 
    !FIXME: note that the k_i terms may not be documented correctly here.
@@ -2883,7 +2791,7 @@ contains
          !!                \underline{k}
          !!          \end{array} \right\} \f$
          !!
-      fff(1:6) = MATMUL(Stif,eee)
+      fff(1:6) = MATMUL(Stif,strain)
 
 
          !> ###Calculate the extension twist coupling.
@@ -2894,13 +2802,13 @@ contains
          !! \f$ \kappa_{m} = \left( \underline{\underline{R}}\underline{\underline{R}}_0 \right) ^T \underline{k}\f$ \n
 
          ! Strain into the material basis (eq (39) of Dymore manual)
-      !Wrk(:) = MATMUL(TRANSPOSE(m%qp%RR0(:,:,idx_qp,nelem)),eee(1:3))
+      !Wrk(:) = MATMUL(TRANSPOSE(m%qp%RR0(:,:,idx_qp,nelem)),strain(1:3))
       !e1s = Wrk(3)      !epsilon_{1} in material basis (for major axis of blade, which is z in the IEC formulation)
-      e1s = dot_product( RR0(:,3), eee(1:3) )
+      e1s = dot_product( RR0(:,3), strain(1:3) )
 
-      !Wrk(:) = MATMUL(TRANSPOSE(m%qp%RR0(:,:,idx_qp,nelem)),eee(4:6))
+      !Wrk(:) = MATMUL(TRANSPOSE(m%qp%RR0(:,:,idx_qp,nelem)),strain(4:6))
       !k1s = Wrk(3)      !kappa_{1} in material basis (for major axis of blade, which is z in the IEC formulation)
-      k1s = dot_product( RR0(:,3), eee(4:6) )
+      k1s = dot_product( RR0(:,3), strain(4:6) )
 
 
       !> Add extension twist coupling terms to the \f$ \underline{F}^c_{a} \f$\n
@@ -4550,14 +4458,6 @@ SUBROUTINE BD_GA2(t,n,u,utimes,p,x,xd,z,OtherState,m,ErrStat,ErrMsg)
    call BD_Input_extrapinterp( u, utimes, u_interp, t+p%dt, ErrStat2, ErrMsg2 )
       call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
 
-   CALL BD_UpdateDiscState( t, n, u_interp, p, x, xd, z, OtherState, m, ErrStat2, ErrMsg2 )
-      call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
-
-      ! Actuator
-   IF( p%UsePitchAct ) THEN
-      CALL PitchActuator_SetBC(p, u_interp, xd)
-   ENDIF
-
       ! Transform quantities from global frame to local (blade in BD coords) frame
    CALL BD_InputGlobalLocal(p,OtherState,u_interp)
 
@@ -5621,6 +5521,7 @@ SUBROUTINE BD_CalcForceAcc( u, p, OtherState, m, ErrStat, ErrMsg )
    INTEGER(IntKi)                               :: j
    REAL(BDKi)                                   :: RootAcc(6)
    REAL(BDKi)                                   :: NodeMassAcc(6)
+   INTEGER(IntKi)                               :: n_free
    INTEGER(IntKi)                               :: nelem ! number of elements
    INTEGER(IntKi)                               :: ErrStat2                     ! Temporary Error status
    CHARACTER(ErrMsgLen)                         :: ErrMsg2                      ! Temporary Error message
@@ -5628,73 +5529,54 @@ SUBROUTINE BD_CalcForceAcc( u, p, OtherState, m, ErrStat, ErrMsg )
 
    ErrStat = ErrID_None
    ErrMsg  = ""
-
-      ! must initialize these because BD_AssembleStiffK and BD_AssembleRHS are INOUT
+   ! must initialize these because BD_AssembleStiffK and BD_AssembleRHS are INOUT
    m%RHS    =  0.0_BDKi
    m%MassM  =  0.0_BDKi
 
-      ! Store the root accelerations as they will be used multiple times
+   ! Store the root accelerations as they will be used multiple times
    RootAcc(1:3) = u%RootMotion%TranslationAcc(1:3,1)
    RootAcc(4:6) = u%RootMotion%RotationAcc(1:3,1)
 
-
-      ! Calculate the global mass matrix and force vector for the beam
+   ! Calculate the global mass matrix and force vector for the beam
    DO nelem=1,p%elem_total
       CALL BD_ElementMatrixAcc( nelem, p, OtherState, m )            ! Calculate m%elm and m%elf
       CALL BD_AssembleStiffK(nelem,p,m%elm, m%MassM)     ! Assemble full mass matrix
       CALL BD_AssembleRHS(nelem,p,m%elf, m%RHS)          ! Assemble right hand side force terms
    ENDDO
 
-
-      ! Add point forces at GLL points to RHS of equation.
+   ! Add point forces at GLL points to RHS of equation.
    m%RHS = m%RHS + m%PointLoadLcl
 
+   ! Number of free degrees of freedom
+   n_free = p%dof_total - 6
 
-      ! Now set the root reaction force.
-      ! Note: m%RHS currently holds the force terms for the RHS of the equation.
-      !> The root reaction force is first node force minus  mass time acceleration terms:
-      !! \f$ F_\textrm{root} = F_1 - \sum_{i} m_{1,i} a_{i} \f$.
-   m%FirstNodeReactionLclForceMoment(1:6) =  m%RHS(1:6,1)
+   ! Full mass matrix (n_dof, n_dof)
+   m%LP_MassM = reshape(m%MassM, [p%dof_total, p%dof_total])
 
-      ! Setup the RHS of the m*a=F equation. Skip the first node as that is handled separately.
-   DO j=2,p%node_total
-      m%RHS(:,j)  =  m%RHS(:,j)  -  MATMUL( RESHAPE(m%MassM(:,j,:,1),(/6,6/)), RootAcc)
-   ENDDO
+   ! Mass matrix for free nodes
+   m%LP_MassM_LU = m%LP_MassM(7:p%dof_total, 7:p%dof_total)
 
+   ! Residual vector for free nodes
+   m%LP_RHS_LU = reshape(m%RHS(:,2:p%node_total), [n_free])
 
-      ! Solve for the accelerations!
-      !  Reshape for the use with the LAPACK solver.  Only solving for nodes 2:p%node_total (node 1 accelerations are known)
-   m%LP_RHS_LU =  RESHAPE(m%RHS(:,2:p%node_total),    (/p%dof_total-6/))
-   m%LP_MassM  =  RESHAPE(m%MassM,  (/p%dof_total,p%dof_total/))     ! Flatten out the dof dimensions of the matrix.
-   m%LP_MassM_LU  = m%LP_MassM(7:p%dof_total,7:p%dof_total)
+   ! Add force contributions from root acceleration
+   m%LP_RHS_LU = m%LP_RHS_LU - matmul(m%LP_MassM(7:,1:6), RootAcc)
 
-      ! Solve linear equations A * X = B for acceleration (F=ma) for nodes 2:p%node_total
-   CALL LAPACK_getrf( p%dof_total-6, p%dof_total-6, m%LP_MassM_LU, m%LP_indx, ErrStat2, ErrMsg2)
-      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-   CALL LAPACK_getrs( 'N',p%dof_total-6, m%LP_MassM_LU, m%LP_indx, m%LP_RHS_LU,ErrStat2, ErrMsg2)
-      CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-
+   ! Solve linear equations A * X = B for acceleration (F=ma) for nodes 2:p%node_total
+   CALL LAPACK_getrf(n_free, n_free, m%LP_MassM_LU, m%LP_indx, ErrStat2, ErrMsg2)
+   CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   CALL LAPACK_getrs('N', n_free, m%LP_MassM_LU, m%LP_indx, m%LP_RHS_LU, ErrStat2, ErrMsg2)
+   CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (ErrStat >= AbortErrLev) return
 
-      ! Reshape for copy over to output overall accelerations of system
-   m%RHS(:,2:p%node_total) = RESHAPE( m%LP_RHS_LU, (/ p%dof_node, p%node_total-1 /) )
-   m%RHS(:,1) = RootAcc       ! This is known at the start.
+   ! Get reaction force at root node
+   m%FirstNodeReactionLclForceMoment = m%RHS(1:6,1) - &
+                                       matmul(m%LP_MassM(1:6,7:), m%LP_RHS_LU) - &
+                                       matmul(m%LP_MassM(1:6,1:6), RootAcc)   
 
-
-
-      !> Now that we have all the accelerations, complete the summation \f$ \sum_{i} m_{1,i} a_{i} \f$
-      ! First node:
-   NodeMassAcc = MATMUL( RESHAPE(m%MassM(:,1,:,1),(/6,6/)),m%RHS(:,1) )
-   m%FirstNodeReactionLclForceMoment(1:6)   =  m%FirstNodeReactionLclForceMoment(1:6)   - NodeMassAcc(1:6)
-
-      ! remaining nodes
-   DO j=2,p%Node_total
-      NodeMassAcc = MATMUL( RESHAPE(m%MassM(:,j,:,1),(/6,6/)),m%RHS(:,j) )
-      m%FirstNodeReactionLclForceMoment(1:6)   =  m%FirstNodeReactionLclForceMoment(1:6)   - NodeMassAcc(1:6)
-   ENDDO
-
-
-   RETURN
+   ! Populate RHS with prescribed root acceleration and solved accelerations
+   m%RHS(:,1) = RootAcc
+   m%RHS(:,2:p%node_total) = RESHAPE(m%LP_RHS_LU, [p%dof_node, p%node_total-1])
 
 END SUBROUTINE BD_CalcForceAcc
 
@@ -5810,50 +5692,6 @@ SUBROUTINE BD_ComputeElementMass(nelem,p,NQPpos,EMass0_GL,elem_mass,elem_CG,elem
    RETURN
 
 END SUBROUTINE BD_ComputeElementMass
-
-
-!-----------------------------------------------------------------------------------------------------------------------------------
-!> This routine alters the RootMotion inputs based on the pitch-actuator parameters and discrete states
-SUBROUTINE PitchActuator_SetBC(p, u, xd, AllOuts)
-
-   TYPE(BD_ParameterType),    INTENT(IN   )  :: p                                 !< The module parameters
-   TYPE(BD_InputType),        INTENT(INOUT)  :: u                                 !< inputs
-   TYPE(BD_DiscreteStateType),INTENT(IN   )  :: xd                                !< The module discrete states
-   REAL(ReKi),       OPTIONAL,INTENT(INOUT)  :: AllOuts(0:)                       !< all output array for writing to file
-   ! local variables
-   REAL(BDKi)                                :: temp_R(3,3)
-   REAL(BDKi)                                :: temp_cc(3)
-   REAL(BDKi)                                :: u_theta_pitch
-   REAL(BDKi)                                :: thetaP
-   REAL(BDKi)                                :: omegaP
-   REAL(BDKi)                                :: alphaP
-
-
-   temp_R = MATMUL(u%RootMotion%Orientation(:,:,1),TRANSPOSE(u%HubMotion%Orientation(:,:,1)))
-   temp_cc = EulerExtract(temp_R)   != Hub_theta_Root
-   u_theta_pitch = -temp_cc(3)
-
-   thetaP = xd%thetaP
-   omegaP = xd%thetaPD
-   alphaP = -(p%pitchK/p%pitchJ) * xd%thetaP - (p%pitchC/p%pitchJ) * xd%thetaPD + (p%pitchK/p%pitchJ) * u_theta_pitch
-
-   ! Calculate new root motions for use as BeamDyn boundary conditions:
-   !note: we alter the orientation last because we need the input (before actuator) root orientation for the rotational velocity and accelerations
-   u%RootMotion%RotationVel(:,1) = u%RootMotion%RotationVel(:,1) - omegaP * u%RootMotion%Orientation(3,:,1)
-   u%RootMotion%RotationAcc(:,1) = u%RootMotion%RotationAcc(:,1) - alphaP * u%RootMotion%Orientation(3,:,1)
-
-   temp_cc(3) = -thetaP
-   temp_R = EulerConstruct(temp_cc)
-   u%RootMotion%Orientation(:,:,1) = MATMUL(temp_R,u%HubMotion%Orientation(:,:,1))
-
-   if (present(AllOuts)) then
-      AllOuts(PAngInp) = u_theta_pitch
-      AllOuts(PAngAct) = thetaP
-      AllOuts(PRatAct) = omegaP
-      AllOuts(PAccAct) = alphaP
-   end if
-
-END SUBROUTINE PitchActuator_SetBC
 
 
 subroutine BD_InitVars(u, p, x, y, m, InitOut, Linearize, ErrStat, ErrMsg)

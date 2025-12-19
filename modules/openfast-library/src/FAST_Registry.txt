@@ -495,7 +495,6 @@ typedef	^	FAST_ExternInputType	ReKi	YawRateCom	-	-	-	"yaw rate command from Simu
 typedef	^	FAST_ExternInputType	ReKi	BlPitchCom	3	-	2pi	"blade pitch commands from Simulink/Labview"	"rad"
 typedef	^	FAST_ExternInputType	ReKi	BlAirfoilCom	3	-	-	"blade airfoil commands from Simulink/Labview"	"-"
 typedef	^	FAST_ExternInputType	ReKi	HSSBrFrac	-	-	-	"Fraction of full braking torque: 0 (off) <= HSSBrFrac <= 1 (full) from Simulink or LabVIEW"
-typedef	^	FAST_ExternInputType	ReKi	LidarFocus	3	-	-	"lidar focus (relative to lidar location)"	m
 typedef	^	FAST_ExternInputType	ReKi	CableDeltaL	{20}	-	-	"Cable control DeltaL"	m
 typedef	^	FAST_ExternInputType	ReKi	CableDeltaLdot	{20}	-	-	"Cable control DeltaLdot"	m/s
 
@@ -504,8 +503,8 @@ typedef	FAST	FAST_MiscVarType	DbKi	TiLstPrn	-	-	-	"The simulation time of the la
 typedef	^	FAST_MiscVarType	DbKi	t_global	-	-	-	"Current simulation time (for global/FAST simulation)"	(s)
 typedef	^	FAST_MiscVarType	ReKi	PrevClockTime	-	-	-	"Clock time at start of simulation in seconds"	(s)
 typedef	^	FAST_MiscVarType	ReKi	UsrTime1	-	-	-	"User CPU time for simulation initialization"	(s)
-typedef	^	FAST_MiscVarType	ReKi	UsrTime2	-	-	-	"User CPU time for simulation (without intialization)"	(s)
-typedef	^	FAST_MiscVarType	INTEGER	StrtTime	{8}	-	-	"Start time of simulation (including intialization)"
+typedef	^	FAST_MiscVarType	ReKi	UsrTime2	-	-	-	"User CPU time for simulation (without initialization)"	(s)
+typedef	^	FAST_MiscVarType	INTEGER	StrtTime	{8}	-	-	"Start time of simulation (including initialization)"
 typedef	^	FAST_MiscVarType	INTEGER	SimStrtTime	{8}	-	-	"Start time of simulation (after initialization)"
 #typedef	^	FAST_MiscVarType	IntKi	n_t_global	-	-	-	"simulation time step, loop counter for global (FAST) simulation"	(s)
 typedef	^	FAST_MiscVarType	FAST_ExternInputType	ExternInput	-	-	-	"external input values"	-

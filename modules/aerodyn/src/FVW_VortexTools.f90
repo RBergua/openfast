@@ -2149,11 +2149,12 @@ contains
    end subroutine curl_regular_grid
 
    !> Return an ellipsoid made of panels
-   subroutine EllipsoidPanels(n1, n2, L1, L2, L3, Points, IDs)
+   subroutine EllipsoidPanels(n1, n2, L1, L2, L3, Points, IDs, zoff)
       integer,    intent(in) :: n1, n2     !< Number of points in main and secondary direction (spherical coordinates)
       real(ReKi), intent(in) :: L1, L2, L3 !< Main axes of ellipsoid in 3 directions
       real(ReKi), dimension(:,:), allocatable, intent(out) :: Points !< 3 x nP
       integer, dimension(:,:), allocatable,    intent(out) :: IDs    !< 4 x nPanels, connectivity
+      real(ReKi), intent(in) :: zOff !< zoffset
       ! Variables
       integer                  :: ip, it, node,e
       real(ReKi)               :: phi                                       !< 
@@ -2180,8 +2181,8 @@ contains
             node = (it-1)*nphi +ip
             Points(1, node) = L1*cos(theta)*cos(phi)
             Points(2, node) = L2*cos(theta)*sin(phi)
-            Points(3, node) = L3*sin(theta)
-         end do 
+            Points(3, node) = L3*sin(theta) +zoff
+         end do
       end do 
       ! Ugly for loops for Panl 
       do it=1,ntheta-1 

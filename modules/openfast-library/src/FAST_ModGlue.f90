@@ -508,6 +508,13 @@ subroutine ModGlue_Init(p, m, y, p_FAST, m_FAST, Turbine, ErrStat, ErrMsg)
             end do
          end select
 
+         ! Remove linearize flag from input variables that have VF_NoLin flag
+         do j = 1, size(ModData%Vars%u)
+            if (MV_HasFlagsAll(ModData%Vars%u(j), VF_NoLin)) then
+               call MV_ClearFlags(ModData%Vars%u(j), VF_Linearize)
+            end if
+         end do
+
          ! Add or remove linearize flag based on requested output
          select case (p_FAST%LinOutputs)
          case (LIN_NONE)
@@ -528,6 +535,13 @@ subroutine ModGlue_Init(p, m, y, p_FAST, m_FAST, Turbine, ErrStat, ErrMsg)
             end do
          end select
 
+         ! Remove linearize flag from output variables that have VF_NoLin flag
+         do j = 1, size(ModData%Vars%y)
+            if (MV_HasFlagsAll(ModData%Vars%y(j), VF_NoLin)) then
+               call MV_ClearFlags(ModData%Vars%y(j), VF_Linearize)
+            end if
+         end do
+
       end associate
    end do
 
@@ -535,10 +549,9 @@ subroutine ModGlue_Init(p, m, y, p_FAST, m_FAST, Turbine, ErrStat, ErrMsg)
    ! Glue Module
    !----------------------------------------------------------------------------
 
-   LinFlags = VF_Linearize + VF_Mapping
-   ! LinFlags = VF_None
+   LinFlags = VF_Linearize + VF_Mapping + VF_Mesh
    call ModGlue_CombineModules(m%ModGlue, m%ModData, m%Mappings, p%Lin%iMod, LinFlags, &
-                            p_FAST%Linearize, ErrStat2, ErrMsg2, Name="Lin")
+                               p_FAST%Linearize, ErrStat2, ErrMsg2, Name="Lin")
    if (Failed()) return
 
    !----------------------------------------------------------------------------
@@ -672,7 +685,6 @@ subroutine ModGlue_CalcSteady(n_t_global, t_global, p, m, y, p_FAST, m_FAST, T, 
    end do
 
    ! Loop through modules and collect output
-
    do j = 1, size(m%ModGlue%ModData)
       associate (ModData => m%ModGlue%ModData(j))
 
@@ -681,7 +693,7 @@ subroutine ModGlue_CalcSteady(n_t_global, t_global, p, m, y, p_FAST, m_FAST, T, 
 
          ! Get outputs
          call FAST_GetOP(ModData, t_global, INPUT_CURR, STATE_CURR, T, ErrStat2, ErrMsg2, &
-                         y_op=m%ModGlue%Lin%y, y_glue=m%ModGlue%Lin%y)
+                         y_op=ModData%Lin%y, y_glue=m%ModGlue%Lin%y)
          if (Failed()) return
 
       end associate
@@ -768,6 +780,7 @@ subroutine ModGlue_CalcSteady(n_t_global, t_global, p, m, y, p_FAST, m_FAST, T, 
       ! If converged or in first rotation, save this operating point for linearization later
       if (m%CS%IsConverged .or. m%CS%NumRotations == 0) then !
          y%Lin%Times(m%Lin%AzimuthIndex) = t_global
+         m_FAST%Lin%LinTimes = y%Lin%Times
          call ModGlue_SaveOperatingPoint(p, m, m%Lin%AzimuthIndex, m%CS%NumRotations == 0, T, ErrStat2, ErrMsg2)
          if (Failed()) return
       end if
@@ -830,8 +843,6 @@ contains
    function CalcOutputErrorAtAzimuth() result(eps_squared)
       real(R8Ki)  :: eps_squared_sum, eps_squared
       integer(IntKi) :: un, k
-
-
 
       ! Calculate difference between interpolated outputs for this rotation and
       ! interpolated outputs from previous rotation
@@ -1608,9 +1619,9 @@ subroutine WrLinFile_txt_Table(VarAry, FlagFilter, p_FAST, Un, RowCol, op, IsDer
                rv = quat_to_rvec(op(i_op:i_op + 2))
 
                ! Write all components of WM parameters
-               write (Un, Fmt) RowColIdx, rv(1), VarRotFrame, VarDerivOrder, trim(Var%LinNames(j + 0))
-               write (Un, Fmt) RowColIdx, rv(2), VarRotFrame, VarDerivOrder, trim(Var%LinNames(j + 1))
-               write (Un, Fmt) RowColIdx, rv(3), VarRotFrame, VarDerivOrder, trim(Var%LinNames(j + 2))
+               write (Un, Fmt) RowColIdx + 0, rv(1), VarRotFrame, VarDerivOrder, trim(Var%LinNames(j + 0))
+               write (Un, Fmt) RowColIdx + 1, rv(2), VarRotFrame, VarDerivOrder, trim(Var%LinNames(j + 1))
+               write (Un, Fmt) RowColIdx + 2, rv(3), VarRotFrame, VarDerivOrder, trim(Var%LinNames(j + 2))
 
             else
 

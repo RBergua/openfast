@@ -52,15 +52,9 @@ typedef	^	InitInputType	CHARACTER(64)	CableControlRequestor	{:}	-	-	"Array with 
 typedef	^	InitInputType	IntKi	InterpOrder	-	-	-	"Interpolation order from glue code -- required to set m%u_xStC sizes" -
 #ADD in the TMD submodule input file passing here
 #initial inputs of lidar parameters
-typedef	^	InitInputType	ReKi	LidSpeed     	{:}  -	-	"Number of Lidar measurement distances"	-
-typedef	^	InitInputType	ReKi	MsrPositionsX	{:}  -	-	"Lidar X direction measurement points" m
-typedef	^	InitInputType	ReKi	MsrPositionsY	{:}  -	-	"Lidar Y direction measurement points" m
-typedef	^	InitInputType	ReKi	MsrPositionsZ	{:}  -	-	"Lidar Z direction measurement points" m
 typedef	^	InitInputType	IntKi	SensorType   	 -   -	-	"Lidar sensor type" -
 typedef	^	InitInputType	IntKi	NumBeam     	 -   -	-	"Number of beams" -
 typedef	^	InitInputType	IntKi	NumPulseGate	 -   -	-	"Number of pulse gates" -
-typedef	^	InitInputType	ReKi	PulseSpacing	 -   -	-	"Distance between range gates" -
-typedef	^	InitInputType	ReKi	URefLid      	 -   -	-	"Reference average wind speed for the lidar"  m/s
 
 # Define outputs from the initialization routine here:
 typedef  ^  InitOutputType    CHARACTER(ChanLen)      WriteOutputHdr    {:} - -  "Names of the output-to-file channels"   -
@@ -86,6 +80,9 @@ typedef	ServoDyn/SrvD	SrvD_InputFile	DbKi	DT	-	-	-	"Communication interval for c
 typedef	^	SrvD_InputFile	LOGICAL	Echo	-	-	-	"Echo the input file out" -
 typedef	^	SrvD_InputFile	IntKi	PCMode	-	-	-	"Pitch control mode"	-
 typedef	^	SrvD_InputFile	DbKi	TPCOn	-	-	-	"Time to enable active pitch control [unused when PCMode=0]"	s
+typedef	^	SrvD_InputFile	ReKi	PitNeut	3	-	-	"Neutral pitch position--pitch spring moment is zero at this pitch"	deg
+typedef	^	SrvD_InputFile	ReKi	PitSpr	3	-	-	"Blade-pitch spring constant"	N-m/rad
+typedef	^	SrvD_InputFile	ReKi	PitDamp	3	-	-	"Blade-pitch damping constant"	N-m/(rad/s)
 typedef	^	SrvD_InputFile	DbKi	TPitManS	3	-	-	"Time to start override pitch maneuver for blade (K) and end standard pitch control"	s
 typedef	^	SrvD_InputFile	ReKi	PitManRat	3	-	-	"Pitch rates at which override pitch maneuvers head toward final pitch angles"	rad/s
 typedef	^	SrvD_InputFile	ReKi	BlPitchF	3	-	-	"Blade (K) final pitch for pitch maneuvers"	radians
@@ -237,8 +234,6 @@ typedef	^	BladedDLLType	ReKi	MsrPositionsZ  {:}      -	-	"Lidar Z direction meas
 typedef	^	BladedDLLType	IntKi	SensorType      -       -	-	"Lidar sensor type" -
 typedef	^	BladedDLLType	IntKi	NumBeam     	-       -	-	"Number of beams" -
 typedef	^	BladedDLLType	IntKi	NumPulseGate	-       -	-	"Number of pulse gates" -
-typedef	^	BladedDLLType	IntKi	PulseSpacing	-       -	-	"Distance between range gates" -
-typedef	^	BladedDLLType	IntKi	URefLid         -       -	-	"Reference average wind speed for the lidar"  m/s
 ## these are PARAMETERS sent to the DLL (THEIR VALUES SHOULD NOT CHANGE DURING SIMULATION):
 typedef	^	BladedDLLType	DbKi	DLL_DT	-	-	-	"interval for calling DLL (integer multiple number of DT)"	s
 typedef	^	BladedDLLType	CHARACTER(1024)	DLL_InFile	-	-	-	"Name of input file used in DLL"	-
@@ -394,7 +389,10 @@ typedef	^	ParameterType	LOGICAL	GenTiStr	-	-	-	"Start generator based upon T: ti
 typedef	^	ParameterType	ReKi	VS_Rgn2K	-	-	-	"Generator torque constant in Region 2 for simple variable-speed generator control (HSS side) [used only when VSContrl=1]"	N-m/(rad/s)^2
 typedef	^	ParameterType	ReKi	YawNeut	-	-	-	"Neutral yaw position--yaw spring force is zero at this yaw"	radians
 typedef	^	ParameterType	ReKi	YawSpr	-	-	-	"Nacelle-yaw spring constant"	N-m/rad
-typedef	^	ParameterType	ReKi	YawDamp	-	-	-	"Nacelle-yaw constant"	N-m/(rad/s)
+typedef	^	ParameterType	ReKi	YawDamp	-	-	-	"Nacelle-yaw damping constant"	N-m/(rad/s)
+typedef	^	ParameterType	ReKi	PitNeut	{:}	-	-	"Neutral blade pitch position--pitch spring force is zero at this angle"	rad
+typedef	^	ParameterType	ReKi	PitSpr	{:}	-	-	"Blade-pitch spring constant"	N-m/rad
+typedef	^	ParameterType	ReKi	PitDamp	{:}	-	-	"Blade-pitch damping constant"	N-m/(rad/s)
 typedef	^	ParameterType	DbKi	TpBrDT	-	-	-	"Time for tip-brake to reach full deployment once released"	s
 typedef	^	ParameterType	ReKi	TBDepISp	{:}	-	-	"Deployment-initiation speed for the tip brakes"	rad/s
 typedef	^	ParameterType	ReKi	TBDrConN	-	-	-	"Tip-brake drag constant during normal operation, Cd*Area"
@@ -466,13 +464,12 @@ typedef  ^  ParameterType  Integer  Jac_Idx_SStC_y {:}{:}    - -  "the start and
 typedef	^	ParameterType	IntKi	SensorType  	 -   -	-	"Lidar sensor type" -
 typedef	^	ParameterType	IntKi	NumBeam     	 -   -	-	"Number of beams" -
 typedef	^	ParameterType	IntKi	NumPulseGate	 -   -	-	"Number of pulse gates" -
-typedef	^	ParameterType	ReKi	PulseSpacing	 -   -	-	"Distance between range gates" m
-typedef	^	ParameterType	ReKi	URefLid     	 -   -	-	"Reference average wind speed for the lidar"  m/s
 
 
 # ..... Inputs ....................................................................................................................
 # Define inputs that are not on this mesh here:
 typedef	^	InputType	ReKi	BlPitch	{:}	-	2pi	"Current blade pitch angles"	radians
+typedef	^	InputType	ReKi	BlPRate	{:}	-	-	"Current blade pitch rate"	rad/s
 typedef	^	InputType	ReKi	Yaw	-	-	2pi	"Current nacelle yaw"	radians
 typedef	^	InputType	ReKi	YawRate	-	-	-	"Current nacelle yaw rate"	rad/s
 typedef	^	InputType	ReKi	LSS_Spd	-	-	-	"Low-speed shaft (LSS) speed at entrance to gearbox"	rad/s
@@ -528,7 +525,9 @@ typedef	^	InputType	ReKi	MsrPositionsZ	{:}     -	-	"Lidar Z direction measuremen
 #typedef	^	OutputType	MeshType	MeshedOutput	-	-	-	"Meshed output data"	-
 # Define outputs that are not on this mesh here:
 typedef	^	OutputType	ReKi	WriteOutput	{:}	-	-	"Data to be written to an output file: see WriteOutputHdr for names of each variable"	"see WriteOutputUnt"
+typedef	^	OutputType	ReKi	BlPitchMom	{:}	-	-	"Blade-pitch moment transmitted to the blades"	N-m
 typedef	^	OutputType	ReKi	BlPitchCom	{:}	-	2pi	"Commanded blade pitch angles"	radians
+typedef	^	OutputType	ReKi	BlPRateCom	{:}	-	-	"Commanded blade pitch rates; only used to compute blade-pitch moment"	rad/s
 typedef	^	OutputType	ReKi	BlAirfoilCom	{:}	-	-	"Commanded Airfoil UserProp for blade.  Passed to AD15 for airfoil interpolation (must be same units as given in AD15 airfoil tables)"	-
 typedef	^	OutputType	ReKi	YawMom	-	-	-	"Torque transmitted through the yaw bearing"	N-m
 typedef	^	OutputType	ReKi	YawPosCom	-	-	-	"Yaw command from controller (for SED module)"	rad
@@ -551,7 +550,8 @@ typedef	^	MiscVarType	DbKi	LastTimeCalled	-	-	-	"last time the CalcOutput/Bladed
 typedef	^	MiscVarType	BladedDLLType	dll_data	-	-	-	"data used for Bladed DLL"	-
 typedef	^	MiscVarType	logical	FirstWarn	-	-	-	"Whether or not this is the first warning about the DLL being called without Explicit-Loose coupling."	-
 typedef	^	MiscVarType	DbKi	LastTimeFiltered	-	-	-	"last time the CalcOutput/Bladed DLL was filtered"	s
-typedef	^	MiscVarType	ReKi	xd_BlPitchFilter	{:}	-	-	"blade pitch filter"	-
+typedef	^	MiscVarType	ReKi	xd_BlPitchFilter	{:}	-	-	"blade pitch filter"	rad
+typedef	^	MiscVarType	ReKi	xd_BlPRateFilter	{:}	-	-	"blade pitch rate filter"	rad/s
 typedef	^	MiscVarType	StC_MiscVarType	BStC	{:}	-	-	"StC module misc vars - blade"	-
 typedef	^	MiscVarType	StC_MiscVarType	NStC	{:}	-	-	"StC module misc vars - nacelle"	-
 typedef	^	MiscVarType	StC_MiscVarType	TStC	{:}	-	-	"StC module misc vars - tower"	-

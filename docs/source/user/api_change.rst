@@ -9,7 +9,7 @@ The changes are tabulated according to the module input file, line number, and f
 The line number corresponds to the resulting line number after all changes are implemented.
 Thus, be sure to implement each in order so that subsequent line numbers are correct.
 
-OpenFAST v4.0.3 to OpenFAST dev
+OpenFAST v4.1.2 to OpenFAST dev
 ----------------------------------
 
 Added mass and fluid inertia loads were added to the rotor blades and tower in AeroDyn. 
@@ -53,6 +53,23 @@ AeroDyn driver                                24       CompSeaSt            1   
 AeroDyn driver                                25       SeaStFile            "MHK_RM1_Fixed_SeaState.dat"     SeaStFile     - Name of the SeaState input file [used only when CompSeaSt=1]
 AeroDyn                                       \*       TwrCp                1.0         [additional column in *Tower Influence and Aerodynamics* table]
 AeroDyn                                       \*       TwrCa                1.0         [additional column in *Tower Influence and Aerodynamics* table]
+SeaState                                      18       WvCrntMod            0     WvCrntMod     - Combined wave-current modeling option {0: simple superposition, 1: include Doppler effect, 2: include both Doppler effect and wave amplitude/spectrum scaling} (switch)
+ElastoDyn                                     11       PitchDOF             False         PitchDOF    - Blade pitch DOF (flag)
+ElastoDyn                                     77       PBrIner(1)           200           PBrIner(1)  - Pitch bearing/actuator inertia, blade 1 (kg m^2)
+ElastoDyn                                     78       PBrIner(2)           200           PBrIner(2)  - Pitch bearing/actuator inertia, blade 2 (kg m^2)
+ElastoDyn                                     79       PBrIner(3)           200           PBrIner(3)  - Pitch bearing/actuator inertia, blade 3 (kg m^2) [unused for 2 blades]
+ElastoDyn                                     80       BlPIner(1)           28578         BlPIner(1)  - Pitch inertia of an undeflected blade, blade 1 (kg m^2)
+ElastoDyn                                     81       BlPIner(2)           28578         BlPIner(2)  - Pitch inertia of an undeflected blade, blade 2 (kg m^2)
+ElastoDyn                                     82       BlPIner(3)           28578         BlPIner(3)  - Pitch inertia of an undeflected blade, blade 3 (kg m^2) [unused for 2 blades]
+ServoDyn                                      9        PitNeut(1)           0             PitNeut(1)  - Blade 1 neutral pitch position--pitch spring moment is zero at this position *[unused when* **PCMode>0** and **t>=TPCOn** *]*
+ServoDyn                                      10       PitNeut(2)           0             PitNeut(2)  - Blade 2 neutral pitch position--pitch spring moment is zero at this position *[unused when* **PCMode>0** and **t>=TPCOn** *]*
+ServoDyn                                      11       PitNeut(3)           0             PitNeut(3)  - Blade 3 neutral pitch position--pitch spring moment is zero at this position *[unused when* **PCMode>0** and **t>=TPCOn** *]* *[unused for 2 blades]*
+ServoDyn                                      12       PitSpr(1)            3.6E7         PitSpr(1)   - Blade 1 pitch spring constant
+ServoDyn                                      13       PitSpr(2)            3.6E7         PitSpr(2)   - Blade 2 pitch spring constant
+ServoDyn                                      14       PitSpr(3)            3.6E7         PitSpr(3)   - Blade 3 pitch spring constant *[unused for 2 blades]*
+ServoDyn                                      15       PitDamp(1)           1.4E6         PitDamp(1)  - Blade 1 pitch damping constant
+ServoDyn                                      16       PitDamp(2)           1.4E6         PitDamp(2)  - Blade 2 pitch damping constant
+ServoDyn                                      17       PitDamp(3)           1.4E6         PitDamp(3)  - Blade 3 pitch damping constant *[unused for 2 blades]*
 ============================================= ======== ==================== ========================================================================================================================================================================================================
 
 
@@ -83,20 +100,98 @@ AeroDyn                                       11       Buoyancy             Fals
 ============================================= ======== ==================== ========================================================================================================================================================================================================
 
 
+OpenFAST v4.1.1 to OpenFAST v4.1.2
+----------------------------------
 
-OpenFAST v4.0.3 to OpenFAST v4.1.0
+No input file changes were made.
+
+
+OpenFAST v4.1.0 to OpenFAST v4.1.1
+----------------------------------
+
+No input file changes were made.
+
+
+OpenFAST v4.0.5 to OpenFAST v4.1.0
 ----------------------------------
 Supercontroller module has been removed from FAST.Farm.
 
-============================================= ==== =============== ========================================================================================================================================================================================================
+============================================= ==== ================== ===============================================================================================================================================================================================================================================================================================================================================================================================================================================================
 Removed in OpenFAST `v4.1.0`
----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-Module                                        Line  Flag Name        Example Value
-============================================= ==== =============== ========================================================================================================================================================================================================
-FAST.Farm                                     7    UseSC           False         UseSC                 - Use a super controller? (flag)
-FAST.Farm                                     11   na              --- SUPER CONTROLLER --- [used only for UseSC=True]
-FAST.Farm                                     12   SC_FileName     "SC_DLL.dll"  SC_FileName Name/location of the dynamic library {.dll [Windows] or .so [Linux]} containing the Super Controller algorithms (quoted string)
-============================================= ==== =============== ========================================================================================================================================================================================================
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Module                                        Line  Flag Name         Example Value
+============================================= ==== ================== ===============================================================================================================================================================================================================================================================================================================================================================================================================================================================
+FAST.Farm                                     7    UseSC              False         UseSC                 - Use a super controller? (flag)
+FAST.Farm                                     11   na                 --- SUPER CONTROLLER --- [used only for UseSC=True]
+FAST.Farm                                     12   SC_FileName        "SC_DLL.dll"  SC_FileName Name/location of the dynamic library {.dll [Windows] or .so [Linux]} containing the Super Controller algorithms (quoted string)
+============================================= ==== ================== ===============================================================================================================================================================================================================================================================================================================================================================================================================================================================
+
+Line numbers are not provided in the table below because the line numbers can change depending on the number of entries in the input files. Please refer to the User Documentation on the input files for examples.
+
+============================================= ========= ================== ===============================================================================================================================================================================================================================================================================================================================================================================================================================================================
+Added/Modified in OpenFAST `v4.1.0`
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Module                                        Change    Flag Name          Example Value
+============================================= ========= ================== ===============================================================================================================================================================================================================================================================================================================================================================================================================================================================
+HydroDyn                                      Modified  na                 ---------------- CYLINDRICAL MEMBER CROSS-SECTION PROPERTIES -------------------
+HydroDyn                                      Modified  NPropSetsCyl       1   NPropSetsCyl    - Number of cylindrical member property sets (-)
+HydroDyn                                      Added     na                 ---------------- RECTANGULAR MEMBER CROSS-SECTION PROPERTIES -------------------
+HydroDyn                                      Added     NPropSetsRec       1   NPropSetsRec    - Number of rectangular member property sets (-)
+HydroDyn                                      Added     na                 PropSetID    PropA      PropB    PropThck
+HydroDyn                                      Added     na                    (-)        (m)        (m)       (m)
+HydroDyn                                      Modified  na                 -------- SIMPLE CYLINDRICAL-MEMBER HYDRODYNAMIC COEFFICIENTS (model 1) ---------
+HydroDyn                                      Added     na                 -------- SIMPLE RECTANGULAR-MEMBER HYDRODYNAMIC COEFFICIENTS (model 1) ---------
+HydroDyn                                      Added     na                 SimplCdA SimplCdAMG SimplCdB SimplCdBMG SimplCaA SimplCaAMG SimplCaB SimplCaBMG SimplCp SimplCpMG SimplAxCd SimplAxCdMG SimplAxCa SimplAxCaMG SimplAxCp SimplAxCpMG SimplCb SimplCbMG
+HydroDyn                                      Added     na                    (-)      (-)        (-)      (-)        (-)      (-)        (-)      (-)        (-)     (-)       (-)       (-)         (-)       (-)         (-)       (-)         (-)     (-)
+HydroDyn                                      Modified  na                 ------ DEPTH-BASED CYLINDRICAL-MEMBER HYDRODYNAMIC COEFFICIENTS (model 2) -------
+HydroDyn                                      Modified  NCoefDpthCyl       0   NCoefDpthCyl    - Number of depth-dependent cylindrical member coefficients (-)
+HydroDyn                                      Added     na                 ------ DEPTH-BASED RECTANGULAR-MEMBER HYDRODYNAMIC COEFFICIENTS (model 2) -------
+HydroDyn                                      Added     NCoefDpthRec       0   NCoefDpthRec    - Number of depth-dependent rectangular member coefficients (-)
+HydroDyn                                      Added     na                 Dpth DpthCdA DpthCdAMG DpthCdB DpthCdBMG DpthCaA DpthCaAMG DpthCaB DpthCaBMG DpthCp DpthCpMG DpthAxCd DpthAxCdMG DpthAxCa DpthAxCaMG DpthAxCp DpthAxCpMG DpthCb DpthCbMG
+HydroDyn                                      Added     na                  `(m)`  (-)     (-)       (-)     (-)       (-)     (-)       (-)     (-)       (-)    (-)      (-)      (-)        (-)      (-)        (-)      (-)        (-)    (-)
+HydroDyn                                      Modified  na                 ------ MEMBER-BASED CYLINDRICAL-MEMBER HYDRODYNAMIC COEFFICIENTS (model 3) ------
+HydroDyn                                      Modified  NCoefMembersCyl    0   NCoefMembersCyl - Number of member-based cylindrical member coefficients (-)
+HydroDyn                                      Added     na                 ------ MEMBER-BASED RECTANGULAR-MEMBER HYDRODYNAMIC COEFFICIENTS (model 3) ------
+HydroDyn                                      Added     NCoefMembersRec    0   NCoefMembersRec - Number of member-based rectangular member coefficients (-)
+HydroDyn                                      Added     na                 MemberID MemberCdA1 MemberCdA2 MemberCdAMG1 MemberCdAMG2 MemberCdB1 MemberCdB2 MemberCdBMG1 MemberCdBMG2 MemberCaA1 MemberCaA2 MemberCaAMG1 MemberCaAMG2 MemberCaB1 MemberCaB2 MemberCaBMG1 MemberCaBMG2 MemberCp1 MemberCp2 MemberCpMG1 MemberCpMG2 MemberAxCd1 MemberAxCd2 MemberAxCdMG1 MemberAxCdMG2 MemberAxCa1 MemberAxCa2 MemberAxCaMG1 MemberAxCaMG2 MemberAxCp1 MemberAxCp2 MemberAxCpMG1 MemberAxCpMG2 MemberCb1 MemberCb2 MemberCbMG1 MemberCbMG2
+HydroDyn                                      Added     na                 (-)      (-)        (-)        (-)          (-)          (-)        (-)        (-)          (-)          (-)        (-)        (-)          (-)          (-)        (-)        (-)          (-)          (-)       (-)       (-)         (-)         (-)         (-)         (-)           (-)           (-)         (-)         (-)           (-)           (-)         (-)         (-)           (-)           (-)       (-)       (-)         (-)
+HydroDyn                                      Modified  na                 MemberID MJointID1 MJointID2 MPropSetID1 MPropSetID2 MSecGeom MSpinOrient MDivSize MCoefMod MHstLMod PropPot [MCoefMod=1: use simple coeff table, 2: use depth-based coeff table, 3: use member-based coeff table] [PropPot/=0 if member is modeled with potential-flow theory]
+HydroDyn                                      Modified  na                 (-)      (-)       (-)       (-)         (-)         (switch) (deg)       (m)      (switch) (switch) (flag)
+MoorDyn                                       Optional  na                 <Several new optional sections have been added. See note below>
+SubDyn                                        Modified  na                 MemberID MJointID1 MJointID2 MPropSetID1 MPropSetID2 MType MSpin/COSMID ![MType={1c:beam circ., 1r:beam rect., 2:cable, 3:rigid, 4:beam arb., 5:spring}. COMSID={-1:none}]
+SubDyn                                        Modified  na                 (-)      (-)       (-)       (-)         (-)         (-)   (deg/-)
+SubDyn                                        Added     na                 ----------------- RECTANGULAR BEAM CROSS-SECTION PROPERTIES ---------------------------
+SubDyn                                        Added     na                 0   NPropSets   - Number of structurally unique cross-sections (if 0 the following table is ignored)
+SubDyn                                        Added     na                 PropSetID YoungE ShearG MatDens XsecSa XsecSb XsecT
+SubDyn                                        Added     na                 (-)       (N/m2) (N/m2) (kg/m3) (m)    (m)    (m)
+SubDyn                                        Modified  na                 PropSetID YoungE ShearG MatDens XsecA XsecAsx XsecAsy XsecJxx XsecJyy XsecJ0 XsecJt
+SubDyn                                        Modified  na                 (-)       (N/m2) (N/m2) (kg/m3) (m2)  (m2)    (m2)    (m4)    (m4)    (m4)   (m4)
+============================================= ========= ================== ===============================================================================================================================================================================================================================================================================================================================================================================================================================================================
+
+MoorDyn changes
+~~~~~~~~~~~~~~~
+
+The *MoorDyn* input file now includes additional optional inputs, but is fully
+backwards compatible.  For further information on the new inputs:
+
+- coupling with the *SeaState* module for wave information, see example files:
+
+   - `https://github.com/OpenFAST/r-test/tree/main/modules/moordyn/md_waterkin3 <https://github.com/OpenFAST/r-test/tree/main/modules/moordyn/md_waterkin3>`_ - full wave information from *SeaState* module
+   - `https://github.com/OpenFAST/r-test/tree/main/modules/moordyn/md_waterkin2  <https://github.com/OpenFAST/r-test/tree/main/modules/moordyn/md_waterkin2>`_ - hybrid wave kinematics coupling with *SeaState* module
+
+- vortex-induced vibration (VIV) - see `https://moordyn.readthedocs.io/en/latest/inputs.html#id2 <https://moordyn.readthedocs.io/en/latest/inputs.html#id2>`_
+
+
+OpenFAST v4.0.4 to OpenFAST v4.0.5
+----------------------------------
+
+No input file changes were made.
+
+
+OpenFAST v4.0.3 to OpenFAST v4.0.4
+----------------------------------
+
+No input file changes were made.
 
 
 OpenFAST v4.0.2 to OpenFAST v4.0.3

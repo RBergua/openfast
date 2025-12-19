@@ -85,6 +85,7 @@ set(NWTCLIBS_SOURCES
   src/VTK.f90
   src/YAML.f90
   src/JSON.f90
+  src/KdTree.f90
 
   # RanLux sources
   src/ranlux/RANLUX.f90
@@ -162,6 +163,9 @@ add_dependencies(nwtclibs nwtc_library_inc_subs)
 target_link_libraries(nwtclibs PUBLIC
   ${LAPACK_LIBRARIES} 
   ${CMAKE_DL_LIBS} 
+)
+target_include_directories(nwtclibs PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/include>
 )
 if (USE_DLL_INTERFACE)
   target_compile_definitions(nwtclibs PRIVATE USE_DLL_INTERFACE)

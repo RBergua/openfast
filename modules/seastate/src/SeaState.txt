@@ -64,7 +64,7 @@ typedef     ^                 ^                 SiKi                     WvLowCO
 typedef     ^                 ^                 SiKi                     WvHiCOffS         -        -        -  "Maximum frequency used in the sum-QTF method     [Ignored if SumQTF = 0]"                   (rad/s)
 typedef     ^                 ^                 SiKi                     WaveDOmega        -        -        -  "Frequency step for incident wave calculations" (rad/s)
 typedef     ^                 ^                 INTEGER                  WaveMod           -        -        -  "Incident wave kinematics model: See valid values in SeaSt_WaveField module parameters." -
-
+typedef     ^                 ^                 INTEGER                  WvCrntMod         -        -        -  "Wave-current modeling option" -
 
 typedef   SeaState/SeaSt     InitInputType          CHARACTER(1024)          InputFile                       -          -          -         "Supplied by Driver:  full path and filename for the SeaState module"    -
 typedef   ^                  ^                      LOGICAL                  UseInputFile                    -       .TRUE.        -         "Supplied by Driver:  .TRUE. if using a input file, .FALSE. if all inputs are being passed in by the caller"    -
@@ -87,6 +87,7 @@ typedef   ^                  ^                      IntKi                    Com
 typedef   ^                  ^                      Logical                  SurfaceVis                      -     .FALSE.         -         "Turn on grid surface visualization outputs" -
 typedef   ^                  ^                      IntKi                    SurfaceVisNx                    -          0          -         "Number of points in X direction to output for visualization grid.  Use 0 or negative to set to SeaState resolution." -
 typedef   ^                  ^                      IntKi                    SurfaceVisNy                    -          0          -         "Number of points in Y direction to output for visualization grid.  Use 0 or negative to set to SeaState resolution." -
+typedef   ^                  ^                      FlowFieldType           *CurrField                       -          -          -         "Pointer to FlowField type from InflowWind containing the dynamic current information" (-)
 
 #
 #

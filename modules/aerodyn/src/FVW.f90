@@ -508,7 +508,7 @@ subroutine FVW_FinalWrite(u, p, x, z, OtherState, m, ErrStat, ErrMsg)
    ErrMsg  = ""
    ! Place any last minute operations or calculations here:
    if (p%WrVTK>0 .and. m%VTKstep<FINAL_STEP .and. OtherState%Initialized) then
-      call WrScr('OLAF: writting final VTK outputs')
+      call WrScr('OLAF: writing final VTK outputs')
       t=-1.0_ReKi
       if (p%WrVTK==1) then
          if (m%VTKstep<m%iStep+1) then
@@ -1596,7 +1596,7 @@ subroutine WriteVTKOutputs(t, force, VTKstep, u, p, x, z, m, ErrStat, ErrMsg)
             ! Global coordinate system, ALL VTK will be exported in global
             call WrVTK_FVW(p, x, z, m, trim(p%VTK_OutFileBase)//'FVW_Glb', VTKstep, 9, bladeFrame=.FALSE.)
          endif
-         m%VTKstep=VTKstep ! We save the step at which writing occured
+         m%VTKstep=VTKstep ! We save the step at which writing occurred
       endif
    endif
    ! --- Write VTK grids
@@ -1616,7 +1616,7 @@ subroutine WriteVTKOutputs(t, force, VTKstep, u, p, x, z, m, ErrStat, ErrMsg)
             call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
             m%GridOutputs(iGrid)%tLastOutput = t
             call WrVTK_FVW_Grid(p, m, iGrid, trim(p%VTK_OutFileBase)//'FVW_Grid', VTKstep, 9)
-            m%VTKstep=VTKstep ! We save the step at which writing occured
+            m%VTKstep=VTKstep ! We save the step at which writing occurred
          endif
       enddo
    endif
@@ -1669,7 +1669,7 @@ subroutine UA_Init_Wrapper(AFInfo, InitInp, interval, p, x, xd, OtherState, m, E
          do i = 1,InitInp%numBladeNodes
             InitInp%UA_Init%c(i,1)      = p%W(iW)%chord_LL(i) ! NOTE: InitInp chord move-allocd to p
          end do
-         InitInp%UA_Init%OutRootName     = trim(InitInp%RootName)//'W'//num2lstr(iW)//'.UA'
+         InitInp%UA_Init%OutRootName     = trim(InitInp%RootName)//'W'//trim(num2lstr(iW))//'.UA'
 
          InitInp%UA_Init%ShedEffect      = .False. ! Important, when coupling UA wih vortex code, shed vorticity is inherently accounted for
          InitInp%UA_Init%UAOff_innerNode(1) = InitInp%W(iW)%UAOff_innerNode

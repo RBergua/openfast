@@ -882,8 +882,6 @@ contains
       !integer, parameter       :: nScnd =65 !< 
       integer :: ncp 
       integer :: np , icpp, ip
-      real(ReKi), dimension(:,:), allocatable :: CPs
-      real(ReKi), dimension(:,:), allocatable :: UI
       real(ReKi), dimension(3) :: Uwnd
       real(ReKi)               :: Uwnd_norm2
       real(ReKi)               :: rho, Cp
@@ -892,9 +890,11 @@ contains
       errStat = ErrID_None
       errMsg  = ""
 
-      call EllipsoidPanels(nMain, nScnd, 1., 1., 1., p_SrcPnl%P, p_SrcPnl%IDs)
+      call EllipsoidPanels(nMain, nScnd, 1., 1., 1., p_SrcPnl%P, p_SrcPnl%IDs, 5.0)
       call srcPnl_init(p_SrcPnl, m_SrcPnl, z_SrcPnl, errStat2, errMsg2); if(Failed()) return
       label = 'n1='//trim(num2lstr(nMain))//' - n2='//trim(num2lstr(nScnd))
+      call AllocAry(p_SrcPnl%BodyIDs, p_SrcPnl%n, 'BodyIDs', errStat2, errMsg2); if(Failed()) return
+      p_SrcPnl%BodyIDs(:) = 1
       p_SrcPnl%Comment = ' - Sphere - '//trim(label)
 
       ! --- Compute Uext
@@ -910,7 +910,7 @@ contains
       call srcPnl_calcOutput(p_SrcPnl, m_SrcPnl, z_SrcPnl, 1.225_ReKi) !, errStat, errMsg
 
       call vtk_misc_init(mvtk)
-      call WrVTK_Panels('../_Sphere_'//trim(label)//'.vtk', mvtk, p_SrcPnl, m_SrcPnl, z_SrcPnl)
+      call WrVTK_Panels('_FVW_Tests_Sphere_'//trim(label)//'.vtk', mvtk, p_SrcPnl, m_SrcPnl, z_SrcPnl)
 
       !print*,'>>>> CP Min Max',(/minval(m_SrcPnl%Cp), maxval(m_SrcPnl%Cp)/)
       !print*,'>>>> P  Min Max',(/minval(m_SrcPnl%p), maxval(m_SrcPnl%p)/)
@@ -923,6 +923,9 @@ contains
          !call test_almost_equal('p sphere' , (/minval(m_SrcPnl%p),  maxval(m_SrcPnl%p)/) , (/0.000,1.38878/), 1e-3_ReKi, errStat2, errMsg2);if(Failed())return
          call test_almost_equal('p sphere' , (/minval(m_SrcPnl%p),  maxval(m_SrcPnl%p)/) , (/-0.7955,0.6125/), 1e-3_ReKi, errStat2, errMsg2);if(Failed())return
       endif
+      call FVW_DestroyT_SrcPanlParam(p_SrcPnl, errStat2, errMsg2); if(Failed()) return
+      call FVW_DestroyT_SrcPanlMisc(m_SrcPnl, errStat2, errMsg2); if(Failed()) return
+      call FVW_DestroyT_SrcPanlVar(z_SrcPnl, errStat2, errMsg2); if(Failed()) return
    contains
       logical function Failed()
          call SeterrStat(errStat2, errMsg2, errStat, errMsg, 'Test_SrcPnl_Sphere')

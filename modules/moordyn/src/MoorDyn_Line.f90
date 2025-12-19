@@ -375,7 +375,7 @@ CONTAINS
             Line%r(3,J) = Line%r(3,0) + (Line%r(3,N) - Line%r(3,0))*REAL(J, DbKi)/REAL(N, DbKi)
          END DO
 
-         CALL WrScr(' Vertical initial profile for Line '//trim(Num2LStr(Line%IdNum))//'.')
+         CALL WrScr('    Vertical initial profile for Line '//trim(Num2LStr(Line%IdNum))//'.')
 
       ELSE ! If the line is not vertical, solve for the catenary profile
 
@@ -396,9 +396,9 @@ CONTAINS
 
          ELSE ! if there is a problem with the catenary approach, just stretch the nodes linearly between fairlead and anchor
             ! CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, ' Line_Initialize: Line '//trim(Num2LStr(Line%IdNum))//' ')
-            CALL WrScr('   Catenary solve of Line '//trim(Num2LStr(Line%IdNum))//' unsuccessful. Initializing as linear.')
+            CALL WrScr('    Catenary solve of Line '//trim(Num2LStr(Line%IdNum))//' unsuccessful. Initializing as linear.')
             IF (wordy == 1) THEN 
-               CALL WrScr('   Message from catenary solver: '//ErrMsg2)
+               CALL WrScr('    Message from catenary solver: '//ErrMsg2)
             ENDIF
 
             DO J = 0,N ! Loop through all nodes per line where the line position and tension can be output
@@ -579,7 +579,7 @@ CONTAINS
       IF ( ZF <  0.0 )  THEN   ! .TRUE. if the fairlead has passed below its anchor
          ZF = -ZF
          reverseFlag = .TRUE.
-         CALL WrScr(' Warning from catenary: Anchor point is above the fairlead point for Line '//trim(Num2LStr(Line%IdNum))//', consider changing.')
+         CALL WrScr('    Warning from catenary: Anchor point is above the fairlead point for Line '//trim(Num2LStr(Line%IdNum))//', consider changing.')
       ELSE 
          reverseFlag = .FALSE.
       ENDIF
@@ -1033,11 +1033,12 @@ CONTAINS
 
    
    !--------------------------------------------------------------
-   SUBROUTINE Line_SetState(Line, X, t)
+   SUBROUTINE Line_SetState(Line, X, t, m)
 
       TYPE(MD_Line),    INTENT(INOUT)  :: Line           ! the current Line object
       Real(DbKi),       INTENT(IN   )  :: X(:)           ! state vector section for this line
       Real(DbKi),       INTENT(IN   )  :: t              ! instantaneous time
+      TYPE(MD_MiscVarType), INTENT(INOUT) :: m       ! passing along all mooring objects
 
       INTEGER(IntKi)                   :: i              ! index of segments or nodes along line
       INTEGER(IntKi)                   :: J              ! index
@@ -1063,7 +1064,7 @@ CONTAINS
       end if
 
       ! if using the viv mdodel, also set the lift force phase
-      if (Line%Cl > 0 .AND. (.NOT. Line%IC_gen) .AND. t > 0) then ! not needed in IC_gen, and t=0 should be skipped to avoid setting these all to zero. Initialize as distribution on 0-2pi
+      if (Line%Cl > 0 .AND. (.NOT. m%IC_gen) .AND. t > 0) then ! not needed in IC_gen, and t=0 should be skipped to avoid setting these all to zero. Initialize as distribution on 0-2pi
          do I=0, Line%N
             if (Line%ElasticMod > 1) then ! if both additional states are included then N-1 entries after internal node states and visco segment states
                   Line%phi(I) = X( 7*Line%N-6 + I+1) - (2 * Pi * floor(X( 7*Line%N-6 + I+1) / (2*Pi))) ! Map integrated phase to 0-2Pi range. Is this necessary? sin (a-b) is the same if b is 100 pi or 2pi
@@ -1167,6 +1168,12 @@ CONTAINS
       Real(DbKi)                       :: phi_dot       ! frequency of lift force (rad/s)
       Real(DbKi)                       :: f_hat         ! non-dimensional frequency 
 
+      INTEGER(IntKi)                   :: ErrStat2
+      CHARACTER(ErrMsgLen)             :: ErrMsg2   
+      CHARACTER(120)                   :: RoutineName = 'Line_GetStateDeriv'   
+
+      ErrStat = ErrID_None
+      ErrMsg  = ""
 
       N = Line%N                      ! for convenience
       d = Line%d    
@@ -1215,7 +1222,8 @@ CONTAINS
       
       ! apply wave kinematics (if there are any) 
       DO i=0,N
-         CALL getWaterKin(p, Line%r(1,i), Line%r(2,i), Line%r(3,i), Line%time, m%WaveTi, Line%U(:,i), Line%Ud(:,i), Line%zeta(i), Line%PDyn(i))
+         CALL getWaterKin(p, m, Line%r(1,i), Line%r(2,i), Line%r(3,i), Line%time, Line%U(:,i), Line%Ud(:,i), Line%zeta(i), Line%PDyn(i), ErrStat2, ErrMsg2)
+         CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
       END DO
       
       ! --------- calculate line partial submergence (Line::calcSubSeg from MD-C) ---------
@@ -1341,8 +1349,8 @@ CONTAINS
          
          
          ! >>>> could do similar as above for nonlinear damping or bending stiffness <<<<         
-         if (Line%nBApoints > 0) print *, 'Nonlinear elastic damping not yet implemented'
-         if (Line%nEIpoints > 0) print *, 'Nonlinear bending stiffness not yet implemented'
+         if (Line%nBApoints > 0) CALL SetErrStat(ErrID_Warn,'Nonlinear elastic damping not yet implemented',ErrStat,ErrMsg,RoutineName)
+         if (Line%nEIpoints > 0) CALL SetErrStat(ErrID_Warn,'Nonlinear bending stiffness not yet implemented',ErrStat,ErrMsg,RoutineName)
             
             
          ! basic elasticity model
@@ -1367,8 +1375,7 @@ CONTAINS
                   
                   ! Double check none of the assumptions were violated (this should never happen)
                   IF (Line%alphaMBL <= 0 .OR. Line%vbeta <= 0 .OR. Line%l(I) <= 0 .OR. Line%dl_1(I) <= 0 .OR. EA_D < Line%EA) THEN
-                     ErrStat = ErrID_Warn
-                     ErrMsg = "Viscoelastic model: Assumption for mean load dependent dynamic stiffness violated"
+                     CALL SetErrStat(ErrID_Warn,"Viscoelastic model: Assumption for mean load dependent dynamic stiffness violated",ErrStat,ErrMsg,RoutineName)
                      if (wordy > 2) then
                         print *, "Line%alphaMBL", Line%alphaMBL
                         print *, "Line%vbeta", Line%vbeta
@@ -1389,12 +1396,10 @@ CONTAINS
             endif
 
             if (EA_D == 0.0) then ! Make sure EA != EA_D or else nans, also make sure EA_D != 0  or else nans. 
-               ErrStat = ErrID_Fatal
-               ErrMsg = "Viscoelastic model: Dynamic stiffness cannot equal zero"
+               CALL SetErrStat(ErrID_Fatal,"Viscoelastic model: Dynamic stiffness cannot equal zero",ErrStat,ErrMsg,RoutineName)
                return
             else if (EA_D == Line%EA) then
-               ErrStat = ErrID_Fatal
-               ErrMsg = "Viscoelastic model: Dynamic stiffness cannot equal static stiffness"
+               CALL SetErrStat(ErrID_Fatal,"Viscoelastic model: Dynamic stiffness cannot equal static stiffness",ErrStat,ErrMsg,RoutineName)
                return
             endif
          
@@ -1554,7 +1559,7 @@ CONTAINS
 
          ! Vortex Induced Vibration (VIV) cross-flow lift force
          Line%Lf(:,I) = 0.0_DbKi ! Zero lift force
-         IF ((Line%Cl > 0.0) .AND. (.NOT. Line%IC_gen)) THEN ! If non-zero lift coefficient and not during IC_gen 
+         IF ((Line%Cl > 0.0) .AND. (.NOT. m%IC_gen)) THEN ! If non-zero lift coefficient and not during IC_gen 
    
             ! Note: This logic is slightly different than MD-C, but equivalent. MD-C runs the VIV model for only the internal 
             ! nodes. That means in MD-F the state vector has N+1 extra states when using the VIV model while the MD-C state 
@@ -1746,7 +1751,7 @@ CONTAINS
       endif
 
       ! ! for checking rdd_old
-      ! if (Line%time <0.5+p%dtM0 .and. Line%time >0.5-p%dtM0 .and. .not. Line%IC_gen) then
+      ! if (Line%time <0.5+p%dtM0 .and. Line%time >0.5-p%dtM0 .and. .not. m%IC_gen) then
       !    print*, "rdd_old at t = ", Line%time
       !    DO I = 0, 4
       !       print*, "I =", I, "rdd_old =", Line%rdd_old(:,I)
@@ -2016,7 +2021,7 @@ CONTAINS
       ! check for failed where /= 0 is fatal
       logical function Failed0(txt)
          character(*), intent(in) :: txt
-         if (errStat /= 0) then
+         if (ErrStat2 /= 0) then
             ErrStat2 = ErrID_Fatal
             ErrMsg2  = "Could not allocate "//trim(txt)
             call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)

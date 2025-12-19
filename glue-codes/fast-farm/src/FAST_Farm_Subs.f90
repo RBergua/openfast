@@ -207,11 +207,14 @@ SUBROUTINE Farm_Initialize( farm, InputFile, ErrStat, ErrMsg )
                    ! [note that FAST uses the ceiling function, so it might think we're doing one more step than FAST.Farm; 
                    ! This difference will be a problem only if FAST thinks it's doing FEWER timesteps than FAST.Farm does.]
    
-   IF ( WD_InitInput%InputFileData%NumPlanes > farm%p%n_TMax ) THEN
-      WD_InitInput%InputFileData%NumPlanes = max( 2, min( WD_InitInput%InputFileData%NumPlanes, farm%p%n_TMax ) )
-      call SetErrStat(ErrID_Warn, "For efficiency, NumPlanes has been reduced to the number of time steps ("//TRIM(Num2LStr(WD_InitInput%InputFileData%NumPlanes))//").", ErrStat, ErrMsg, RoutineName )
-   ENDIF
-   
+
+   call AllocAry( farm%p%MaxNumPlanes, farm%p%NumTurbines, 'farm%p%MaxNumPlanes', ErrStat2, ErrMsg2);  CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName); if (Failed()) return
+   do i=1,farm%p%NumTurbines
+      ! Eventually, we will have different settings for different rotors
+      farm%p%MaxNumPlanes(i) = ceiling( 15.0 * Real( WD_InitInput%InputFileData%NumDFull + WD_InitInput%InputFileData%NumDBuff , ReKi ) / AWAE_InitInput%InputFileData%C_Meander )
+      farm%p%MaxNumPlanes(i) = max( 2, min( farm%p%MaxNumPlanes(i) , farm%p%n_TMax + 2 ) )
+   end do
+
    !...............................................................................................................................  
    ! step 3: initialize WAT, AWAE, and WD (b, c, and d can be done in parallel)
    !...............................................................................................................................  
@@ -231,7 +234,7 @@ SUBROUTINE Farm_Initialize( farm, InputFile, ErrStat, ErrMsg )
    AWAE_InitInput%InputFileData%dt_low       = farm%p%dt_low
    AWAE_InitInput%InputFileData%NumTurbines  = farm%p%NumTurbines
    AWAE_InitInput%InputFileData%NumRadii     = WD_InitInput%InputFileData%NumRadii
-   AWAE_InitInput%InputFileData%NumPlanes    = WD_InitInput%InputFileData%NumPlanes
+   AWAE_InitInput%MaxPlanes                  = MAXVAL(farm%p%MaxNumPlanes)
    AWAE_InitInput%InputFileData%WindFilePath = farm%p%WindFilePath
    AWAE_InitInput%n_high_low                 = farm%p%n_high_low
    AWAE_InitInput%NumDT                      = farm%p%n_TMax
@@ -245,15 +248,15 @@ SUBROUTINE Farm_Initialize( farm, InputFile, ErrStat, ErrMsg )
       
    farm%AWAE%IsInitialized = .true.
 
-   farm%p%X0_Low = AWAE_InitOutput%X0_Low
-   farm%p%Y0_low = AWAE_InitOutput%Y0_low
-   farm%p%Z0_low = AWAE_InitOutput%Z0_low
-   farm%p%nX_Low = AWAE_InitOutput%nX_Low
-   farm%p%nY_low = AWAE_InitOutput%nY_low
-   farm%p%nZ_low = AWAE_InitOutput%nZ_low
-   farm%p%dX_low = AWAE_InitOutput%dX_low
-   farm%p%dY_low = AWAE_InitOutput%dY_low
-   farm%p%dZ_low = AWAE_InitOutput%dZ_low
+   farm%p%X0_Low = AWAE_InitOutput%oXYZ_Low(1)
+   farm%p%Y0_low = AWAE_InitOutput%oXYZ_Low(2)
+   farm%p%Z0_low = AWAE_InitOutput%oXYZ_Low(3)
+   farm%p%nX_Low = AWAE_InitOutput%nXYZ_Low(1)
+   farm%p%nY_low = AWAE_InitOutput%nXYZ_Low(2)
+   farm%p%nZ_low = AWAE_InitOutput%nXYZ_Low(3)
+   farm%p%dX_low = AWAE_InitOutput%dXYZ_Low(1)
+   farm%p%dY_low = AWAE_InitOutput%dXYZ_Low(2)
+   farm%p%dZ_low = AWAE_InitOutput%dXYZ_Low(3)
    farm%p%Module_Ver( ModuleFF_AWAE  ) = AWAE_InitOutput%Ver
    
       !-------------------
@@ -345,7 +348,7 @@ SUBROUTINE WAT_init( p, WAT_IfW, AWAE_InitInput, ErrStat, ErrMsg )
    HAWC_InitInput%WindFileName(3) = trim(BoxFileRoot)//trim(FileEnding(3))
 
    ! HAWC spatial grid
-   if (p%WAT == Mod_WAT_PreDef) then       ! from libary of WAT files, set the NxNyNz and DxDyDz terms
+   if (p%WAT == Mod_WAT_PreDef) then       ! from library of WAT files, set the NxNyNz and DxDyDz terms
       call MannLibDims(BoxFileRoot, p%RotorDiamRef, p%WAT_NxNyNz, p%WAT_DxDyDz, ErrStat2, ErrMsg2);  if (Failed()) return
       write(sDummy, '(3(I8,1X))') p%WAT_NxNyNz
       call WrScr('  WAT: NxNyNz set to: '//trim(sDummy)//' (inferred from filename)')
@@ -580,8 +583,9 @@ SUBROUTINE Farm_InitWD( farm, WD_InitInp, ErrStat, ErrMsg )
          ! initialization can be done in parallel (careful for FWrap_InitInp, though)
          !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++         
          
-         WD_InitInp%TurbNum     = nt
-         WD_InitInp%OutFileRoot = farm%p%OutFileRoot
+         WD_InitInp%TurbNum      = nt
+         WD_InitInp%MaxNumPlanes = farm%p%MaxNumPlanes(nt)
+         WD_InitInp%OutFileRoot  = farm%p%OutFileRoot
          
             ! note that WD_Init has Interval as INTENT(IN) so, we don't need to worry about overwriting farm%p%dt_low here:
          call WD_Init( WD_InitInp, farm%WD(nt)%u, farm%WD(nt)%p, farm%WD(nt)%x, farm%WD(nt)%xd, farm%WD(nt)%z, &
@@ -608,12 +612,12 @@ contains
    ! check for failed where /= 0 is fatal
    logical function Failed0(txt)
       character(*), intent(in) :: txt
-      if (errStat /= 0) then
+      if (ErrStat2 /= 0) then
          ErrStat2 = ErrID_Fatal
          ErrMsg2  = "Could not allocate memory for "//trim(txt)
-         call SetErrStat(errStat2, errMsg2, errStat, errMsg, RoutineName)
+         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
       endif
-      Failed0 = errStat >= AbortErrLev
+      Failed0 = ErrStat >= AbortErrLev
       if(Failed0) call cleanUp()
    end function Failed0
 END SUBROUTINE Farm_InitWD
@@ -653,10 +657,6 @@ SUBROUTINE Farm_InitFAST( farm, WD_InitInp, AWAE_InitOutput, ErrStat, ErrMsg )
       FWrap_InitInp%tmax          = farm%p%TMax
       FWrap_InitInp%n_high_low    = farm%p%n_high_low + 1   ! Add 1 because the FAST wrapper uses an index that starts at 1
       FWrap_InitInp%dt_high       = farm%p%dt_high
-     
-      FWrap_InitInp%nX_high       = AWAE_InitOutput%nX_high
-      FWrap_InitInp%nY_high       = AWAE_InitOutput%nY_high
-      FWrap_InitInp%nZ_high       = AWAE_InitOutput%nZ_high
       
       if (farm%p%MooringMod > 0) then
          FWrap_Interval = farm%p%dt_mooring    ! when there is a farm-level mooring model, FASTWrapper will be called at the mooring coupling time step
@@ -676,14 +676,17 @@ SUBROUTINE Farm_InitFAST( farm, WD_InitInp, AWAE_InitOutput, ErrStat, ErrMsg )
          FWrap_InitInp%TurbNum       = nt
          FWrap_InitInp%RootName      = trim(farm%p%OutFileRoot)//'.T'//num2lstr(nt)
          
-         
-         FWrap_InitInp%p_ref_high(1) = AWAE_InitOutput%X0_high(nt)
-         FWrap_InitInp%p_ref_high(2) = AWAE_InitOutput%Y0_high(nt)
-         FWrap_InitInp%p_ref_high(3) = AWAE_InitOutput%Z0_high(nt)
+         FWrap_InitInp%nX_high       = AWAE_InitOutput%nXYZ_high(1,nt)
+         FWrap_InitInp%nY_high       = AWAE_InitOutput%nXYZ_high(2,nt)
+         FWrap_InitInp%nZ_high       = AWAE_InitOutput%nXYZ_high(3,nt)
 
-         FWrap_InitInp%dX_high       = AWAE_InitOutput%dX_high(nt)
-         FWrap_InitInp%dY_high       = AWAE_InitOutput%dY_high(nt)
-         FWrap_InitInp%dZ_high       = AWAE_InitOutput%dZ_high(nt)
+         FWrap_InitInp%p_ref_high(1) = AWAE_InitOutput%oXYZ_high(1,nt)
+         FWrap_InitInp%p_ref_high(2) = AWAE_InitOutput%oXYZ_high(2,nt)
+         FWrap_InitInp%p_ref_high(3) = AWAE_InitOutput%oXYZ_high(3,nt)
+
+         FWrap_InitInp%dX_high       = AWAE_InitOutput%dXYZ_high(1,nt)
+         FWrap_InitInp%dY_high       = AWAE_InitOutput%dXYZ_high(2,nt)
+         FWrap_InitInp%dZ_high       = AWAE_InitOutput%dXYZ_high(3,nt)
 
          FWrap_InitInp%Vdist_High   => AWAE_InitOutput%Vdist_High(nt)%data
 
@@ -720,12 +723,12 @@ contains
    ! check for failed where /= 0 is fatal
    logical function Failed0(txt)
       character(*), intent(in) :: txt
-      if (errStat /= 0) then
+      if (ErrStat2 /= 0) then
          ErrStat2 = ErrID_Fatal
          ErrMsg2  = "Could not allocate memory for "//trim(txt)
-         call SetErrStat(errStat2, errMsg2, errStat, errMsg, RoutineName)
+         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
       endif
-      Failed0 = errStat >= AbortErrLev
+      Failed0 = ErrStat >= AbortErrLev
       if(Failed0) call cleanUp()
    end function Failed0
 END SUBROUTINE Farm_InitFAST
@@ -817,6 +820,9 @@ SUBROUTINE Farm_InitMD( farm, ErrStat, ErrMsg )
    ALLOCATE( farm%MD%Input( 2 ), farm%MD%InputTimes( 2 ), STAT = ErrStat2 )
    if (Failed0("MD%Input and MD%InputTimes.")) return;
 
+   ! Assign the SS pointer of the first SS instance (turbine 1) to MD. Because MD in FF mode will only pull frequency info, instance of SS doesn't matter (error will be thrown by MD if user asks for SS grid).
+   MD_InitInp%WaveField => farm%FWrap(1)%m%Turbine%SeaSt%p%WaveField ! this is the same wave field as Init%OutData_SeaSt%WaveField in FAST_subs.f90 (as set by line 278 in SeaSt_Init). Cant use Init%OutData_SeaSt%WaveField because Init is a local variable to FAST_InitializeAll
+   
    ! initialize MoorDyn
    CALL MD_Init( MD_InitInp, farm%MD%Input(1), farm%MD%p, farm%MD%x, farm%MD%xd, farm%MD%z, &
                  farm%MD%OtherSt, farm%MD%y, farm%MD%m, farm%p%DT_mooring, MD_InitOut, ErrStat2, ErrMsg2 )
@@ -877,12 +883,12 @@ contains
    ! check for failed where /= 0 is fatal
    logical function Failed0(txt)
       character(*), intent(in) :: txt
-      if (errStat /= 0) then
+      if (ErrStat2 /= 0) then
          ErrStat2 = ErrID_Fatal
          ErrMsg2  = "Could not allocate memory for "//trim(txt)
-         call SetErrStat(errStat2, errMsg2, errStat, errMsg, RoutineName)
+         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
       endif
-      Failed0 = errStat >= AbortErrLev
+      Failed0 = ErrStat >= AbortErrLev
       if(Failed0) call cleanUp()
    end function Failed0
 END SUBROUTINE Farm_InitMD
@@ -1365,7 +1371,7 @@ subroutine Farm_WriteOutput(n, t, farm, ErrStat, ErrMsg)
             ! Loop over user-requested, downstream distances (OutDist), m   
          do iOutDist = 1, farm%p%NOutDist
             
-            if (  farm%p%OutDist(iOutDist) >= maxval( farm%WD(nt)%y%x_plane(0:min(farm%WD(nt)%p%NumPlanes-1,n+1)) ) ) then
+            if ( farm%p%OutDist(iOutDist) >= maxval( farm%WD(nt)%y%x_plane( 0:NINT(farm%WD(nt)%y%NumPlanes)-1 ) ) ) then
                
                farm%m%AllOuts(WkAxsXTD(iOutDist,nt)) = 0.0_ReKi
                farm%m%AllOuts(WkAxsYTD(iOutDist,nt)) = 0.0_ReKi
@@ -1402,7 +1408,7 @@ subroutine Farm_WriteOutput(n, t, farm, ErrStat, ErrMsg)
             else
                
                   ! Find wake volume which contains the user-requested downstream location.
-               do np = 0, min(farm%WD(nt)%p%NumPlanes-2 , n)
+               do np = 0, NINT(farm%WD(nt)%y%NumPlanes)-2
 
                   if ( ( farm%p%OutDist(iOutDist) >= farm%WD(nt)%y%x_plane(np) ) .and. ( farm%p%OutDist(iOutDist) < farm%WD(nt)%y%x_plane(np+1) ) ) then   ! A wake volume has been found
 
@@ -1772,12 +1778,14 @@ END SUBROUTINE Transfer_FAST_to_WD
 SUBROUTINE Transfer_AWAE_to_WD(farm)
    type(All_FastFarm_Data),  INTENT(INOUT) :: farm                            !< FAST.Farm data  
 
-   integer(intKi)  :: nt
+   integer(IntKi)  :: nt
+   integer(IntKi)  :: MaxPln
    
    DO nt = 1,farm%p%NumTurbines
-      farm%WD(nt)%u%V_plane      = farm%AWAE%y%V_plane(:,:,nt)   ! Advection, deflection, and meandering velocity of wake planes, m/s
-      farm%WD(nt)%u%Vx_wind_disk = farm%AWAE%y%Vx_wind_disk(nt)  ! Rotor-disk-averaged ambient wind speed, normal to planes, m/s
-      farm%WD(nt)%u%TI_amb       = farm%AWAE%y%TI_amb(nt)        ! Ambient turbulence intensity of wind at rotor disk
+      MaxPln = NINT(farm%WD(nt)%y%NumPlanes)-1
+      farm%WD(nt)%u%V_plane(:,0:MaxPln) = farm%AWAE%y%V_plane(:,0:MaxPln,nt)  ! Advection, deflection, and meandering velocity of wake planes, m/s
+      farm%WD(nt)%u%Vx_wind_disk        = farm%AWAE%y%Vx_wind_disk(nt)        ! Rotor-disk-averaged ambient wind speed, normal to planes, m/s
+      farm%WD(nt)%u%TI_amb              = farm%AWAE%y%TI_amb(nt)              ! Ambient turbulence intensity of wind at rotor disk
    END DO
    
 END SUBROUTINE Transfer_AWAE_to_WD
@@ -1786,16 +1794,19 @@ SUBROUTINE Transfer_WD_to_AWAE(farm)
    type(All_FastFarm_Data),  INTENT(INOUT) :: farm                            !< FAST.Farm data  
 
    integer(intKi)  :: nt
+   integer(IntKi)  :: MaxPln
    
-   DO nt = 1,farm%p%NumTurbines   
-      farm%AWAE%u%xhat_plane(:,:,nt) = farm%WD(nt)%y%xhat_plane     ! Orientations of wake planes, normal to wake planes, for each turbine
-      farm%AWAE%u%p_plane(:,:,nt)    = farm%WD(nt)%y%p_plane        ! Center positions of wake planes for each turbine
-      farm%AWAE%u%Vx_wake(:,:,:,nt)  = farm%WD(nt)%y%Vx_wake2       ! Axial wake velocity deficit at wake planes, distributed radially, for each turbine
-      farm%AWAE%u%Vy_wake(:,:,:,nt)  = farm%WD(nt)%y%Vy_wake2       ! Horizontal wake velocity deficit at wake planes, distributed radially, for each turbine
-      farm%AWAE%u%Vz_wake(:,:,:,nt)  = farm%WD(nt)%y%Vz_wake2       ! "Vertical" wake velocity deficit at wake planes, distributed radially, for each turbine
-      farm%AWAE%u%D_wake(:,nt)       = farm%WD(nt)%y%D_wake         ! Wake diameters at wake planes for each turbine
+   DO nt = 1,farm%p%NumTurbines
+      MaxPln = NINT(farm%WD(nt)%y%NumPlanes)-1
+      farm%AWAE%u%NumPlanes (             nt) = farm%WD(nt)%y%NumPlanes                 ! Number of active wake planes for each turbine
+      farm%AWAE%u%xhat_plane(  :,0:MaxPln,nt) = farm%WD(nt)%y%xhat_plane(  :,0:MaxPln)  ! Orientations of wake planes, normal to wake planes, for each turbine
+      farm%AWAE%u%p_plane   (  :,0:MaxPln,nt) = farm%WD(nt)%y%p_plane   (  :,0:MaxPln)  ! Center positions of wake planes for each turbine
+      farm%AWAE%u%Vx_wake   (:,:,0:MaxPln,nt) = farm%WD(nt)%y%Vx_wake2  (:,:,0:MaxPln)  ! Axial wake velocity deficit at wake planes, distributed radially, for each turbine
+      farm%AWAE%u%Vy_wake   (:,:,0:MaxPln,nt) = farm%WD(nt)%y%Vy_wake2  (:,:,0:MaxPln)  ! Horizontal wake velocity deficit at wake planes, distributed radially, for each turbine
+      farm%AWAE%u%Vz_wake   (:,:,0:MaxPln,nt) = farm%WD(nt)%y%Vz_wake2  (:,:,0:MaxPln)  ! "Vertical" wake velocity deficit at wake planes, distributed radially, for each turbine
+      farm%AWAE%u%D_wake    (    0:MaxPln,nt) = farm%WD(nt)%y%D_wake    (    0:MaxPln)  ! Wake diameters at wake planes for each turbine
       if (farm%p%WAT /= Mod_WAT_None) then
-         farm%AWAE%u%WAT_k(:,:,:,nt) = farm%WD(nt)%y%WAT_k          ! scaling factor for each wake plane for WAT
+         farm%AWAE%u%WAT_k  (:,:,0:MaxPln,nt) = farm%WD(nt)%y%WAT_k     (:,:,0:MaxPln)  ! scaling factor for each wake plane for WAT
       endif
    END DO
    

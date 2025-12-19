@@ -429,6 +429,27 @@ contains
          end associate
       end do
 
+      ! Clear VF_Solve flag from variables that have VF_NoLin flag
+      do i = 1, size(GlueModData)
+         associate (ModData => GlueModData(i))
+            if (allocated(ModData%Vars%u)) then
+               do j = 1, size(ModData%Vars%u)
+                  associate (Var => ModData%Vars%u(j))
+                     if (MV_HasFlagsAny(Var, VF_NoLin)) call MV_ClearFlags(Var, VF_Solve)
+                  end associate
+               end do
+            end if
+            if (allocated(ModData%Vars%y)) then
+               do j = 1, size(ModData%Vars%y)
+                  associate (Var => ModData%Vars%y(j))
+                     if (MV_HasFlagsAny(Var, VF_NoLin)) call MV_ClearFlags(Var, VF_Solve)
+                  end associate
+               end do
+            end if
+         end associate
+      end do
+
+      ! If debugging, print out variables that will be solved
       if (DebugSolver) then
          do i = 1, size(GlueModData)
             associate (ModData => GlueModData(i))
@@ -1156,6 +1177,7 @@ subroutine FAST_SolverStep(n_t_global, t_initial, p, m, GlueModData, GlueModMaps
 
                ! Update the azimuth angle
                call ED_UpdateAzimuth(Turbine%ED%p(ModData%Ins), Turbine%ED%x(ModData%Ins, STATE_PRED), ModData%DT)
+               call ED_UpdateBlPitch(Turbine%ED%p(ModData%Ins), Turbine%ED%x(ModData%Ins, STATE_PRED)            )
 
             case (Module_BD)
 

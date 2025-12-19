@@ -67,6 +67,7 @@ IMPLICIT NONE
     REAL(ReKi)  :: WtrDpth = 0.0_ReKi      !< Water depth [m]
     REAL(ReKi)  :: MSL2SWL = 0.0_ReKi      !< Offset between still-water level and mean sea level [m]
     Character(1024)  :: RootName      !< RootName for writing output files [-]
+    LOGICAL  :: OutputAccel = .FALSE.      !< Flag to output wind acceleration [-]
   END TYPE ADI_IW_InputData
 ! =======================
 ! =========  ADI_InitInputType  =======
@@ -360,6 +361,7 @@ subroutine ADI_CopyIW_InputData(SrcIW_InputDataData, DstIW_InputDataData, CtrlCo
    DstIW_InputDataData%WtrDpth = SrcIW_InputDataData%WtrDpth
    DstIW_InputDataData%MSL2SWL = SrcIW_InputDataData%MSL2SWL
    DstIW_InputDataData%RootName = SrcIW_InputDataData%RootName
+   DstIW_InputDataData%OutputAccel = SrcIW_InputDataData%OutputAccel
 end subroutine
 
 subroutine ADI_DestroyIW_InputData(IW_InputDataData, ErrStat, ErrMsg)
@@ -395,6 +397,7 @@ subroutine ADI_PackIW_InputData(RF, Indata)
    call RegPack(RF, InData%WtrDpth)
    call RegPack(RF, InData%MSL2SWL)
    call RegPack(RF, InData%RootName)
+   call RegPack(RF, InData%OutputAccel)
    if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
@@ -416,6 +419,7 @@ subroutine ADI_UnPackIW_InputData(RF, OutData)
    call RegUnpack(RF, OutData%WtrDpth); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%MSL2SWL); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%RootName); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%OutputAccel); if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
 subroutine ADI_CopyInitInput(SrcInitInputData, DstInitInputData, CtrlCode, ErrStat, ErrMsg)

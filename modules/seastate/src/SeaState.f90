@@ -154,11 +154,24 @@ SUBROUTINE SeaSt_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, Init
       
       ! Initialize Current module
       CALL Current_Init(InputFileData%Current, Current_InitOut, ErrStat2, ErrMsg2 ); if(Failed()) return;
+      p%WaveField%Current_InitInput = InputFileData%Current ! Save the current input data for later use by MD (What if InflowWind current is used?)
 
+      ! Dynamic current from IfW
+      p%WaveField%hasCurrField = InitInp%hasCurrField
+      IF ( p%WaveField%hasCurrField ) THEN
+         ! Load dynamic current from IfW
+         p%WaveField%CurrField  => InitInp%CurrField
+         IF ( InputFileData%WvCrntMod /= WvCrntMod_Superpose ) THEN
+            CALL WaveField_GetMeanDynSurfCurr( p%WaveField, InputFileData%Waves%WaveTMax, InputFileData%Waves%WaveDT, Current_InitOut%CurrVxi0, Current_InitOut%CurrVyi0, ErrStat2, ErrMsg2 ); if(Failed()) return;
+         END IF
+      END IF
       
       ! Move initialization output data from Current module into the initialization input data for the Waves module
       IF (ALLOCATED(Current_InitOut%CurrVxi)) CALL Move_Alloc( Current_InitOut%CurrVxi, InputFileData%Waves%CurrVxi )
       IF (ALLOCATED(Current_InitOut%CurrVyi)) CALL Move_Alloc( Current_InitOut%CurrVyi, InputFileData%Waves%CurrVyi )
+
+      InputFileData%Waves%CurrVxi0      = Current_InitOut%CurrVxi0
+      InputFileData%Waves%CurrVyi0      = Current_InitOut%CurrVyi0
       
       InputFileData%Waves%PCurrVxiPz0   = Current_InitOut%PCurrVxiPz0
       InputFileData%Waves%PCurrVyiPz0   = Current_InitOut%PCurrVyiPz0
@@ -277,7 +290,7 @@ SUBROUTINE SeaSt_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, Init
          DEALLOCATE ( InitOut%WriteOutputHdr )
       END IF
       
-      InitOut%WaveField => p%WaveField
+      InitOut%WaveField => p%WaveField 
 
       ! Tell HydroDyn if state-space wave excitation is not allowed:
       InitOut%InvalidWithSSExctn = InputFileData%WaveMod == WaveMod_ExtFull      .or. & ! 'Externally generated full wave-kinematics time series cannot be used with state-space wave excitations. Set WaveMod 0, 1, 1P#, 2, 3, 4, or 5.'
@@ -699,7 +712,7 @@ SUBROUTINE SeaSt_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, ErrStat, Er
       REAL(SiKi)                           :: WaveAcc(3,p%NWaveKin)
       REAL(SiKi)                           :: WaveAccMCF(3,p%NWaveKin)
       REAL(SiKi)                           :: WaveDynP(p%NWaveKin)
-      REAL(ReKi)                           :: AllOuts(MaxOutPts)
+      REAL(ReKi)                           :: AllOuts(0:MaxOutPts)
       real(ReKi)                           :: positionXYZ(3), positionXY(2)
 
       REAL(SiKi)                           :: zeta

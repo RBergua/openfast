@@ -416,10 +416,6 @@ subroutine FAST_SetExternalInputs(iTurb, NumInputs_c, InputAry, m_FAST)
       m_FAST%ExternInput%CableDeltaL      = InputAry(12:31)
       m_FAST%ExternInput%CableDeltaLdot   = InputAry(32:51)
 
-      IF ( NumInputs_c > NumFixedInputs ) THEN  ! NumFixedInputs is the fixed number of inputs
-         IF ( NumInputs_c == NumFixedInputs + 3 ) &
-             m_FAST%ExternInput%LidarFocus = InputAry(52:54)
-      END IF
 
 end subroutine FAST_SetExternalInputs
 !==================================================================================================================================
@@ -1219,6 +1215,10 @@ subroutine FAST_CFD_WriteOutput(iTurb_c, ErrStat_c, ErrMsg_c) BIND (C, NAME='FAS
    iTurb = int(iTurb_c,IntKi) + 1
 
    CALL FAST_WriteOutput_T( t_initial, n_t_global, Turbine(iTurb), ErrStat, ErrMsg )
+
+   ErrStat_c = ErrStat
+   ErrMsg = TRIM(ErrMsg)//C_NULL_CHAR
+   ErrMsg_c  = TRANSFER( ErrMsg//C_NULL_CHAR, ErrMsg_c )
 
 end subroutine FAST_CFD_WriteOutput
 !==================================================================================================================================

@@ -30,8 +30,6 @@ typedef   ^         InitInputType R8Ki            GlbRot    {3}{3} - - "Initial 
 typedef   ^         InitInputType R8Ki            RootDisp  {3}    - - "Initial root displacement"
 typedef   ^         InitInputType R8Ki            RootOri   {3}{3} - - "Initial root orientation"
 typedef   ^         InitInputType ReKi            RootVel   {6}    - - "Initial root velocities and angular veolcities"
-typedef   ^         InitInputType ReKi            HubPos    {3}    - - "Initial Hub position vector"
-typedef   ^         InitInputType R8Ki            HubRot    {3}{3} - - "Initial Hub direction cosine matrix"
 typedef   ^         InitInputType Logical         Linearize - .FALSE. - "Flag that tells this module if the glue code wants to linearize." -
 typedef   ^         InitInputType Logical         DynamicSolve - .TRUE. - "Use dynamic solve option.  Set to False for static solving (handled by glue code or driver code)." -
 typedef   ^         InitInputType LOGICAL         CompAeroMaps -   .FALSE. - "flag to determine if BeamDyn is computing aero maps (true) or running a normal simulation (false)"	-
@@ -74,7 +72,6 @@ typedef   ^        BD_InputFile    DbKi            rhoinf         -  - - "Numeri
 typedef   ^        BD_InputFile    DbKi            DTBeam         -  - - "Time interval for BeamDyn  calculations {or default} (s)" -
 typedef   ^        BD_InputFile    BladeInputData  InpBl          -  - - "Input data for individual blades"   "see BladeInputData Type"
 typedef   ^        BD_InputFile    CHARACTER(1024) BldFile        -  - - "Name of blade input file"
-typedef   ^        BD_InputFile    Logical         UsePitchAct    -  - - "Whether to use a pitch actuator inside BeamDyn" (flag) 
 typedef   ^        BD_InputFile    Logical         QuasiStaticInit - - - "Use quasistatic pre-conditioning with centripetal accelerations in initialization (flag) [dynamic solve and enFAST only]" -
 #vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 #the following are BDKi = R8Ki
@@ -82,9 +79,6 @@ typedef   ^        BD_InputFile    R8Ki     stop_tol         - - - "Tolerance fo
 typedef   ^        BD_InputFile     ^       tngt_stf_pert    - - - "Perturbation size for computing finite differenced tangent stiffness" -
 typedef   ^        BD_InputFile     ^       tngt_stf_difftol - - - "When comparing tangent stiffness matrix, stop simulation if error greater than this" -
 typedef   ^        BD_InputFile     ^       kp_coordinate   {:}{:} - - "Key point coordinates array" -
-typedef   ^        BD_InputFile     ^       pitchJ - - -     "Pitch actuator inertia" (kg-m^2)
-typedef   ^        BD_InputFile     ^       pitchK - - -     "Pitch actuator stiffness" (kg-m^2/s^2) 
-typedef   ^        BD_InputFile     ^       pitchC - - -     "Pitch actuator damping" - (kg-m^2/s)
 #end of BDKi-type variables
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 typedef   ^        BD_InputFile    Logical             Echo        -  - - "Echo" -
@@ -116,9 +110,8 @@ typedef   ^        ContinuousStateType  ^   dqdt     {:}{:} - -  "dqdt - velocit
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 # Define discrete (nondifferentiable) states here:
+typedef   ^        BD_DiscreteStateType ReKi DummyDiscState  - - - "A variable, Replace if you have discrete states" -
 #typedef   ^        BD_DiscreteStateType ReKi rot  {3} - - "For filter" -             
-typedef   ^        BD_DiscreteStateType ReKi thetaP  - - - "Pitch angle state" -      
-typedef   ^        BD_DiscreteStateType ReKi thetaPD  - - - "Pitch rate state" -      
 
 # Define constraint states here:
 typedef   ^        ConstraintStateType ReKi DummyConstrState - - - "A variable, Replace if you have constraint states" -
@@ -207,11 +200,6 @@ typedef   ^        ParameterType IntKi          NdIndx          {:}        - -  
 typedef   ^        ParameterType IntKi          NdIndxInverse   {:}        - -  "Index from BldMotion mesh to unique nodes (to number the nodes for output without using collocated nodes)"	-
 typedef   ^        ParameterType IntKi          OutNd2NdElem    {:}{:}     - -  "To go from an output node number to a node/elem pair" -
 typedef   ^        ParameterType CHARACTER(20)  OutFmt           -         - -  "Format specifier" -
-typedef   ^        ParameterType Logical        UsePitchAct      -         - -  "Whether to use a pitch actuator inside BeamDyn" (flag) 
-typedef   ^        ParameterType ReKi           pitchJ           -         - -  "Pitch actuator inertia" (kg-m^2)
-typedef   ^        ParameterType ReKi           pitchK           -         - -  "Pitch actuator stiffness" (kg-m^2/s^2) 
-typedef   ^        ParameterType ReKi           pitchC           -         - -  "Pitch actuator damping" - (kg-m^2/s)
-typedef   ^        ParameterType ReKi           torqM           {2}{2}     - -  "Pitch actuator matrix: (I-hA)^-1" - 
 typedef   ^        ParameterType qpParam        qp               -         - -  "Quadrature point info that does not change during simulation" -
 typedef   ^        ParameterType IntKi          qp_indx_offset   -         - -  "Offset for computing index of the quadrature arrays (gauss skips the first [end-point] node)" -
 typedef   ^        ParameterType IntKi          BldMotionNodeLoc -         - -  "switch to determine where the nodes on the blade motion mesh should be located 1=FE (GLL) nodes; 2=quadrature nodes; 3=blade input stations"
@@ -233,6 +221,7 @@ typedef   ^        ParameterType    ^           QPtw_ShpDer            {:}{:}   
 typedef   ^        ParameterType    ^           FEweight               {:}{:}        - - "weighting factors for integrating local sectional loads" -
 typedef   ^        ParameterType    logical     RotStates               -            - - "Orient states in rotating frame during linearization? (flag)" -
 typedef   ^        ParameterType    LOGICAL     CompAeroMaps            -   .FALSE.    - "flag to determine if BeamDyn is computing aero maps (true) or running a normal simulation (false)"	-
+typedef   ^        ParameterType    LOGICAL     CompAppliedLdAtRoot     -   .FALSE.    - "flag to determine if BeamDyn should compute the applied loads at root"	-
 
 
 # ..... Inputs
@@ -241,7 +230,7 @@ typedef   ^        ParameterType    LOGICAL     CompAeroMaps            -   .FAL
 typedef   ^        InputType  MeshType  RootMotion - - - "contains motion" -
 typedef   ^        InputType  MeshType  PointLoad  - - - "Applied point forces along beam axis" -
 typedef   ^        InputType  MeshType  DistrLoad  - - - "Applied distributed forces along beam axis" -
-typedef   ^        InputType  MeshType  HubMotion  - - - "motion (orientation) at the hub" -
+
 
 # ..... Outputs
 # ...................................................................................................................
@@ -272,6 +261,7 @@ typedef   ^        EqMotionQP      ^           aaa        :::    - - "Translatio
 typedef   ^        EqMotionQP      ^           RR0        ::::   - - "Rotation tensor at current QP \\f$ \\left(\\underline{\\underline{R}}\\underline{\\underline{R}}_0\\right) \\f$" -
 typedef   ^        EqMotionQP      ^           kappa      :::    - - "Curvature vector \\f$ \\underline{k} \\f$ at current QP (note this is not \\kappa, but a term in \\kappa)" -
 typedef   ^        EqMotionQP      ^           E1         :::    - - "\\vec{e_1} = x_0^\\prime + u^\\prime (3) at current QP" -
+typedef   ^        EqMotionQP      ^           strain     :::    - - "strain vector" -
 typedef   ^        EqMotionQP      ^           Stif       ::::   - - "C/S stiffness matrix resolved in inertial frame at current QP. 6x6" -
 
 typedef   ^        EqMotionQP      ^           Fb         :::    - - "Gyroscopic forces at current QP. 6" -
@@ -313,8 +303,10 @@ typedef   ^        EqMotionQP      ^           Yd         :::: - - "Dissipative 
 #   e.g. indices for searching in an array, large arrays that are local variables in any routine called multiple times, etc.
 typedef   ^        MiscVarType    MeshType    u_DistrLoad_at_y     - - - "input loads at output node locations" -
 typedef   ^        MiscVarType    MeshType    y_BldMotion_at_u     - - - "output motions at input node locations (displacements necessary for mapping loads)" -
+typedef   ^        MiscVarType    MeshType    LoadsAtRoot          - - - "Applied loads mapped to root" -
 typedef   ^        MiscVarType    MeshMapType Map_u_DistrLoad_to_y - - - "mapping of input loads to output node locations" -
 typedef   ^        MiscVarType    MeshMapType Map_y_BldMotion_to_u - - - "mapping of output motions to input node locations (for load transfer)" -
+typedef   ^        MiscVarType    MeshMapType Map_u_DistrLoad_to_R - - - "mapping of input loads to root location" -
 typedef   ^        MiscVarType    IntKi       Un_Sum               - - - "unit number of summary file"	-
 typedef   ^        MiscVarType    EqMotionQP  qp                   - - - "Quadrature point calculation info" -
 typedef   ^        MiscVarType    R8Ki        lin_A            {:}{:}  - - "A (dXdx) matrix used in linearization (before RotState is applied)" -
@@ -356,7 +348,6 @@ typedef   ^        MiscVarType    ^            LP_RHS_LU    {:}           - - "R
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 typedef   ^        MiscVarType    IntKi        LP_indx      {:}           - - "Index vector for LU" -
 typedef   ^        MiscVarType    BD_InputType u             -            - - "Inputs converted to the internal BD coordinate system" -
-typedef   ^        MiscVarType    BD_InputType u2            -            - - "Inputs in the FAST coordinate system, possibly modified by pitch actuator" -
 typedef   ^        MiscVarType    ModJacType   Jac           -            - - "Jacobian matrices and arrays corresponding to module variables"
 typedef   ^        MiscVarType    BD_ContinuousStateType    x_perturb   - - - "" -
 typedef   ^        MiscVarType    BD_ContinuousStateType    dxdt_lin  - - - "" -

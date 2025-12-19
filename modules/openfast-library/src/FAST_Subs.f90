@@ -224,7 +224,7 @@ SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SE
    END IF
 
    ! ... Open and read input files ...
-   ! also, set applicable farm paramters and turbine reference position also for graphics output
+   ! also, set applicable farm parameters and turbine reference position also for graphics output
    if (PRESENT(ExternInitData)) then
       p_FAST%FarmIntegration = ExternInitData%FarmIntegration
       p_FAST%TurbinePos = ExternInitData%TurbinePos
@@ -438,9 +438,6 @@ SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SE
             p_FAST%BDRotMap(j) = iRot     ! Set this rotor number for this instance
             p_FAST%BDBldMap(j) = k        ! Set this blade number for this instance
 
-            Init%InData_BD%HubPos       = ED%y(iRot)%HubPtMotion%Position(:,1)
-            Init%InData_BD%HubRot       = ED%y(iRot)%HubPtMotion%RefOrientation(:,:,1)
-
             Init%InData_BD%RootName     = TRIM(p_FAST%OutFileRoot)//'.'//TRIM(y_FAST%Module_Abrev(Module_BD))//TRIM(Num2LStr(k))
             Init%InData_BD%InputFile    = p_FAST%BDBldFile(k, iRot)
             Init%InData_BD%GlbPos       = ED%y(iRot)%BladeRootMotion(k)%Position(:,1)          ! {:}    - - "Initial Position Vector of the local blade coordinate system"
@@ -503,16 +500,15 @@ SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SE
       ! lidar
       ! TODO: Expand IfW to support multiple hubs
       Init%InData_IfW%LidarEnabled                 = .true.          ! Lidar allowed with OF, but not FF
-      Init%InData_IfW%lidar%Tmax                   = p_FAST%TMax
       select case (p_FAST%CompElast)
       case (Module_SED)
-         Init%InData_IfW%lidar%HubPosition = SED%y%HubPtMotion%Position(:,1)
+         Init%InData_IfW%HubPosition = SED%y%HubPtMotion%Position(:,1)
          Init%InData_IfW%RadAvg = Init%OutData_SED%BladeLength
       case (Module_ED)
-         Init%InData_IfW%lidar%HubPosition = ED%y(1)%HubPtMotion%Position(:,1)
+         Init%InData_IfW%HubPosition = ED%y(1)%HubPtMotion%Position(:,1)
          Init%InData_IfW%RadAvg = Init%OutData_ED(1)%BladeLength
       case (Module_BD)
-         Init%InData_IfW%lidar%HubPosition = ED%y(1)%HubPtMotion%Position(:,1)
+         Init%InData_IfW%HubPosition = ED%y(1)%HubPtMotion%Position(:,1)
          Init%InData_IfW%RadAvg = 0.0_ReKi
          do k = 1, p_FAST%NumBD
             Init%InData_IfW%RadAvg = Init%InData_IfW%RadAvg + TwoNorm(BD%y(k)%BldMotion%Position(:,1) - BD%y(k)%BldMotion%Position(:,BD%y(k)%BldMotion%Nnodes))
@@ -593,10 +589,12 @@ SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SE
       Init%InData_SeaSt%PtfmLocationY = p_FAST%TurbinePos(2)
 
       
-      IF ( p_FAST%MHK /= MHK_None .AND. p_FAST%CompInflow == Module_IfW) THEN
-         Init%InData_SeaSt%hasCurrField = .TRUE.
+      IF ( p_FAST%MHK /= MHK_None .AND. p_FAST%CompInflow == Module_IfW) THEN ! MHK turbine with dynamic current
+         ! Simulating an MHK turbine; load dynamic current from IfW
+         Init%InData_SeaSt%CurrField    => Init%OutData_IfW%FlowField
+         Init%InData_SeaSt%hasCurrField =  .TRUE.
       ELSE
-         Init%InData_SeaSt%hasCurrField = .FALSE.
+         Init%InData_SeaSt%hasCurrField =  .FALSE.
       END IF
 
          ! wave field visualization
@@ -621,13 +619,6 @@ SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SE
          p_FAST%VTK_surface%NWaveElevPts(2) = 0
       endif
 
-      IF ( p_FAST%MHK /= MHK_None .AND. p_FAST%CompInflow == Module_IfW) THEN ! MHK turbine with dynamic current
-         ! Simulating an MHK turbine; load dynamic current from IfW
-         SeaSt%p%WaveField%CurrField  => Init%OutData_IfW%FlowField
-         SeaSt%p%WaveField%hasCurrField = .TRUE.
-      ELSE ! Wind turbine
-         SeaSt%p%WaveField%hasCurrField = .FALSE.
-      END IF
    end if
 
    !----------------------------------------------------------------------------
@@ -1056,6 +1047,13 @@ SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SE
 
       !bjj: until we modify this, MAP requires HydroDyn to be used. (perhaps we could send air density from AeroDyn or something...)
 
+      ! If mode shape visualization requested when MAP is active, set error and return
+      if (p_FAST%WrVTK == VTK_ModeShapes) then
+         call SetErrStat(ErrID_Fatal, "Mode shape visualization is not supported when using MAP.", ErrStat, ErrMsg, RoutineName)
+         call Cleanup()
+         return
+      end if
+
       CALL WrScr(NewLine) !bjj: I'm printing two blank lines here because MAP seems to be writing over the last line on the screen.
 
       ! Init%InData_MAP%rootname        =  p_FAST%OutFileRoot        ! Output file name
@@ -1101,6 +1099,9 @@ SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SE
 
       Init%InData_MD%Linearize = p_FAST%Linearize
       if (p_FAST%WrVTK /= VTK_None) Init%InData_MD%VisMeshes = .true.
+
+      ! Assign the seastate pointer here
+      Init%InData_MD%WaveField => Init%OutData_SeaSt%WaveField
 
       ! Call module initialization routine
       dt_module = p_FAST%DT
@@ -1374,23 +1375,6 @@ SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SE
             Init%InData_SrvD%SensorType    = IfW%p%lidar%SensorType
             Init%InData_SrvD%NumBeam       = IfW%p%lidar%NumBeam
             Init%InData_SrvD%NumPulseGate  = IfW%p%lidar%NumPulseGate
-            Init%InData_SrvD%PulseSpacing  = IfW%p%lidar%PulseSpacing
-            if (allocated(IfW%y%lidar%LidSpeed)) then
-               call AllocAry(Init%InData_SrvD%LidSpeed,        size(IfW%y%lidar%LidSpeed),      'Init%InData_SrvD%LidSpeed',        errStat2, ErrMsg2); if (Failed()) return
-               Init%InData_SrvD%LidSpeed = IfW%y%lidar%LidSpeed
-            endif
-            if (allocated(IfW%y%lidar%MsrPositionsX)) then
-               call AllocAry(Init%InData_SrvD%MsrPositionsX,   size(IfW%y%lidar%MsrPositionsX), 'Init%InData_SrvD%MsrPositionsX',   errStat2, ErrMsg2); if (Failed()) return
-               Init%InData_SrvD%MsrPositionsX = IfW%y%lidar%MsrPositionsX
-            endif
-            if (allocated(IfW%y%lidar%MsrPositionsY)) then
-               call AllocAry(Init%InData_SrvD%MsrPositionsY,   size(IfW%y%lidar%MsrPositionsY), 'Init%InData_SrvD%MsrPositionsY',   errStat2, ErrMsg2); if (Failed()) return
-               Init%InData_SrvD%MsrPositionsY = IfW%y%lidar%MsrPositionsY
-            endif
-            if (allocated(IfW%y%lidar%MsrPositionsZ)) then
-               call AllocAry(Init%InData_SrvD%MsrPositionsZ,   size(IfW%y%lidar%MsrPositionsZ), 'Init%InData_SrvD%MsrPositionsZ',   errStat2, ErrMsg2); if (Failed()) return
-               Init%InData_SrvD%MsrPositionsZ = IfW%y%lidar%MsrPositionsZ
-            endif
          END IF
 
          ! Set cable controls inputs (if requested by other modules)  -- There is probably a nicer way to do this, but this will work for now.
@@ -1404,7 +1388,15 @@ SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SE
                         SrvD%y(iRot), SrvD%m(iRot), dt_module, Init%OutData_SrvD(iRot), ErrStat2, ErrMsg2 )
          if (Failed()) return
 
-         !IF ( Init%OutData_SrvD%CouplingScheme == ExplicitLoose ) THEN ...  bjj: abort if we're doing anything else!
+         IF ( p_FAST%CompInflow == Module_IfW ) THEN ! assign the number of gates to ServD
+            Init%InData_SrvD%SensorType    = IfW%p%lidar%SensorType
+            Init%InData_SrvD%NumBeam       = IfW%p%lidar%NumBeam
+            Init%InData_SrvD%NumPulseGate  = IfW%p%lidar%NumPulseGate
+         else
+            Init%InData_SrvD%SensorType    = 0
+            Init%InData_SrvD%NumBeam       = 0
+            Init%InData_SrvD%NumPulseGate  = 0
+         END IF
 
          ! Add module to list of modules
          CALL MV_AddModule(m_Glue%ModData, Module_SrvD, 'SrvD', iRot, dt_module, p_FAST%DT, &
@@ -1997,8 +1989,6 @@ SUBROUTINE ValidateInputData(p, m_FAST, ErrStat, ErrMsg)
 
    IF (p%MHK /= MHK_None .and. p%MHK /= MHK_FixedBottom .and. p%MHK /= MHK_Floating) CALL SetErrStat( ErrID_Fatal, 'MHK switch is invalid. Set MHK to 0, 1, or 2 in the FAST input file.', ErrStat, ErrMsg, RoutineName )
 
-   IF (p%MHK /= MHK_None .and. p%Linearize) CALL SetErrStat( ErrID_Warn, 'Linearization is not fully implemented for an MHK turbine (buoyancy not included in perturbations, and added mass not included anywhere).', ErrStat, ErrMsg, RoutineName )
-
    IF (p%MHK /= MHK_None .and. p%CompSeaSt == Module_SeaSt .and. p%CompInflow /= Module_IfW) CALL SetErrStat( ErrID_Fatal, 'InflowWind must be activated for MHK turbines when SeaState is used.', ErrStat, ErrMsg, RoutineName )
 
    IF (p%Gravity < 0.0_ReKi) CALL SetErrStat( ErrID_Fatal, 'Gravity must not be negative.', ErrStat, ErrMsg, RoutineName )
@@ -2226,7 +2216,7 @@ SUBROUTINE FAST_InitOutput( p_FAST, y_FAST, Init, ErrStat, ErrMsg )
    !......................................................
    ! Set the number of output columns from each module
    !......................................................
-   y_FAST%numOuts = 0    ! Inintialize entire array
+   y_FAST%numOuts = 0    ! Initialize entire array
 
    if (allocated(Init%OutData_BD)) then
       do i = 1, p_FAST%NumBD
@@ -3329,7 +3319,7 @@ SUBROUTINE FAST_ReadPrimaryFile( InputFile, p, m_FAST, OverrideAbortErrLev, ErrS
       IF (p%WrVTK == VTK_ModeShapes) THEN
          p%n_VTKTime = 1
       ELSE IF (TmpTime > p%TMax) THEN
-         p%n_VTKTime = HUGE(p%n_VTKTime)
+         p%n_VTKTime = NINT( p%TMax  / p%DT )   ! write at init and last step only
       ELSE
          p%n_VTKTime = NINT( TmpTime / p%DT )
          ! I'll warn if p%n_VTKTime*p%DT is not TmpTime
@@ -5695,13 +5685,13 @@ SUBROUTINE WrVTK_AllMeshes(p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInfw, HD, SD
       do iRot = 1, p_FAST%NRotors
          do iBld = 1, p_FAST%RotNumBld(iRot)
 
-            Suffix = '_R'//trim(Num2LStr(iRot)//"B"//Num2LStr(iBld))    ! Mesh suffix with rotor and blade number
+            Suffix = '_R'//trim(Num2LStr(iRot))//"B"//Num2LStr(iBld)    ! Mesh suffix with rotor and blade number
             k = k + 1                                                   ! BeamDyn instance number
          
             !call MeshWrVTK(p_FAST%TurbinePos, BD%Input(1,k)%RootMotion, trim(p_FAST%VTK_OutFileRoot)//'.BD_RootMotion'//trim(Num2LStr(k)), &
             !               y_FAST%VTK_count, p_FAST%VTK_fields, ErrStat2, ErrMsg2, p_FAST%VTK_tWidth )
-            call MeshWrVTK(p_FAST%TurbinePos, BD%Input(INPUT_CURR,k)%HubMotion, trim(p_FAST%VTK_OutFileRoot)//'.BD_HubMotion'//Suffix, &
-                           y_FAST%VTK_count, p_FAST%VTK_fields, ErrStat2, ErrMsg2, p_FAST%VTK_tWidth)
+            !call MeshWrVTK(p_FAST%TurbinePos, BD%Input(INPUT_CURR,k)%HubMotion, trim(p_FAST%VTK_OutFileRoot)//'.BD_HubMotion'//Suffix, &
+            !               y_FAST%VTK_count, p_FAST%VTK_fields, ErrStat2, ErrMsg2, p_FAST%VTK_tWidth)
             if (p_FAST%BD_OutputSibling) then
                call MeshWrVTK(p_FAST%TurbinePos, BD%Input(1,k)%DistrLoad, trim(p_FAST%VTK_OutFileRoot)//'.BD_Blade'//Suffix, &
                               y_FAST%VTK_count, p_FAST%VTK_fields, ErrStat2, ErrMsg2, p_FAST%VTK_tWidth, BD%y(k)%BldMotion)
@@ -5729,7 +5719,7 @@ SUBROUTINE WrVTK_AllMeshes(p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInfw, HD, SD
       do iRot = 1, p_FAST%NRotors
          do iBld = 1, p_FAST%RotNumBld(iRot)
 
-            Suffix = '_R'//trim(Num2LStr(iRot)//"B"//Num2LStr(iBld))    ! Mesh suffix with rotor and blade number
+            Suffix = '_R'//trim(Num2LStr(iRot))//"B"//Num2LStr(iBld)    ! Mesh suffix with rotor and blade number
 
             call MeshWrVTK(p_FAST%TurbinePos, ED%y(iRot)%BladeLn2Mesh(iBld), &
                            trim(p_FAST%VTK_OutFileRoot)//'.ED_BladeLn2Mesh_motion'//Suffix, &
@@ -6841,7 +6831,10 @@ SUBROUTINE ExitThisProgram_T( Turbine, ErrLevel_in, StopTheProgram, ErrLocMsg, S
    END IF
 
    ! Close summary file if opened
-   IF (UnSum > 0) CLOSE(UnSum)
+   IF (UnSum > 0) then
+      CLOSE(UnSum)
+      Turbine%y_FAST%UnSum = -1
+   end if
 
    if (StopTheProgram) then
 #if (defined COMPILE_SIMULINK || defined COMPILE_LABVIEW)
@@ -6997,6 +6990,12 @@ SUBROUTINE FAST_CreateCheckpoint_T(t_initial, n_t_global, NumTurbines, Turbine, 
       ! init error status
    ErrStat = ErrID_None
    ErrMsg  = ""
+
+   ! Writing checkpoint files is not supported when using MAP
+   if (Turbine%p_FAST%CompMooring == Module_MAP) then
+      call SetErrStat(ErrID_Fatal, "Writing checkpoint files is not supported when using MAP.", ErrStat, ErrMsg, RoutineName)
+      return
+   end if
       
    FileName    = TRIM(CheckpointRoot)//'.chkp'
    DLLFileName = TRIM(CheckpointRoot)//'.dll.chkp'
@@ -7270,6 +7269,8 @@ SUBROUTINE FAST_RestoreForVTKModeShape_Tary(t_initial, Turbine, InputFileName, E
    INTEGER(IntKi)                          :: i_turb
    INTEGER(IntKi)                          :: n_t_global          !< loop counter
    INTEGER(IntKi)                          :: NumTurbines         ! Number of turbines in this simulation
+   INTEGER(IntKi)                          :: i_ext
+   CHARACTER(1024)                         :: OutFileRoot
    TYPE(FAST_VTK_ModeShapeType)            :: VTK_Modes
 
 
@@ -7285,10 +7286,14 @@ SUBROUTINE FAST_RestoreForVTKModeShape_Tary(t_initial, Turbine, InputFileName, E
    CALL ReadModeShapeFile( Turbine(1)%p_FAST, trim(InputFileName), VTK_Modes, ErrStat2, ErrMsg2, checkpointOnly=.true. )
       CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       if (ErrStat >= AbortErrLev) return
+   
+   ! Save checkpoint root path as read from mode shape file and remove extension
+   OutFileRoot = VTK_modes%CheckpointRoot
+   i_ext = index(OutFileRoot, '.ModeShapeVTK', back=.true.)
+   if (i_ext > 1) OutFileRoot = OutFileRoot(:i_ext - 1)
 
    CALL FAST_RestoreFromCheckpoint_Tary( t_initial, n_t_global, Turbine, trim(VTK_modes%CheckpointRoot), ErrStat2, ErrMsg2, silent=.true. )
       CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-
 
    DO i_turb = 1,NumTurbines
       if (.not. allocated(Turbine(i_turb)%m_FAST%Lin%LinTimes)) then
@@ -7298,6 +7303,9 @@ SUBROUTINE FAST_RestoreForVTKModeShape_Tary(t_initial, Turbine, InputFileName, E
 
       CALL FAST_RestoreForVTKModeShape_T(t_initial, trim(InputFileName), VTK_Modes, Turbine(i_turb), ErrStat2, ErrMsg2)
       CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+
+      ! If extension was found, overwrite saved out file root
+      if (i_ext > 1) Turbine(i_turb)%p_FAST%OutFileRoot = OutFileRoot
    END DO
 
 
