@@ -86,12 +86,18 @@ subroutine ADI_Init(InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitOut
    InitOut%Ver = InitOut_AD%ver
    ! Add writeoutput units and headers to driver, same for all cases and rotors!
    !TODO: this header is too short if we add more rotors.  Should also add a rotor identifier
-   call concatOutputHeaders(InitOut%WriteOutputHdr, InitOut%WriteOutputUnt, InitOut_AD%rotors(1)%WriteOutputHdr, InitOut_AD%rotors(1)%WriteOutputUnt, errStat2, errMsg2); if(Failed()) return
+   if (size(InitOut_AD%rotors)>=1) then
+      call concatOutputHeaders(InitOut%WriteOutputHdr, InitOut%WriteOutputUnt, InitOut_AD%rotors(1)%WriteOutputHdr, InitOut_AD%rotors(1)%WriteOutputUnt, errStat2, errMsg2); if(Failed()) return
+   endif
 
    ! --- Initialize grouped outputs
-   !TODO: assumes one rotor
-   p%NumOuts = p%AD%rotors(1)%NumOuts + p%AD%rotors(1)%BldNd_TotNumOuts + m%IW%p%NumOuts
-   call AllocAry(y%WriteOutput, p%NumOuts, 'WriteOutput', errStat2, errMsg2); if (Failed()) return
+   if (size(InitOut_AD%rotors)>=1) then
+      !TODO: assumes one rotor
+      p%NumOuts = p%AD%rotors(1)%NumOuts + p%AD%rotors(1)%BldNd_TotNumOuts + m%IW%p%NumOuts
+      call AllocAry(y%WriteOutput, p%NumOuts, 'WriteOutput', errStat2, errMsg2); if (Failed()) return
+   else
+      p%NumOuts = m%IW%p%NumOuts
+   endif
 
    ! --- Initialize outputs
    call AllocAry(y%IW_WriteOutput, size(m%IW%y%WriteOutput),'IW_WriteOutput', errStat2, errMsg2); if(Failed()) return
@@ -297,21 +303,26 @@ subroutine ADI_CalcOutput(t, u, p, x, xd, z, OtherState, y, m, errStat, errMsg)
    y%PLExp = m%IW%PLExp
 
    ! --- Set outputs
-   !TODO: this assumes one rotor!!!
-   associate(AD_NumOuts => p%AD%rotors(1)%NumOuts + p%AD%rotors(1)%BldNd_TotNumOuts, &
-             IW_NumOuts => m%IW%p%NumOuts)
-      y%WriteOutput(1:IW_NumOuts) = y%IW_WriteOutput(1:IW_NumOuts)
-      y%WriteOutput(IW_NumOuts+1:p%NumOuts) = y%AD%rotors(1)%WriteOutput(1:AD_NumOuts)
-   end associate
+   if (size(p%AD%rotors)>=1) then
+      !TODO: this assumes one rotor!!!
+      associate(AD_NumOuts => p%AD%rotors(1)%NumOuts + p%AD%rotors(1)%BldNd_TotNumOuts, &
+                IW_NumOuts => m%IW%p%NumOuts)
+         y%WriteOutput(1:IW_NumOuts) = y%IW_WriteOutput(1:IW_NumOuts)
+         y%WriteOutput(IW_NumOuts+1:p%NumOuts) = y%AD%rotors(1)%WriteOutput(1:AD_NumOuts)
+      end associate
 
-   !----------------------------------------------------------------------------
-   ! Store hub height velocity calculated in CalcOutput
-   !----------------------------------------------------------------------------
+      !----------------------------------------------------------------------------
+      ! Store hub height velocity calculated in CalcOutput
+      !----------------------------------------------------------------------------
 
-   if (p%storeHHVel) then
-      do iWT = 1, size(u%AD%rotors)
-         y%HHVel(:,iWT) = m%AD%Inflow(1)%RotInflow(iWT)%InflowOnHub(:,1)
-      end do
+      if (p%storeHHVel) then
+         do iWT = 1, size(u%AD%rotors)
+            y%HHVel(:,iWT) = m%AD%Inflow(1)%RotInflow(iWT)%InflowOnHub(:,1)
+         end do
+      endif
+
+   else
+      y%WriteOutput(1:p%NumOuts) = y%IW_WriteOutput(1:m%IW%p%NumOuts)
    endif
 
 contains

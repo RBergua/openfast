@@ -50,9 +50,9 @@ IMPLICIT NONE
     REAL(ReKi)  :: xEnd = 0.0_ReKi      !< xEnd [-]
     REAL(ReKi)  :: yEnd = 0.0_ReKi      !< yEnd [-]
     REAL(ReKi)  :: zEnd = 0.0_ReKi      !< zEnd [-]
-    INTEGER(IntKi)  :: nx = 0_IntKi      !< nx [-]
-    INTEGER(IntKi)  :: ny = 0_IntKi      !< ny [-]
-    INTEGER(IntKi)  :: nz = 0_IntKi      !< nz [-]
+    INTEGER(IntKi)  :: nx = 0      !< nx [-]
+    INTEGER(IntKi)  :: ny = 0      !< ny [-]
+    INTEGER(IntKi)  :: nz = 0      !< nz [-]
     REAL(ReKi) , DIMENSION(:,:,:,:), ALLOCATABLE  :: uGrid      !< Grid velocity 3 x nz x ny x nx [-]
     REAL(ReKi) , DIMENSION(:,:,:,:), ALLOCATABLE  :: omGrid      !< Grid vorticity 3 x nz x ny x nx [-]
     REAL(DbKi)  :: tLastOutput = 0.0_R8Ki      !< Last output time [-]
@@ -65,8 +65,8 @@ IMPLICIT NONE
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: Gamma      !< Segment circulations [-]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: Epsilon      !< Segment regularization parameter [-]
     INTEGER(IntKi)  :: RegFunction = 0_IntKi      !< Type of regularizaion function (LambOseen, Vatistas, see FVW_BiotSavart) [-]
-    INTEGER(IntKi)  :: nAct = 0_IntKi      !< Number of active segments [-]
-    INTEGER(IntKi)  :: nActP = 0_IntKi      !< Number of active segment points [-]
+    INTEGER(IntKi)  :: nAct = 0      !< Number of active segments [-]
+    INTEGER(IntKi)  :: nActP = 0      !< Number of active segment points [-]
   END TYPE T_Sgmt
 ! =======================
 ! =========  T_Part  =======
@@ -75,8 +75,45 @@ IMPLICIT NONE
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: Alpha      !< Particle intensity 3 x nP [-]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: RegParam      !< Particle regularization parameter [-]
     INTEGER(IntKi)  :: RegFunction = 0_IntKi      !< Type of regularizaion function (FVW_BiotSavart) [-]
-    INTEGER(IntKi)  :: nAct = 0_IntKi      !< Number of active particles <=nP [-]
+    INTEGER(IntKi)  :: nAct = 0      !< Number of active particles <=nP [-]
   END TYPE T_Part
+! =======================
+! =========  T_SrcPanlParam  =======
+  TYPE, PUBLIC :: T_SrcPanlParam
+    INTEGER(IntKi)  :: n = 0      !< Number of panels [-]
+    CHARACTER(1024)  :: Comment      !< Area [-]
+    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: Area      !< Area [-]
+    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: P      !< Points database [-]
+    INTEGER(IntKi) , DIMENSION(:,:), ALLOCATABLE  :: IDs      !< Points connectivity ID for each panel 4xnPn [-]
+    INTEGER(IntKi) , DIMENSION(:), ALLOCATABLE  :: BodyIDs      !< Body ID for each panel [-]
+    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: Pcent      !< Centroid point [-]
+    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: Pmid      !< Mid point [-]
+    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: Normal      !< Normal to panel [-]
+    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: xi      !< Xi coordinate for each panel point [-]
+    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: eta      !< eta coordinate for each panel point [-]
+    REAL(ReKi) , DIMENSION(:,:,:), ALLOCATABLE  :: R_g2p      !< Transformation matrix global to Panel [-]
+  END TYPE T_SrcPanlParam
+! =======================
+! =========  T_SrcPanlVar  =======
+  TYPE, PUBLIC :: T_SrcPanlVar
+    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: Sigma      !< Intensities [-]
+  END TYPE T_SrcPanlVar
+! =======================
+! =========  T_SrcPanlMisc  =======
+  TYPE, PUBLIC :: T_SrcPanlMisc
+    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: AI      !< Influence matrix to solve for intensity [-]
+    REAL(ReKi) , DIMENSION(:,:,:), ALLOCATABLE  :: UUI      !< Unit induced velocity [-]
+    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: Uext      !< External inflow velocity at panel control points [-]
+    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: Uwnd      !< Inflow velocity vector at panel control points [-]
+    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: Uind      !< Induced velocity vector at panel control points [-]
+    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: Utot      !< Full velocity (include induced) vector at panel control points [-]
+    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: Cp      !< Pressure coefficient [-]
+    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: p      !< Pressure (1/2 rho Utot^2) [-]
+    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: F      !< Force from pressure [-]
+    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: FpA      !< Force per area [-]
+    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: RHS      !< Right hand side [-]
+    INTEGER(IntKi) , DIMENSION(:), ALLOCATABLE  :: IPIV      !< Pivot for factorization [-]
+  END TYPE T_SrcPanlMisc
 ! =======================
 ! =========  Wng_ParameterType  =======
   TYPE, PUBLIC :: Wng_ParameterType
@@ -84,23 +121,23 @@ IMPLICIT NONE
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: chord_CP      !< Chord on LL cp  [m]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: s_LL      !< Spanwise coordinate of LL elements [m]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: s_CP      !< Spanwise coordinate of LL CP [m]
-    INTEGER(IntKi)  :: iRotor = 0_IntKi      !< Index of rotor the wing belong to [-]
+    INTEGER(IntKi)  :: iRotor = 0      !< Index of rotor the wing belong to [-]
     INTEGER(IntKi) , DIMENSION(:,:), ALLOCATABLE  :: AFindx      !< Index to the airfoils from AD15 [BladeNode,BladeIndex=1] [-]
-    INTEGER(IntKi)  :: nSpan = 0_IntKi      !< TODO, should be defined per wing. Number of spanwise element [-]
+    INTEGER(IntKi)  :: nSpan = 0      !< TODO, should be defined per wing. Number of spanwise element [-]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: PrescribedCirculation      !< Prescribed circulation on all lifting lines [m/s]
   END TYPE Wng_ParameterType
 ! =======================
 ! =========  FVW_ParameterType  =======
   TYPE, PUBLIC :: FVW_ParameterType
-    INTEGER(IntKi)  :: nRotors = 0_IntKi      !< Number of Wings [-]
-    INTEGER(IntKi)  :: nWings = 0_IntKi      !< Number of Wings [-]
+    INTEGER(IntKi)  :: nRotors = 0      !< Number of Rotors [-]
+    INTEGER(IntKi)  :: nWings = 0      !< Number of Wings [-]
     TYPE(Wng_ParameterType) , DIMENSION(:), ALLOCATABLE  :: W      !< Wings parameters [-]
     INTEGER(IntKi) , DIMENSION(:,:), ALLOCATABLE  :: Bld2Wings      !< Index mapping from blades to wings [-]
-    INTEGER(IntKi)  :: iNWStart = 0_IntKi      !< Index where NW start in r_NW. (iNWStart=2, the first panel contains the lifting line panel, otherwise, start at 1) [-]
-    INTEGER(IntKi)  :: nNWMax = 0_IntKi      !< Maximum number of nw panels, per wing [-]
-    INTEGER(IntKi)  :: nNWFree = 0_IntKi      !< Number of nw panels that are free, per wing [-]
-    INTEGER(IntKi)  :: nFWMax = 0_IntKi      !< Maximum number of fw panels, per wing [-]
-    INTEGER(IntKi)  :: nFWFree = 0_IntKi      !< Number of fw panels that are free, per wing [-]
+    INTEGER(IntKi)  :: iNWStart = 0      !< Index where NW start in r_NW. (iNWStart=2, the first panel contains the lifting line panel, otherwise, start at 1) [-]
+    INTEGER(IntKi)  :: nNWMax = 0      !< Maximum number of nw panels, per wing [-]
+    INTEGER(IntKi)  :: nNWFree = 0      !< Number of nw panels that are free, per wing [-]
+    INTEGER(IntKi)  :: nFWMax = 0      !< Maximum number of fw panels, per wing [-]
+    INTEGER(IntKi)  :: nFWFree = 0      !< Number of fw panels that are free, per wing [-]
     LOGICAL  :: FWShedVorticity = .false.      !< Include shed vorticity in the far wake [-]
     INTEGER(IntKi)  :: IntMethod = 0_IntKi      !< Integration Method (1=RK4, 2=AB4, 3=ABM4, 5=Euler1) [-]
     REAL(ReKi)  :: FreeWakeStart = 0.0_ReKi      !< Time when wake starts convecting (rolling up) [s]
@@ -124,6 +161,7 @@ IMPLICIT NONE
     INTEGER(IntKi) , DIMENSION(1:2)  :: PartPerSegment = 0_IntKi      !< Number of particles per segment, e.g. for tree method, for full wake and lifting line [-]
     REAL(DbKi)  :: DTaero = 0.0_R8Ki      !< Time interval for calls calculations [s]
     REAL(DbKi)  :: DTfvw = 0.0_R8Ki      !< Time interval for calculating wake induced velocities [s]
+    REAL(ReKi)  :: AirDens = 0.0_ReKi      !< Air density [kg/m^3]
     REAL(ReKi)  :: KinVisc = 0.0_ReKi      !< Kinematic air viscosity [m^2/s]
     INTEGER(IntKi)  :: MHK = 0_IntKi      !< MHK flag [-]
     REAL(ReKi)  :: WtrDpth = 0.0_ReKi      !< Water depth [m]
@@ -134,13 +172,17 @@ IMPLICIT NONE
     CHARACTER(1024)  :: RootName      !< RootName for writing output files [-]
     CHARACTER(1024)  :: VTK_OutFileRoot      !< Rootdirectory for writing VTK files [-]
     CHARACTER(1024)  :: VTK_OutFileBase      !< Basename for writing VTK files [-]
-    INTEGER(IntKi)  :: nGridOut = 0_IntKi      !< Number of VTK grid to output [-]
+    INTEGER(IntKi)  :: nGridOut = 0      !< Number of VTK grid to output [-]
     LOGICAL  :: InductionAtCP = .true.      !< Compute induced velocities at nodes or CP [-]
     LOGICAL  :: WakeAtTE = .true.      !< Start the wake at the trailing edge, or at the LL [-]
     LOGICAL  :: DStallOnWake = .false.      !< Dynamic stall has influence on wake [-]
     LOGICAL  :: Induction = .true.      !< Compute induction [-]
     REAL(ReKi)  :: kFrozenNWStart = 0.75      !< Fraction of wake induced velocity at start of frozen wake. 1 seems too strong. [-]
     REAL(ReKi)  :: kFrozenNWEnd = 0.5      !< Fraction of wake induced velocity at end of frozen wake [-]
+    REAL(ReKi)  :: zGround = 0.0      !< Ground height [-]
+    REAL(ReKi)  :: zGroundPush = 0.1      !< Distance above ground where vortices are pushed back [-]
+    INTEGER(IntKi)  :: nSrcPnlUpdate = 1      !< How often do src panel updates (in time steps of OLAF) [-]
+    TYPE(T_SrcPanlParam)  :: SrcPnl      !< Source panel parameters [-]
   END TYPE FVW_ParameterType
 ! =======================
 ! =========  Wng_ContinuousStateType  =======
@@ -237,6 +279,7 @@ IMPLICIT NONE
     LOGICAL  :: UA_Flag = .false.      !< logical flag indicating whether to use UnsteadyAero [-]
     TYPE(T_Sgmt)  :: Sgmt      !< Segments storage [-]
     TYPE(T_Part)  :: Part      !< Particle storage [-]
+    TYPE(T_SrcPanlMisc)  :: SrcPnl      !< Source panels storage [-]
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: CPs      !< Control points used for wake rollup computation [-]
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: Uind      !< Induced velocities obtained at control points [-]
     TYPE(GridOutType) , DIMENSION(:), ALLOCATABLE  :: GridOutputs      !< Number of VTK grid to output [-]
@@ -278,12 +321,14 @@ IMPLICIT NONE
   TYPE, PUBLIC :: FVW_ConstraintStateType
     TYPE(Wng_ConstraintStateType) , DIMENSION(:), ALLOCATABLE  :: W      !< rotors constr. states [-]
     REAL(ReKi)  :: residual = 0.0_ReKi      !< Residual [-]
+    TYPE(T_SrcPanlVar)  :: SrcPnl      !< Source panel constraints [-]
   END TYPE FVW_ConstraintStateType
 ! =======================
 ! =========  FVW_OtherStateType  =======
   TYPE, PUBLIC :: FVW_OtherStateType
-    INTEGER(IntKi)  :: Dummy = 0_IntKi      !< Empty to satisfy framework [-]
+    REAL(ReKi)  :: ShedScale = 0.0_ReKi      !< Scale shed vorticity at begining of simulation [-]
     TYPE(UA_OtherStateType) , DIMENSION(:), ALLOCATABLE  :: UA      !< other states for UnsteadyAero for each wing [-]
+    LOGICAL  :: Initialized = .false.      !< True if OLAF is initialized [-]
   END TYPE FVW_OtherStateType
 ! =======================
 ! =========  Wng_InitInputType  =======
@@ -304,6 +349,7 @@ IMPLICIT NONE
     TYPE(MeshType) , DIMENSION(:), ALLOCATABLE  :: WingsMesh      !< Input Mesh defining position and orientation of wings (nSpan+1)  [-]
     INTEGER(IntKi)  :: numBladeNodes = 0_IntKi      !< Number of nodes on each blade [-]
     REAL(DbKi)  :: DTaero = 0.0_R8Ki      !< Time interval for calls (from AD15) [s]
+    REAL(ReKi)  :: AirDens = 0.0_ReKi      !< Air density [kg/m^3]
     REAL(ReKi)  :: KinVisc = 0.0_ReKi      !< Kinematic air viscosity [m^2/s]
     INTEGER(IntKi)  :: MHK = 0_IntKi      !< MHK flag [-]
     REAL(ReKi)  :: WtrDpth = 0.0_ReKi      !< Water depth [m]
@@ -345,6 +391,7 @@ IMPLICIT NONE
     INTEGER(IntKi)  :: VTKBlades = 0_IntKi      !< Outputs VTk for each blade 0=no blade, 1=Bld 1 [-]
     REAL(DbKi)  :: DTvtk = 0.0_R8Ki      !< Requested timestep between VTK outputs (calculated from the VTK_fps read in) [s]
     INTEGER(IntKi)  :: VTKCoord = 0_IntKi      !< Switch for VTK outputs coordinate  system [-]
+    CHARACTER(1024)  :: SrcPnlFile      !< Input file for source panels [-]
   END TYPE FVW_InputFile
 ! =======================
 ! =========  FVW_InitOutputType  =======
@@ -702,6 +749,523 @@ subroutine FVW_UnPackT_Part(RF, OutData)
    call RegUnpack(RF, OutData%nAct); if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
+subroutine FVW_CopyT_SrcPanlParam(SrcT_SrcPanlParamData, DstT_SrcPanlParamData, CtrlCode, ErrStat, ErrMsg)
+   type(T_SrcPanlParam), intent(in) :: SrcT_SrcPanlParamData
+   type(T_SrcPanlParam), intent(inout) :: DstT_SrcPanlParamData
+   integer(IntKi),  intent(in   ) :: CtrlCode
+   integer(IntKi),  intent(  out) :: ErrStat
+   character(*),    intent(  out) :: ErrMsg
+   integer(B4Ki)                  :: LB(3), UB(3)
+   integer(IntKi)                 :: ErrStat2
+   character(*), parameter        :: RoutineName = 'FVW_CopyT_SrcPanlParam'
+   ErrStat = ErrID_None
+   ErrMsg  = ''
+   DstT_SrcPanlParamData%n = SrcT_SrcPanlParamData%n
+   DstT_SrcPanlParamData%Comment = SrcT_SrcPanlParamData%Comment
+   if (allocated(SrcT_SrcPanlParamData%Area)) then
+      LB(1:1) = lbound(SrcT_SrcPanlParamData%Area)
+      UB(1:1) = ubound(SrcT_SrcPanlParamData%Area)
+      if (.not. allocated(DstT_SrcPanlParamData%Area)) then
+         allocate(DstT_SrcPanlParamData%Area(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstT_SrcPanlParamData%Area.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstT_SrcPanlParamData%Area = SrcT_SrcPanlParamData%Area
+   end if
+   if (allocated(SrcT_SrcPanlParamData%P)) then
+      LB(1:2) = lbound(SrcT_SrcPanlParamData%P)
+      UB(1:2) = ubound(SrcT_SrcPanlParamData%P)
+      if (.not. allocated(DstT_SrcPanlParamData%P)) then
+         allocate(DstT_SrcPanlParamData%P(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstT_SrcPanlParamData%P.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstT_SrcPanlParamData%P = SrcT_SrcPanlParamData%P
+   end if
+   if (allocated(SrcT_SrcPanlParamData%IDs)) then
+      LB(1:2) = lbound(SrcT_SrcPanlParamData%IDs)
+      UB(1:2) = ubound(SrcT_SrcPanlParamData%IDs)
+      if (.not. allocated(DstT_SrcPanlParamData%IDs)) then
+         allocate(DstT_SrcPanlParamData%IDs(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstT_SrcPanlParamData%IDs.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstT_SrcPanlParamData%IDs = SrcT_SrcPanlParamData%IDs
+   end if
+   if (allocated(SrcT_SrcPanlParamData%BodyIDs)) then
+      LB(1:1) = lbound(SrcT_SrcPanlParamData%BodyIDs)
+      UB(1:1) = ubound(SrcT_SrcPanlParamData%BodyIDs)
+      if (.not. allocated(DstT_SrcPanlParamData%BodyIDs)) then
+         allocate(DstT_SrcPanlParamData%BodyIDs(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstT_SrcPanlParamData%BodyIDs.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstT_SrcPanlParamData%BodyIDs = SrcT_SrcPanlParamData%BodyIDs
+   end if
+   if (allocated(SrcT_SrcPanlParamData%Pcent)) then
+      LB(1:2) = lbound(SrcT_SrcPanlParamData%Pcent)
+      UB(1:2) = ubound(SrcT_SrcPanlParamData%Pcent)
+      if (.not. allocated(DstT_SrcPanlParamData%Pcent)) then
+         allocate(DstT_SrcPanlParamData%Pcent(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstT_SrcPanlParamData%Pcent.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstT_SrcPanlParamData%Pcent = SrcT_SrcPanlParamData%Pcent
+   end if
+   if (allocated(SrcT_SrcPanlParamData%Pmid)) then
+      LB(1:2) = lbound(SrcT_SrcPanlParamData%Pmid)
+      UB(1:2) = ubound(SrcT_SrcPanlParamData%Pmid)
+      if (.not. allocated(DstT_SrcPanlParamData%Pmid)) then
+         allocate(DstT_SrcPanlParamData%Pmid(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstT_SrcPanlParamData%Pmid.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstT_SrcPanlParamData%Pmid = SrcT_SrcPanlParamData%Pmid
+   end if
+   if (allocated(SrcT_SrcPanlParamData%Normal)) then
+      LB(1:2) = lbound(SrcT_SrcPanlParamData%Normal)
+      UB(1:2) = ubound(SrcT_SrcPanlParamData%Normal)
+      if (.not. allocated(DstT_SrcPanlParamData%Normal)) then
+         allocate(DstT_SrcPanlParamData%Normal(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstT_SrcPanlParamData%Normal.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstT_SrcPanlParamData%Normal = SrcT_SrcPanlParamData%Normal
+   end if
+   if (allocated(SrcT_SrcPanlParamData%xi)) then
+      LB(1:2) = lbound(SrcT_SrcPanlParamData%xi)
+      UB(1:2) = ubound(SrcT_SrcPanlParamData%xi)
+      if (.not. allocated(DstT_SrcPanlParamData%xi)) then
+         allocate(DstT_SrcPanlParamData%xi(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstT_SrcPanlParamData%xi.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstT_SrcPanlParamData%xi = SrcT_SrcPanlParamData%xi
+   end if
+   if (allocated(SrcT_SrcPanlParamData%eta)) then
+      LB(1:2) = lbound(SrcT_SrcPanlParamData%eta)
+      UB(1:2) = ubound(SrcT_SrcPanlParamData%eta)
+      if (.not. allocated(DstT_SrcPanlParamData%eta)) then
+         allocate(DstT_SrcPanlParamData%eta(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstT_SrcPanlParamData%eta.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstT_SrcPanlParamData%eta = SrcT_SrcPanlParamData%eta
+   end if
+   if (allocated(SrcT_SrcPanlParamData%R_g2p)) then
+      LB(1:3) = lbound(SrcT_SrcPanlParamData%R_g2p)
+      UB(1:3) = ubound(SrcT_SrcPanlParamData%R_g2p)
+      if (.not. allocated(DstT_SrcPanlParamData%R_g2p)) then
+         allocate(DstT_SrcPanlParamData%R_g2p(LB(1):UB(1),LB(2):UB(2),LB(3):UB(3)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstT_SrcPanlParamData%R_g2p.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstT_SrcPanlParamData%R_g2p = SrcT_SrcPanlParamData%R_g2p
+   end if
+end subroutine
+
+subroutine FVW_DestroyT_SrcPanlParam(T_SrcPanlParamData, ErrStat, ErrMsg)
+   type(T_SrcPanlParam), intent(inout) :: T_SrcPanlParamData
+   integer(IntKi),  intent(  out) :: ErrStat
+   character(*),    intent(  out) :: ErrMsg
+   character(*), parameter        :: RoutineName = 'FVW_DestroyT_SrcPanlParam'
+   ErrStat = ErrID_None
+   ErrMsg  = ''
+   if (allocated(T_SrcPanlParamData%Area)) then
+      deallocate(T_SrcPanlParamData%Area)
+   end if
+   if (allocated(T_SrcPanlParamData%P)) then
+      deallocate(T_SrcPanlParamData%P)
+   end if
+   if (allocated(T_SrcPanlParamData%IDs)) then
+      deallocate(T_SrcPanlParamData%IDs)
+   end if
+   if (allocated(T_SrcPanlParamData%BodyIDs)) then
+      deallocate(T_SrcPanlParamData%BodyIDs)
+   end if
+   if (allocated(T_SrcPanlParamData%Pcent)) then
+      deallocate(T_SrcPanlParamData%Pcent)
+   end if
+   if (allocated(T_SrcPanlParamData%Pmid)) then
+      deallocate(T_SrcPanlParamData%Pmid)
+   end if
+   if (allocated(T_SrcPanlParamData%Normal)) then
+      deallocate(T_SrcPanlParamData%Normal)
+   end if
+   if (allocated(T_SrcPanlParamData%xi)) then
+      deallocate(T_SrcPanlParamData%xi)
+   end if
+   if (allocated(T_SrcPanlParamData%eta)) then
+      deallocate(T_SrcPanlParamData%eta)
+   end if
+   if (allocated(T_SrcPanlParamData%R_g2p)) then
+      deallocate(T_SrcPanlParamData%R_g2p)
+   end if
+end subroutine
+
+subroutine FVW_PackT_SrcPanlParam(RF, Indata)
+   type(RegFile), intent(inout) :: RF
+   type(T_SrcPanlParam), intent(in) :: InData
+   character(*), parameter         :: RoutineName = 'FVW_PackT_SrcPanlParam'
+   if (RF%ErrStat >= AbortErrLev) return
+   call RegPack(RF, InData%n)
+   call RegPack(RF, InData%Comment)
+   call RegPackAlloc(RF, InData%Area)
+   call RegPackAlloc(RF, InData%P)
+   call RegPackAlloc(RF, InData%IDs)
+   call RegPackAlloc(RF, InData%BodyIDs)
+   call RegPackAlloc(RF, InData%Pcent)
+   call RegPackAlloc(RF, InData%Pmid)
+   call RegPackAlloc(RF, InData%Normal)
+   call RegPackAlloc(RF, InData%xi)
+   call RegPackAlloc(RF, InData%eta)
+   call RegPackAlloc(RF, InData%R_g2p)
+   if (RegCheckErr(RF, RoutineName)) return
+end subroutine
+
+subroutine FVW_UnPackT_SrcPanlParam(RF, OutData)
+   type(RegFile), intent(inout)    :: RF
+   type(T_SrcPanlParam), intent(inout) :: OutData
+   character(*), parameter            :: RoutineName = 'FVW_UnPackT_SrcPanlParam'
+   integer(B4Ki)   :: LB(3), UB(3)
+   integer(IntKi)  :: stat
+   logical         :: IsAllocAssoc
+   if (RF%ErrStat /= ErrID_None) return
+   call RegUnpack(RF, OutData%n); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%Comment); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%Area); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%P); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%IDs); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%BodyIDs); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%Pcent); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%Pmid); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%Normal); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%xi); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%eta); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%R_g2p); if (RegCheckErr(RF, RoutineName)) return
+end subroutine
+
+subroutine FVW_CopyT_SrcPanlVar(SrcT_SrcPanlVarData, DstT_SrcPanlVarData, CtrlCode, ErrStat, ErrMsg)
+   type(T_SrcPanlVar), intent(in) :: SrcT_SrcPanlVarData
+   type(T_SrcPanlVar), intent(inout) :: DstT_SrcPanlVarData
+   integer(IntKi),  intent(in   ) :: CtrlCode
+   integer(IntKi),  intent(  out) :: ErrStat
+   character(*),    intent(  out) :: ErrMsg
+   integer(B4Ki)                  :: LB(1), UB(1)
+   integer(IntKi)                 :: ErrStat2
+   character(*), parameter        :: RoutineName = 'FVW_CopyT_SrcPanlVar'
+   ErrStat = ErrID_None
+   ErrMsg  = ''
+   if (allocated(SrcT_SrcPanlVarData%Sigma)) then
+      LB(1:1) = lbound(SrcT_SrcPanlVarData%Sigma)
+      UB(1:1) = ubound(SrcT_SrcPanlVarData%Sigma)
+      if (.not. allocated(DstT_SrcPanlVarData%Sigma)) then
+         allocate(DstT_SrcPanlVarData%Sigma(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstT_SrcPanlVarData%Sigma.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstT_SrcPanlVarData%Sigma = SrcT_SrcPanlVarData%Sigma
+   end if
+end subroutine
+
+subroutine FVW_DestroyT_SrcPanlVar(T_SrcPanlVarData, ErrStat, ErrMsg)
+   type(T_SrcPanlVar), intent(inout) :: T_SrcPanlVarData
+   integer(IntKi),  intent(  out) :: ErrStat
+   character(*),    intent(  out) :: ErrMsg
+   character(*), parameter        :: RoutineName = 'FVW_DestroyT_SrcPanlVar'
+   ErrStat = ErrID_None
+   ErrMsg  = ''
+   if (allocated(T_SrcPanlVarData%Sigma)) then
+      deallocate(T_SrcPanlVarData%Sigma)
+   end if
+end subroutine
+
+subroutine FVW_PackT_SrcPanlVar(RF, Indata)
+   type(RegFile), intent(inout) :: RF
+   type(T_SrcPanlVar), intent(in) :: InData
+   character(*), parameter         :: RoutineName = 'FVW_PackT_SrcPanlVar'
+   if (RF%ErrStat >= AbortErrLev) return
+   call RegPackAlloc(RF, InData%Sigma)
+   if (RegCheckErr(RF, RoutineName)) return
+end subroutine
+
+subroutine FVW_UnPackT_SrcPanlVar(RF, OutData)
+   type(RegFile), intent(inout)    :: RF
+   type(T_SrcPanlVar), intent(inout) :: OutData
+   character(*), parameter            :: RoutineName = 'FVW_UnPackT_SrcPanlVar'
+   integer(B4Ki)   :: LB(1), UB(1)
+   integer(IntKi)  :: stat
+   logical         :: IsAllocAssoc
+   if (RF%ErrStat /= ErrID_None) return
+   call RegUnpackAlloc(RF, OutData%Sigma); if (RegCheckErr(RF, RoutineName)) return
+end subroutine
+
+subroutine FVW_CopyT_SrcPanlMisc(SrcT_SrcPanlMiscData, DstT_SrcPanlMiscData, CtrlCode, ErrStat, ErrMsg)
+   type(T_SrcPanlMisc), intent(in) :: SrcT_SrcPanlMiscData
+   type(T_SrcPanlMisc), intent(inout) :: DstT_SrcPanlMiscData
+   integer(IntKi),  intent(in   ) :: CtrlCode
+   integer(IntKi),  intent(  out) :: ErrStat
+   character(*),    intent(  out) :: ErrMsg
+   integer(B4Ki)                  :: LB(3), UB(3)
+   integer(IntKi)                 :: ErrStat2
+   character(*), parameter        :: RoutineName = 'FVW_CopyT_SrcPanlMisc'
+   ErrStat = ErrID_None
+   ErrMsg  = ''
+   if (allocated(SrcT_SrcPanlMiscData%AI)) then
+      LB(1:2) = lbound(SrcT_SrcPanlMiscData%AI)
+      UB(1:2) = ubound(SrcT_SrcPanlMiscData%AI)
+      if (.not. allocated(DstT_SrcPanlMiscData%AI)) then
+         allocate(DstT_SrcPanlMiscData%AI(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstT_SrcPanlMiscData%AI.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstT_SrcPanlMiscData%AI = SrcT_SrcPanlMiscData%AI
+   end if
+   if (allocated(SrcT_SrcPanlMiscData%UUI)) then
+      LB(1:3) = lbound(SrcT_SrcPanlMiscData%UUI)
+      UB(1:3) = ubound(SrcT_SrcPanlMiscData%UUI)
+      if (.not. allocated(DstT_SrcPanlMiscData%UUI)) then
+         allocate(DstT_SrcPanlMiscData%UUI(LB(1):UB(1),LB(2):UB(2),LB(3):UB(3)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstT_SrcPanlMiscData%UUI.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstT_SrcPanlMiscData%UUI = SrcT_SrcPanlMiscData%UUI
+   end if
+   if (allocated(SrcT_SrcPanlMiscData%Uext)) then
+      LB(1:2) = lbound(SrcT_SrcPanlMiscData%Uext)
+      UB(1:2) = ubound(SrcT_SrcPanlMiscData%Uext)
+      if (.not. allocated(DstT_SrcPanlMiscData%Uext)) then
+         allocate(DstT_SrcPanlMiscData%Uext(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstT_SrcPanlMiscData%Uext.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstT_SrcPanlMiscData%Uext = SrcT_SrcPanlMiscData%Uext
+   end if
+   if (allocated(SrcT_SrcPanlMiscData%Uwnd)) then
+      LB(1:2) = lbound(SrcT_SrcPanlMiscData%Uwnd)
+      UB(1:2) = ubound(SrcT_SrcPanlMiscData%Uwnd)
+      if (.not. allocated(DstT_SrcPanlMiscData%Uwnd)) then
+         allocate(DstT_SrcPanlMiscData%Uwnd(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstT_SrcPanlMiscData%Uwnd.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstT_SrcPanlMiscData%Uwnd = SrcT_SrcPanlMiscData%Uwnd
+   end if
+   if (allocated(SrcT_SrcPanlMiscData%Uind)) then
+      LB(1:2) = lbound(SrcT_SrcPanlMiscData%Uind)
+      UB(1:2) = ubound(SrcT_SrcPanlMiscData%Uind)
+      if (.not. allocated(DstT_SrcPanlMiscData%Uind)) then
+         allocate(DstT_SrcPanlMiscData%Uind(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstT_SrcPanlMiscData%Uind.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstT_SrcPanlMiscData%Uind = SrcT_SrcPanlMiscData%Uind
+   end if
+   if (allocated(SrcT_SrcPanlMiscData%Utot)) then
+      LB(1:2) = lbound(SrcT_SrcPanlMiscData%Utot)
+      UB(1:2) = ubound(SrcT_SrcPanlMiscData%Utot)
+      if (.not. allocated(DstT_SrcPanlMiscData%Utot)) then
+         allocate(DstT_SrcPanlMiscData%Utot(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstT_SrcPanlMiscData%Utot.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstT_SrcPanlMiscData%Utot = SrcT_SrcPanlMiscData%Utot
+   end if
+   if (allocated(SrcT_SrcPanlMiscData%Cp)) then
+      LB(1:1) = lbound(SrcT_SrcPanlMiscData%Cp)
+      UB(1:1) = ubound(SrcT_SrcPanlMiscData%Cp)
+      if (.not. allocated(DstT_SrcPanlMiscData%Cp)) then
+         allocate(DstT_SrcPanlMiscData%Cp(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstT_SrcPanlMiscData%Cp.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstT_SrcPanlMiscData%Cp = SrcT_SrcPanlMiscData%Cp
+   end if
+   if (allocated(SrcT_SrcPanlMiscData%p)) then
+      LB(1:1) = lbound(SrcT_SrcPanlMiscData%p)
+      UB(1:1) = ubound(SrcT_SrcPanlMiscData%p)
+      if (.not. allocated(DstT_SrcPanlMiscData%p)) then
+         allocate(DstT_SrcPanlMiscData%p(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstT_SrcPanlMiscData%p.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstT_SrcPanlMiscData%p = SrcT_SrcPanlMiscData%p
+   end if
+   if (allocated(SrcT_SrcPanlMiscData%F)) then
+      LB(1:2) = lbound(SrcT_SrcPanlMiscData%F)
+      UB(1:2) = ubound(SrcT_SrcPanlMiscData%F)
+      if (.not. allocated(DstT_SrcPanlMiscData%F)) then
+         allocate(DstT_SrcPanlMiscData%F(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstT_SrcPanlMiscData%F.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstT_SrcPanlMiscData%F = SrcT_SrcPanlMiscData%F
+   end if
+   if (allocated(SrcT_SrcPanlMiscData%FpA)) then
+      LB(1:2) = lbound(SrcT_SrcPanlMiscData%FpA)
+      UB(1:2) = ubound(SrcT_SrcPanlMiscData%FpA)
+      if (.not. allocated(DstT_SrcPanlMiscData%FpA)) then
+         allocate(DstT_SrcPanlMiscData%FpA(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstT_SrcPanlMiscData%FpA.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstT_SrcPanlMiscData%FpA = SrcT_SrcPanlMiscData%FpA
+   end if
+   if (allocated(SrcT_SrcPanlMiscData%RHS)) then
+      LB(1:1) = lbound(SrcT_SrcPanlMiscData%RHS)
+      UB(1:1) = ubound(SrcT_SrcPanlMiscData%RHS)
+      if (.not. allocated(DstT_SrcPanlMiscData%RHS)) then
+         allocate(DstT_SrcPanlMiscData%RHS(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstT_SrcPanlMiscData%RHS.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstT_SrcPanlMiscData%RHS = SrcT_SrcPanlMiscData%RHS
+   end if
+   if (allocated(SrcT_SrcPanlMiscData%IPIV)) then
+      LB(1:1) = lbound(SrcT_SrcPanlMiscData%IPIV)
+      UB(1:1) = ubound(SrcT_SrcPanlMiscData%IPIV)
+      if (.not. allocated(DstT_SrcPanlMiscData%IPIV)) then
+         allocate(DstT_SrcPanlMiscData%IPIV(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstT_SrcPanlMiscData%IPIV.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstT_SrcPanlMiscData%IPIV = SrcT_SrcPanlMiscData%IPIV
+   end if
+end subroutine
+
+subroutine FVW_DestroyT_SrcPanlMisc(T_SrcPanlMiscData, ErrStat, ErrMsg)
+   type(T_SrcPanlMisc), intent(inout) :: T_SrcPanlMiscData
+   integer(IntKi),  intent(  out) :: ErrStat
+   character(*),    intent(  out) :: ErrMsg
+   character(*), parameter        :: RoutineName = 'FVW_DestroyT_SrcPanlMisc'
+   ErrStat = ErrID_None
+   ErrMsg  = ''
+   if (allocated(T_SrcPanlMiscData%AI)) then
+      deallocate(T_SrcPanlMiscData%AI)
+   end if
+   if (allocated(T_SrcPanlMiscData%UUI)) then
+      deallocate(T_SrcPanlMiscData%UUI)
+   end if
+   if (allocated(T_SrcPanlMiscData%Uext)) then
+      deallocate(T_SrcPanlMiscData%Uext)
+   end if
+   if (allocated(T_SrcPanlMiscData%Uwnd)) then
+      deallocate(T_SrcPanlMiscData%Uwnd)
+   end if
+   if (allocated(T_SrcPanlMiscData%Uind)) then
+      deallocate(T_SrcPanlMiscData%Uind)
+   end if
+   if (allocated(T_SrcPanlMiscData%Utot)) then
+      deallocate(T_SrcPanlMiscData%Utot)
+   end if
+   if (allocated(T_SrcPanlMiscData%Cp)) then
+      deallocate(T_SrcPanlMiscData%Cp)
+   end if
+   if (allocated(T_SrcPanlMiscData%p)) then
+      deallocate(T_SrcPanlMiscData%p)
+   end if
+   if (allocated(T_SrcPanlMiscData%F)) then
+      deallocate(T_SrcPanlMiscData%F)
+   end if
+   if (allocated(T_SrcPanlMiscData%FpA)) then
+      deallocate(T_SrcPanlMiscData%FpA)
+   end if
+   if (allocated(T_SrcPanlMiscData%RHS)) then
+      deallocate(T_SrcPanlMiscData%RHS)
+   end if
+   if (allocated(T_SrcPanlMiscData%IPIV)) then
+      deallocate(T_SrcPanlMiscData%IPIV)
+   end if
+end subroutine
+
+subroutine FVW_PackT_SrcPanlMisc(RF, Indata)
+   type(RegFile), intent(inout) :: RF
+   type(T_SrcPanlMisc), intent(in) :: InData
+   character(*), parameter         :: RoutineName = 'FVW_PackT_SrcPanlMisc'
+   if (RF%ErrStat >= AbortErrLev) return
+   call RegPackAlloc(RF, InData%AI)
+   call RegPackAlloc(RF, InData%UUI)
+   call RegPackAlloc(RF, InData%Uext)
+   call RegPackAlloc(RF, InData%Uwnd)
+   call RegPackAlloc(RF, InData%Uind)
+   call RegPackAlloc(RF, InData%Utot)
+   call RegPackAlloc(RF, InData%Cp)
+   call RegPackAlloc(RF, InData%p)
+   call RegPackAlloc(RF, InData%F)
+   call RegPackAlloc(RF, InData%FpA)
+   call RegPackAlloc(RF, InData%RHS)
+   call RegPackAlloc(RF, InData%IPIV)
+   if (RegCheckErr(RF, RoutineName)) return
+end subroutine
+
+subroutine FVW_UnPackT_SrcPanlMisc(RF, OutData)
+   type(RegFile), intent(inout)    :: RF
+   type(T_SrcPanlMisc), intent(inout) :: OutData
+   character(*), parameter            :: RoutineName = 'FVW_UnPackT_SrcPanlMisc'
+   integer(B4Ki)   :: LB(3), UB(3)
+   integer(IntKi)  :: stat
+   logical         :: IsAllocAssoc
+   if (RF%ErrStat /= ErrID_None) return
+   call RegUnpackAlloc(RF, OutData%AI); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%UUI); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%Uext); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%Uwnd); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%Uind); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%Utot); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%Cp); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%p); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%F); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%FpA); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%RHS); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%IPIV); if (RegCheckErr(RF, RoutineName)) return
+end subroutine
+
 subroutine FVW_CopyWng_ParameterType(SrcWng_ParameterTypeData, DstWng_ParameterTypeData, CtrlCode, ErrStat, ErrMsg)
    type(Wng_ParameterType), intent(in) :: SrcWng_ParameterTypeData
    type(Wng_ParameterType), intent(inout) :: DstWng_ParameterTypeData
@@ -921,6 +1485,7 @@ subroutine FVW_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg)
    DstParamData%PartPerSegment = SrcParamData%PartPerSegment
    DstParamData%DTaero = SrcParamData%DTaero
    DstParamData%DTfvw = SrcParamData%DTfvw
+   DstParamData%AirDens = SrcParamData%AirDens
    DstParamData%KinVisc = SrcParamData%KinVisc
    DstParamData%MHK = SrcParamData%MHK
    DstParamData%WtrDpth = SrcParamData%WtrDpth
@@ -938,6 +1503,12 @@ subroutine FVW_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg)
    DstParamData%Induction = SrcParamData%Induction
    DstParamData%kFrozenNWStart = SrcParamData%kFrozenNWStart
    DstParamData%kFrozenNWEnd = SrcParamData%kFrozenNWEnd
+   DstParamData%zGround = SrcParamData%zGround
+   DstParamData%zGroundPush = SrcParamData%zGroundPush
+   DstParamData%nSrcPnlUpdate = SrcParamData%nSrcPnlUpdate
+   call FVW_CopyT_SrcPanlParam(SrcParamData%SrcPnl, DstParamData%SrcPnl, CtrlCode, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if (ErrStat >= AbortErrLev) return
 end subroutine
 
 subroutine FVW_DestroyParam(ParamData, ErrStat, ErrMsg)
@@ -963,6 +1534,8 @@ subroutine FVW_DestroyParam(ParamData, ErrStat, ErrMsg)
    if (allocated(ParamData%Bld2Wings)) then
       deallocate(ParamData%Bld2Wings)
    end if
+   call FVW_DestroyT_SrcPanlParam(ParamData%SrcPnl, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
 end subroutine
 
 subroutine FVW_PackParam(RF, Indata)
@@ -1012,6 +1585,7 @@ subroutine FVW_PackParam(RF, Indata)
    call RegPack(RF, InData%PartPerSegment)
    call RegPack(RF, InData%DTaero)
    call RegPack(RF, InData%DTfvw)
+   call RegPack(RF, InData%AirDens)
    call RegPack(RF, InData%KinVisc)
    call RegPack(RF, InData%MHK)
    call RegPack(RF, InData%WtrDpth)
@@ -1029,6 +1603,10 @@ subroutine FVW_PackParam(RF, Indata)
    call RegPack(RF, InData%Induction)
    call RegPack(RF, InData%kFrozenNWStart)
    call RegPack(RF, InData%kFrozenNWEnd)
+   call RegPack(RF, InData%zGround)
+   call RegPack(RF, InData%zGroundPush)
+   call RegPack(RF, InData%nSrcPnlUpdate)
+   call FVW_PackT_SrcPanlParam(RF, InData%SrcPnl) 
    if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
@@ -1085,6 +1663,7 @@ subroutine FVW_UnPackParam(RF, OutData)
    call RegUnpack(RF, OutData%PartPerSegment); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%DTaero); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%DTfvw); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%AirDens); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%KinVisc); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%MHK); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%WtrDpth); if (RegCheckErr(RF, RoutineName)) return
@@ -1102,6 +1681,10 @@ subroutine FVW_UnPackParam(RF, OutData)
    call RegUnpack(RF, OutData%Induction); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%kFrozenNWStart); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%kFrozenNWEnd); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%zGround); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%zGroundPush); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%nSrcPnlUpdate); if (RegCheckErr(RF, RoutineName)) return
+   call FVW_UnpackT_SrcPanlParam(RF, OutData%SrcPnl) ! SrcPnl 
 end subroutine
 
 subroutine FVW_CopyWng_ContinuousStateType(SrcWng_ContinuousStateTypeData, DstWng_ContinuousStateTypeData, CtrlCode, ErrStat, ErrMsg)
@@ -2386,6 +2969,9 @@ subroutine FVW_CopyMisc(SrcMiscData, DstMiscData, CtrlCode, ErrStat, ErrMsg)
    call FVW_CopyT_Part(SrcMiscData%Part, DstMiscData%Part, CtrlCode, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (ErrStat >= AbortErrLev) return
+   call FVW_CopyT_SrcPanlMisc(SrcMiscData%SrcPnl, DstMiscData%SrcPnl, CtrlCode, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if (ErrStat >= AbortErrLev) return
    if (allocated(SrcMiscData%CPs)) then
       LB(1:2) = lbound(SrcMiscData%CPs)
       UB(1:2) = ubound(SrcMiscData%CPs)
@@ -2462,6 +3048,8 @@ subroutine FVW_DestroyMisc(MiscData, ErrStat, ErrMsg)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    call FVW_DestroyT_Part(MiscData%Part, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   call FVW_DestroyT_SrcPanlMisc(MiscData%SrcPnl, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (allocated(MiscData%CPs)) then
       deallocate(MiscData%CPs)
    end if
@@ -2512,6 +3100,7 @@ subroutine FVW_PackMisc(RF, Indata)
    call RegPack(RF, InData%UA_Flag)
    call FVW_PackT_Sgmt(RF, InData%Sgmt) 
    call FVW_PackT_Part(RF, InData%Part) 
+   call FVW_PackT_SrcPanlMisc(RF, InData%SrcPnl) 
    call RegPackAlloc(RF, InData%CPs)
    call RegPackAlloc(RF, InData%Uind)
    call RegPack(RF, allocated(InData%GridOutputs))
@@ -2566,6 +3155,7 @@ subroutine FVW_UnPackMisc(RF, OutData)
    call RegUnpack(RF, OutData%UA_Flag); if (RegCheckErr(RF, RoutineName)) return
    call FVW_UnpackT_Sgmt(RF, OutData%Sgmt) ! Sgmt 
    call FVW_UnpackT_Part(RF, OutData%Part) ! Part 
+   call FVW_UnpackT_SrcPanlMisc(RF, OutData%SrcPnl) ! SrcPnl 
    call RegUnpackAlloc(RF, OutData%CPs); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%Uind); if (RegCheckErr(RF, RoutineName)) return
    if (allocated(OutData%GridOutputs)) deallocate(OutData%GridOutputs)
@@ -3092,6 +3682,9 @@ subroutine FVW_CopyConstrState(SrcConstrStateData, DstConstrStateData, CtrlCode,
       end do
    end if
    DstConstrStateData%residual = SrcConstrStateData%residual
+   call FVW_CopyT_SrcPanlVar(SrcConstrStateData%SrcPnl, DstConstrStateData%SrcPnl, CtrlCode, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if (ErrStat >= AbortErrLev) return
 end subroutine
 
 subroutine FVW_DestroyConstrState(ConstrStateData, ErrStat, ErrMsg)
@@ -3114,6 +3707,8 @@ subroutine FVW_DestroyConstrState(ConstrStateData, ErrStat, ErrMsg)
       end do
       deallocate(ConstrStateData%W)
    end if
+   call FVW_DestroyT_SrcPanlVar(ConstrStateData%SrcPnl, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
 end subroutine
 
 subroutine FVW_PackConstrState(RF, Indata)
@@ -3133,6 +3728,7 @@ subroutine FVW_PackConstrState(RF, Indata)
       end do
    end if
    call RegPack(RF, InData%residual)
+   call FVW_PackT_SrcPanlVar(RF, InData%SrcPnl) 
    if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
@@ -3159,6 +3755,7 @@ subroutine FVW_UnPackConstrState(RF, OutData)
       end do
    end if
    call RegUnpack(RF, OutData%residual); if (RegCheckErr(RF, RoutineName)) return
+   call FVW_UnpackT_SrcPanlVar(RF, OutData%SrcPnl) ! SrcPnl 
 end subroutine
 
 subroutine FVW_CopyOtherState(SrcOtherStateData, DstOtherStateData, CtrlCode, ErrStat, ErrMsg)
@@ -3174,7 +3771,7 @@ subroutine FVW_CopyOtherState(SrcOtherStateData, DstOtherStateData, CtrlCode, Er
    character(*), parameter        :: RoutineName = 'FVW_CopyOtherState'
    ErrStat = ErrID_None
    ErrMsg  = ''
-   DstOtherStateData%Dummy = SrcOtherStateData%Dummy
+   DstOtherStateData%ShedScale = SrcOtherStateData%ShedScale
    if (allocated(SrcOtherStateData%UA)) then
       LB(1:1) = lbound(SrcOtherStateData%UA)
       UB(1:1) = ubound(SrcOtherStateData%UA)
@@ -3191,6 +3788,7 @@ subroutine FVW_CopyOtherState(SrcOtherStateData, DstOtherStateData, CtrlCode, Er
          if (ErrStat >= AbortErrLev) return
       end do
    end if
+   DstOtherStateData%Initialized = SrcOtherStateData%Initialized
 end subroutine
 
 subroutine FVW_DestroyOtherState(OtherStateData, ErrStat, ErrMsg)
@@ -3222,7 +3820,7 @@ subroutine FVW_PackOtherState(RF, Indata)
    integer(B4Ki)   :: i1
    integer(B4Ki)   :: LB(1), UB(1)
    if (RF%ErrStat >= AbortErrLev) return
-   call RegPack(RF, InData%Dummy)
+   call RegPack(RF, InData%ShedScale)
    call RegPack(RF, allocated(InData%UA))
    if (allocated(InData%UA)) then
       call RegPackBounds(RF, 1, lbound(InData%UA), ubound(InData%UA))
@@ -3232,6 +3830,7 @@ subroutine FVW_PackOtherState(RF, Indata)
          call UA_PackOtherState(RF, InData%UA(i1)) 
       end do
    end if
+   call RegPack(RF, InData%Initialized)
    if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
@@ -3244,7 +3843,7 @@ subroutine FVW_UnPackOtherState(RF, OutData)
    integer(IntKi)  :: stat
    logical         :: IsAllocAssoc
    if (RF%ErrStat /= ErrID_None) return
-   call RegUnpack(RF, OutData%Dummy); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%ShedScale); if (RegCheckErr(RF, RoutineName)) return
    if (allocated(OutData%UA)) deallocate(OutData%UA)
    call RegUnpack(RF, IsAllocAssoc); if (RegCheckErr(RF, RoutineName)) return
    if (IsAllocAssoc) then
@@ -3258,6 +3857,7 @@ subroutine FVW_UnPackOtherState(RF, OutData)
          call UA_UnpackOtherState(RF, OutData%UA(i1)) ! UA 
       end do
    end if
+   call RegUnpack(RF, OutData%Initialized); if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
 subroutine FVW_CopyWng_InitInputType(SrcWng_InitInputTypeData, DstWng_InitInputTypeData, CtrlCode, ErrStat, ErrMsg)
@@ -3409,6 +4009,7 @@ subroutine FVW_CopyInitInput(SrcInitInputData, DstInitInputData, CtrlCode, ErrSt
    end if
    DstInitInputData%numBladeNodes = SrcInitInputData%numBladeNodes
    DstInitInputData%DTaero = SrcInitInputData%DTaero
+   DstInitInputData%AirDens = SrcInitInputData%AirDens
    DstInitInputData%KinVisc = SrcInitInputData%KinVisc
    DstInitInputData%MHK = SrcInitInputData%MHK
    DstInitInputData%WtrDpth = SrcInitInputData%WtrDpth
@@ -3480,6 +4081,7 @@ subroutine FVW_PackInitInput(RF, Indata)
    end if
    call RegPack(RF, InData%numBladeNodes)
    call RegPack(RF, InData%DTaero)
+   call RegPack(RF, InData%AirDens)
    call RegPack(RF, InData%KinVisc)
    call RegPack(RF, InData%MHK)
    call RegPack(RF, InData%WtrDpth)
@@ -3527,6 +4129,7 @@ subroutine FVW_UnPackInitInput(RF, OutData)
    end if
    call RegUnpack(RF, OutData%numBladeNodes); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%DTaero); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%AirDens); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%KinVisc); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%MHK); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%WtrDpth); if (RegCheckErr(RF, RoutineName)) return
@@ -3575,6 +4178,7 @@ subroutine FVW_CopyInputFile(SrcInputFileData, DstInputFileData, CtrlCode, ErrSt
    DstInputFileData%VTKBlades = SrcInputFileData%VTKBlades
    DstInputFileData%DTvtk = SrcInputFileData%DTvtk
    DstInputFileData%VTKCoord = SrcInputFileData%VTKCoord
+   DstInputFileData%SrcPnlFile = SrcInputFileData%SrcPnlFile
 end subroutine
 
 subroutine FVW_DestroyInputFile(InputFileData, ErrStat, ErrMsg)
@@ -3623,6 +4227,7 @@ subroutine FVW_PackInputFile(RF, Indata)
    call RegPack(RF, InData%VTKBlades)
    call RegPack(RF, InData%DTvtk)
    call RegPack(RF, InData%VTKCoord)
+   call RegPack(RF, InData%SrcPnlFile)
    if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
@@ -3663,6 +4268,7 @@ subroutine FVW_UnPackInputFile(RF, OutData)
    call RegUnpack(RF, OutData%VTKBlades); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%DTvtk); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%VTKCoord); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%SrcPnlFile); if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
 subroutine FVW_CopyInitOutput(SrcInitOutputData, DstInitOutputData, CtrlCode, ErrStat, ErrMsg)
