@@ -188,7 +188,43 @@ SUBROUTINE BD_Init( InitInp, u, p, x, xd, z, OtherState, y, MiscVar, Interval, I
       QuasiStaticInitialized = .FALSE.
    ENDIF
 
+   !.................................
+   ! Calculation of modal damping here
+
+   IF(p%damp_flag .EQ. 2) THEN
+
+      PRINT *, 'In modal damping branch.'
+
+      ! 0. Setup quadrature points
+      CALL BD_QuadraturePointData(p, x, MiscVar)
+
+      ! 1. Generates K, M Matrices
+      ! These go into 'MiscVar%StifK' and 'MiscVar%MassM'
+      CALL BD_GenerateDynamicElementGA2( x, OtherState, p, MiscVar, .TRUE.)
+      ! Do I need to call error handling after this?
+
+      ! 2. Copy lines from 'BD_CalcForceAcc' for M, K -> 2D and apply Boundary conditions
+      ! In that function, this produces LP_MassM_LU
+
+      ! Full mass matrix (n_dof, n_dof)
+      MiscVar%LP_MassM = reshape(MiscVar%MassM, [p%dof_total, p%dof_total])
+
+      ! Mass matrix for free nodes
+      MiscVar%LP_MassM_LU = MiscVar%LP_MassM(7:p%dof_total, 7:p%dof_total)
       
+      ! Full stiffness matrix (n_dof, n_dof)
+      MiscVar%LP_StifK = reshape(MiscVar%StifK, [p%dof_total, p%dof_total])
+
+      ! Stiffness matrix for free nodes
+      MiscVar%LP_StifK_LU = MiscVar%LP_StifK(7:p%dof_total, 7:p%dof_total)
+
+      ! 3. Do eigenanalysis
+
+      ! 4. Save eigenvectors/eigenvalues or damping matrix in original frame
+
+      print *, 'End of Modal damping.'
+
+   ENDIF
 
       !.................................
       ! initialization of output mesh values (used for initial guess to AeroDyn)
@@ -3216,7 +3252,7 @@ SUBROUTINE BD_ElementMatrixAcc(  nelem, p, OtherState, m )
 
 
    CALL BD_ElasticForce( nelem, p, m, .FALSE. )                ! Calculate Fc, Fd only
-   IF(p%damp_flag .NE. 0) THEN
+   IF(p%damp_flag .EQ. 1) THEN
       CALL BD_DissipativeForce( nelem, p, m, .FALSE. )         ! Calculate dissipative terms on Fc, Fd
    ENDIF
    CALL BD_GravityForce( nelem, p, m, MATMUL(p%gravity,OtherState%GlbRot) )              ! Calculate Fg      
@@ -4955,7 +4991,7 @@ SUBROUTINE BD_ElementMatrixGA2(  fact, nelem, p, OtherState, m )
    CALL BD_ElasticForce(  nelem,p,m,fact )                    ! Calculate Fc, Fd  [and if(fact): Oe, Pe, and Qe for N-R algorithm] using m%qp%E1, m%qp%RR0, m%qp%kappa, m%qp%Stif   
    CALL BD_InertialForce( nelem,p,m,fact )                    ! Calculate Fi [and Mi,Gi,Ki IF(fact)]
    
-   IF(p%damp_flag .NE. 0) THEN
+   IF(p%damp_flag .EQ. 1) THEN
       CALL BD_DissipativeForce( nelem,p,m,fact )              ! Calculate dissipative terms on Fc, Fd [and Sd, Od, Pd and Qd, betaC, Gd, Xd, Yd for N-R algorithm]
    ENDIF
    
@@ -5009,7 +5045,7 @@ SUBROUTINE BD_ElementMatrixGA2(  fact, nelem, p, OtherState, m )
       END DO
    
          ! Dissipative terms
-      IF (p%damp_flag .NE. 0) THEN
+      IF (p%damp_flag .EQ. 1) THEN
          DO j=1,p%nodes_per_elem
             DO idx_dof2=1,p%dof_node
                DO i=1,p%nodes_per_elem
