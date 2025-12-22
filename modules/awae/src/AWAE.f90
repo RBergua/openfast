@@ -1423,7 +1423,7 @@ subroutine AWAE_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitO
    call kdtree_build(m%KdT, m%AllPlanePoints(:,1:1), n_max=p%MaxPlanes*p%NumTurbines)
 
    ! Read-in the ambient wind data for the initial calculate output
-   call AWAE_UpdateStates(0.0_DbKi, -1, u, p, x, xd, z, OtherState, m, errStat2, errMsg2 ); if(Failed()) return;
+   call AWAE_UpdateStates(0.0_DbKi, 0, u, p, x, xd, z, OtherState, m, errStat2, errMsg2 ); if(Failed()) return;
 
 contains
    subroutine CheckModAmb3Boundaries()
@@ -1620,7 +1620,7 @@ subroutine AWAE_UpdateStates( t, n, u, p, x, xd, z, OtherState, m, errStat, errM
    errMsg  = ""
    
    ! If last time step, don't populate high-resolution grid
-   if ((n + 1) == (p%NumDT - 1)) then
+   if (n == (p%NumDT - 1)) then
       n_high_low = 0
    else
       n_high_low = p%n_high_low
@@ -1635,8 +1635,8 @@ subroutine AWAE_UpdateStates( t, n, u, p, x, xd, z, OtherState, m, errStat, errM
    ! File-based ambient wind
    case (1)
    
-      ! Read from file the ambient flow for the n+1 time step
-      call ReadLowResWindFile(n+1, p, m%Vamb_Low, errStat2, errMsg2);   if (Failed()) return;
+      ! Read from file the ambient flow for the n time step
+      call ReadLowResWindFile(n, p, m%Vamb_Low, errStat2, errMsg2);   if (Failed()) return;
       
    ! AMReX-based inflow
    ! case (2)
@@ -1662,7 +1662,7 @@ subroutine AWAE_UpdateStates( t, n, u, p, x, xd, z, OtherState, m, errStat, errM
    case (2, 3)
 
       ! Calculate the low-resolution grid inflow velocities
-      call IfW_FlowField_GetVelAcc(p%IfW(0)%FlowField, 1, t+p%dt_low, p%LowRes%GridPoints, m%y_IfW_Low%VelocityUVW, AccUVW, errStat2, errMsg2)
+      call IfW_FlowField_GetVelAcc(p%IfW(0)%FlowField, 1, t, p%LowRes%GridPoints, m%y_IfW_Low%VelocityUVW, AccUVW, errStat2, errMsg2)
       if (Failed()) return
       
       ! Transfer velocities to low resolution grid
@@ -1689,7 +1689,7 @@ subroutine AWAE_UpdateStates( t, n, u, p, x, xd, z, OtherState, m, errStat, errM
          do i_hl=0, n_high_low
             
                ! read from file the ambient flow for the current time step
-            call ReadHighResWindFile(nt, (n+1)*p%n_high_low + i_hl, p, m%Vamb_high(nt)%data(:,:,:,:,i_hl), errStat2, errMsg2)
+            call ReadHighResWindFile(nt, n*p%n_high_low + i_hl, p, m%Vamb_high(nt)%data(:,:,:,:,i_hl), errStat2, errMsg2)
             if (ErrStat2 >= AbortErrLev) then
                !$OMP CRITICAL  ! Needed to avoid data race on ErrStat and ErrMsg
                 call SetErrStat( ErrStat2, ErrMsg2, errStat, errMsg, RoutineName )
@@ -1711,7 +1711,7 @@ subroutine AWAE_UpdateStates( t, n, u, p, x, xd, z, OtherState, m, errStat, errM
          do i_hl = 0, n_high_low
 
             ! Calculate wind velocities at grid locations from InflowWind
-            call IfW_FlowField_GetVelAcc(p%IfW(0)%FlowField, 1, t+p%dt_low+i_hl*p%DT_high, &
+            call IfW_FlowField_GetVelAcc(p%IfW(0)%FlowField, 1, t + i_hl*p%DT_high, &
                                          m%u_IfW_High(nt)%PositionXYZ, &
                                          m%y_IfW_High(nt)%VelocityUVW, AccUVW, errStat2, errMsg2)
             if (Failed()) return
@@ -1735,7 +1735,7 @@ subroutine AWAE_UpdateStates( t, n, u, p, x, xd, z, OtherState, m, errStat, errM
          do i_hl = 0, n_high_low
 
             ! Calculate wind velocities at grid locations from InflowWind
-            call IfW_FlowField_GetVelAcc(p%IfW(nt)%FlowField, 1, t+p%dt_low+i_hl*p%DT_high, &
+            call IfW_FlowField_GetVelAcc(p%IfW(nt)%FlowField, 1, t + i_hl*p%DT_high, &
                                          m%u_IfW_High(nt)%PositionXYZ, &
                                          m%y_IfW_High(nt)%VelocityUVW, AccUVW, errStat2, errMsg2)
             if (Failed()) return
