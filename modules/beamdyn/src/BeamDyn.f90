@@ -24,6 +24,8 @@ MODULE BeamDyn
 
    IMPLICIT NONE
 
+   INTEGER, PARAMETER  :: FEKi = R8Ki  ! Define the kind to be used for FEM/eigenanalysis
+
 #ifndef UNIT_TEST
    PRIVATE
 
@@ -192,38 +194,7 @@ SUBROUTINE BD_Init( InitInp, u, p, x, xd, z, OtherState, y, MiscVar, Interval, I
    ! Calculation of modal damping here
 
    IF(p%damp_flag .EQ. 2) THEN
-
-      PRINT *, 'In modal damping branch.'
-
-      ! 0. Setup quadrature points
-      CALL BD_QuadraturePointData(p, x, MiscVar)
-
-      ! 1. Generates K, M Matrices
-      ! These go into 'MiscVar%StifK' and 'MiscVar%MassM'
-      CALL BD_GenerateDynamicElementGA2( x, OtherState, p, MiscVar, .TRUE.)
-      ! Do I need to call error handling after this?
-
-      ! 2. Copy lines from 'BD_CalcForceAcc' for M, K -> 2D and apply Boundary conditions
-      ! In that function, this produces LP_MassM_LU
-
-      ! Full mass matrix (n_dof, n_dof)
-      MiscVar%LP_MassM = reshape(MiscVar%MassM, [p%dof_total, p%dof_total])
-
-      ! Mass matrix for free nodes
-      MiscVar%LP_MassM_LU = MiscVar%LP_MassM(7:p%dof_total, 7:p%dof_total)
-      
-      ! Full stiffness matrix (n_dof, n_dof)
-      MiscVar%LP_StifK = reshape(MiscVar%StifK, [p%dof_total, p%dof_total])
-
-      ! Stiffness matrix for free nodes
-      MiscVar%LP_StifK_LU = MiscVar%LP_StifK(7:p%dof_total, 7:p%dof_total)
-
-      ! 3. Do eigenanalysis
-
-      ! 4. Save eigenvectors/eigenvalues or damping matrix in original frame
-
-      print *, 'End of Modal damping.'
-
+      call Init_ModalDamping(p, x, MiscVar, OtherState)
    ENDIF
 
       !.................................
@@ -1822,6 +1793,141 @@ CONTAINS
       END SUBROUTINE cleanup
 END SUBROUTINE Init_ContinuousStates
 
+
+!-----------------------------------------------------------------------------------------------------------------------------------
+!> This routine initializes modal damping.
+SUBROUTINE Init_ModalDamping(p, x, m, OtherState)
+
+   ! TODO : Look at what should be INOUT v. IN
+
+   TYPE(BD_ParameterType),          INTENT(INOUT)  :: p           !< Parameters, output eigenpairs here
+   TYPE(BD_ContinuousStateType),    INTENT(INOUT)  :: x           !< Continuous states at t on input at t + dt on output
+   TYPE(BD_MiscVarType),            INTENT(INOUT)  :: m           !< misc/optimization variables
+   type(BD_OtherStateType),         INTENT(INOUT)  :: OtherState        !< Global rotations are stored in otherstate
+
+   INTEGER(IntKi)                            :: nDOF
+   INTEGER(IntKi)           :: ErrStat
+   CHARACTER(ErrMsgLen)     :: ErrMsg
+
+   ErrStat = ErrID_None
+   ErrMsg  = ''
+
+   PRINT *, 'In modal damping branch.'
+
+   ! 0. Setup quadrature points
+   CALL BD_QuadraturePointData(p, x, m)
+
+   ! 1. Generates K, M Matrices
+   ! These go into 'm%StifK' and 'm%MassM'
+   CALL BD_GenerateDynamicElementGA2( x, OtherState, p, m, .TRUE.)
+   ! Do I need to call error handling after this?
+
+   ! 2. Copy lines from 'BD_CalcForceAcc' for M, K -> 2D and apply Boundary conditions
+   ! In that function, this produces LP_MassM_LU
+
+   ! Full mass matrix (n_dof, n_dof)
+   m%LP_MassM = reshape(m%MassM, [p%dof_total, p%dof_total])
+
+   ! Mass matrix for free nodes
+   m%LP_MassM_LU = m%LP_MassM(7:p%dof_total, 7:p%dof_total)
+
+   ! Full stiffness matrix (n_dof, n_dof)
+   m%LP_StifK = reshape(m%StifK, [p%dof_total, p%dof_total])
+
+   ! Stiffness matrix for free nodes
+   m%LP_StifK_LU = m%LP_StifK(7:p%dof_total, 7:p%dof_total)
+
+   ! 3. Do eigenanalysis
+   ! for now, calculate all eigenpairs
+   nDOF = p%dof_total - 6
+
+   ! TODO : Since these are on the parameters is deallocating automatically handled?
+   CALL AllocAry(p%eigenvectors, nDOF, nDOF, 'p%eigenvectors', ErrStat, ErrMsg)
+   CALL SetErrStat(ErrStat, ErrMsg, ErrStat, ErrMsg, 'Init_ModalDamping')
+
+   CALL AllocAry(p%omega, nDOF, 'p%omega', ErrStat, ErrMsg)
+   CALL SetErrStat(ErrStat, ErrMsg, ErrStat, ErrMsg, 'Init_ModalDamping')
+
+   CALL EigenSolveWrap(m%LP_StifK_LU, m%LP_MassM_LU, nDOF, nDOF, .TRUE., p%eigenvectors, p%omega, ErrStat, ErrMsg )
+
+   ! TODO : Mode shapes need to be mass normalized.
+
+   ! 4. Save eigenvectors/eigenvalues or damping matrix in original frame
+
+   print *, 'End of Modal damping.'
+
+END SUBROUTINE
+
+!> Wrapper function for eigen value analyses
+SUBROUTINE EigenSolveWrap(K, M, nDOF, NOmega,  bCheckSingularity, EigVect, Omega, ErrStat, ErrMsg )
+   USE NWTC_Num, only: EigenSolve
+
+   INTEGER,                INTENT(IN   )    :: nDOF                               ! Total degrees of freedom of the incoming system
+   REAL(FEKi),             INTENT(IN   )    :: K(nDOF, nDOF)                      ! stiffness matrix
+   REAL(FEKi),             INTENT(IN   )    :: M(nDOF, nDOF)                      ! mass matrix
+   INTEGER,                INTENT(IN   )    :: NOmega                             ! No. of requested eigenvalues
+   LOGICAL,                INTENT(IN   )    :: bCheckSingularity                  ! If True, the solver will fail if rigid modes are present
+   REAL(FEKi),             INTENT(  OUT)    :: EigVect(nDOF, NOmega)                  ! Returned Eigenvectors
+   REAL(FEKi),             INTENT(  OUT)    :: Omega(NOmega)                      ! Returned Eigenvalues
+   INTEGER(IntKi),         INTENT(  OUT)    :: ErrStat                            ! Error status of the operation
+   CHARACTER(*),           INTENT(  OUT)    :: ErrMsg                             ! Error message if ErrStat /= ErrID_None
+
+   ! LOCALS
+   REAL(LaKi), ALLOCATABLE                   :: K_LaKi(:,:), M_LaKi(:,:)
+   REAL(LaKi), ALLOCATABLE                   :: EigVect_LaKi(:,:), Omega_LaKi(:)
+   INTEGER(IntKi)                            :: N
+   INTEGER(IntKi)                            :: ErrStat2
+   CHARACTER(ErrMsgLen)                      :: ErrMsg2
+   ErrStat = ErrID_None
+   ErrMsg  = ''
+   EigVect=0.0_FeKi
+   Omega=0.0_FeKi
+
+   ! --- Unfortunate conversion to FEKi... TODO TODO consider storing M and K in FEKi
+   N=size(K,1)
+   CALL AllocAry(K_LaKi      , N, N, 'K_FEKi',    ErrStat2, ErrMsg2); if(Failed()) return
+   CALL AllocAry(M_LaKi      , N, N, 'M_FEKi',    ErrStat2, ErrMsg2); if(Failed()) return
+   K_LaKi = real( K, LaKi )
+   M_LaKi = real( M, LaKi )
+   N=size(K_LaKi,1)
+
+   ! Note:  NOmega must be <= N, which is the length of Omega2, Phi!
+   if ( NOmega > nDOF ) then
+      CALL SetErrStat(ErrID_Fatal,"NOmega must be less than or equal to N",ErrStat,ErrMsg,'EigenSolveWrap')
+      CALL CleanupEigen()
+      return
+   end if
+
+   ! --- Eigenvalue analysis
+   CALL AllocAry(EigVect_LAKi, N, N, 'EigVect', ErrStat2, ErrMsg2); if(Failed()) return;
+   CALL AllocAry(Omega_LaKi,     N , 'Omega', ErrStat2, ErrMsg2); if(Failed()) return; ! <<< NOTE: Needed due to dimension of Omega
+   CALL EigenSolve(K_LaKi, M_LaKi, N, bCheckSingularity, EigVect_LaKi, Omega_LaKi, ErrStat2, ErrMsg2 ); if (Failed()) return;
+
+   Omega(:)        = huge(1.0_ReKi)
+   Omega(1:nOmega) = real(Omega_LaKi(1:nOmega), FEKi) !<<< nOmega<N
+
+   ! --- Setting up Phi, and type conversion
+   EigVect=REAL( EigVect_LaKi(:,1:NOmega), LaKi )   ! eigenvectors
+
+   CALL CleanupEigen()
+   return
+
+CONTAINS
+
+   LOGICAL FUNCTION Failed()
+      call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'EigenSolveWrap')
+      Failed =  ErrStat >= AbortErrLev
+      if (Failed) call CleanUpEigen()
+   END FUNCTION Failed
+
+   SUBROUTINE CleanupEigen()
+      IF (ALLOCATED(Omega_LaKi)  ) DEALLOCATE(Omega_LaKi)
+      IF (ALLOCATED(EigVect_LaKi)) DEALLOCATE(EigVect_LaKi)
+      IF (ALLOCATED(K_LaKi)      ) DEALLOCATE(K_LaKi)
+      IF (ALLOCATED(M_LaKi)      ) DEALLOCATE(M_LaKi)
+   END SUBROUTINE CleanupEigen
+
+END SUBROUTINE EigenSolveWrap
 
 !-----------------------------------------------------------------------------------------------------------------------------------
 !> This routine is called at the end of the simulation.

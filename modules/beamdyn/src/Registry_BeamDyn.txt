@@ -222,6 +222,9 @@ typedef   ^        ParameterType    ^           FEweight               {:}{:}   
 typedef   ^        ParameterType    logical     RotStates               -            - - "Orient states in rotating frame during linearization? (flag)" -
 typedef   ^        ParameterType    LOGICAL     CompAeroMaps            -   .FALSE.    - "flag to determine if BeamDyn is computing aero maps (true) or running a normal simulation (false)"	-
 typedef   ^        ParameterType    LOGICAL     CompAppliedLdAtRoot     -   .FALSE.    - "flag to determine if BeamDyn should compute the applied loads at root"	-
+# .... arrays for modal damping ........................................................................................................
+typedef   ^        ParameterType    R8Ki        eigenvectors       {:}{:}  - - "Mode shape eigenvectors" -
+typedef   ^        ParameterType    ^           omega              {:}     - - "Modal frequencies" -
 
 
 # ..... Inputs
