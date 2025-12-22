@@ -194,7 +194,7 @@ SUBROUTINE BD_Init( InitInp, u, p, x, xd, z, OtherState, y, MiscVar, Interval, I
    ! Calculation of modal damping here
 
    IF(p%damp_flag .EQ. 2) THEN
-      call Init_ModalDamping(p, x, MiscVar, OtherState)
+      call Init_ModalDamping(x, OtherState, p, MiscVar)
    ENDIF
 
       !.................................
@@ -1796,23 +1796,37 @@ END SUBROUTINE Init_ContinuousStates
 
 !-----------------------------------------------------------------------------------------------------------------------------------
 !> This routine initializes modal damping.
-SUBROUTINE Init_ModalDamping(p, x, m, OtherState)
+SUBROUTINE Init_ModalDamping(x, OtherState, p, m)
 
    ! TODO : Look at what should be INOUT v. IN
 
-   TYPE(BD_ParameterType),          INTENT(INOUT)  :: p           !< Parameters, output eigenpairs here
-   TYPE(BD_ContinuousStateType),    INTENT(INOUT)  :: x           !< Continuous states at t on input at t + dt on output
+   TYPE(BD_ContinuousStateType),    INTENT(IN   )  :: x           !< Continuous states at t on input at t + dt on output
+   type(BD_OtherStateType),         INTENT(IN   )  :: OtherState        !< Global rotations are stored in otherstate
+   TYPE(BD_ParameterType),          INTENT(INOUT)  :: p           !< Parameters, output modal damping matrix in original frame here
    TYPE(BD_MiscVarType),            INTENT(INOUT)  :: m           !< misc/optimization variables
-   type(BD_OtherStateType),         INTENT(INOUT)  :: OtherState        !< Global rotations are stored in otherstate
 
+   ! Local variables
    INTEGER(IntKi)                            :: nDOF
+   INTEGER(IntKi)                            :: j ! looping indexing variable
+   INTEGER(IntKi)                            :: numZeta ! number of damping values
+   REAL                            :: Zj ! diagonal element of the modal damping matrix
    INTEGER(IntKi)           :: ErrStat
    CHARACTER(ErrMsgLen)     :: ErrMsg
+   REAL(R8Ki), ALLOCATABLE                   :: eigenvectors (:, :) ! mode shapes
+   REAL(R8Ki), ALLOCATABLE                   :: omega (:) ! modal frequencies (rad/s)
+   REAL(LaKi), ALLOCATABLE                   :: phiT_M (:, :) ! mode shapes transpose times mass matrix
+   REAL(LaKi), ALLOCATABLE                   :: phi0T_M_phi0 (:, :) ! normalization calculation of mass matrix
+   REAL, DIMENSION(10) :: zeta ! Modal damping values, should be changed to be user input.
 
    ErrStat = ErrID_None
    ErrMsg  = ''
 
-   PRINT *, 'In modal damping branch.'
+   PRINT *, 'In modal damping branch. Damping values are currently hard-coded.'
+
+   ! TODO : Take actual user input for zeta
+   ! zeta is fraction of critical damping.
+   zeta = (/ 0.001d0, 0.003d0, 0.0015d0, 0.0045d0, 0.002d0, 0.006d0, 0.007d0, 0.008d0, 0.009d0, 0.010d0 /)
+   numZeta = size(zeta, 1)
 
    ! 0. Setup quadrature points
    CALL BD_QuadraturePointData(p, x, m)
@@ -1820,11 +1834,8 @@ SUBROUTINE Init_ModalDamping(p, x, m, OtherState)
    ! 1. Generates K, M Matrices
    ! These go into 'm%StifK' and 'm%MassM'
    CALL BD_GenerateDynamicElementGA2( x, OtherState, p, m, .TRUE.)
-   ! Do I need to call error handling after this?
 
    ! 2. Copy lines from 'BD_CalcForceAcc' for M, K -> 2D and apply Boundary conditions
-   ! In that function, this produces LP_MassM_LU
-
    ! Full mass matrix (n_dof, n_dof)
    m%LP_MassM = reshape(m%MassM, [p%dof_total, p%dof_total])
 
@@ -1838,23 +1849,71 @@ SUBROUTINE Init_ModalDamping(p, x, m, OtherState)
    m%LP_StifK_LU = m%LP_StifK(7:p%dof_total, 7:p%dof_total)
 
    ! 3. Do eigenanalysis
-   ! for now, calculate all eigenpairs
+   ! For now, calculate all eigenpairs
    nDOF = p%dof_total - 6
 
-   ! TODO : Since these are on the parameters is deallocating automatically handled?
-   CALL AllocAry(p%eigenvectors, nDOF, nDOF, 'p%eigenvectors', ErrStat, ErrMsg)
+   CALL AllocAry(eigenvectors, nDOF, nDOF, 'eigenvectors', ErrStat, ErrMsg)
    CALL SetErrStat(ErrStat, ErrMsg, ErrStat, ErrMsg, 'Init_ModalDamping')
 
-   CALL AllocAry(p%omega, nDOF, 'p%omega', ErrStat, ErrMsg)
+   CALL AllocAry(omega, nDOF, 'omega', ErrStat, ErrMsg)
    CALL SetErrStat(ErrStat, ErrMsg, ErrStat, ErrMsg, 'Init_ModalDamping')
 
-   CALL EigenSolveWrap(m%LP_StifK_LU, m%LP_MassM_LU, nDOF, nDOF, .TRUE., p%eigenvectors, p%omega, ErrStat, ErrMsg )
+   CALL EigenSolveWrap(m%LP_StifK_LU, m%LP_MassM_LU, nDOF, nDOF, .TRUE., eigenvectors, omega, ErrStat, ErrMsg )
 
-   ! TODO : Mode shapes need to be mass normalized.
+   ! Mass-normalize the mode shapes
+   CALL AllocAry(phi0T_M_phi0, nDOF, nDof, 'phi0T_M_phi0', ErrStat, ErrMsg)
+   CALL SetErrStat(ErrStat, ErrMsg, ErrStat, ErrMsg, 'Init_ModalDamping')
 
-   ! 4. Save eigenvectors/eigenvalues or damping matrix in original frame
+   phi0T_M_phi0 = matmul(transpose(eigenvectors), matmul(m%LP_MassM_LU, eigenvectors))
+
+   do j = 1, nDOF
+      eigenvectors(:, j) = eigenvectors(:, j) / sqrt(phi0T_M_phi0(j, j))
+   end do
+
+   ! 4. Generate damping matrix in original frame
+   CALL AllocAry(phiT_M, nDOF, nDof, 'phiT_M', ErrStat, ErrMsg)
+   CALL SetErrStat(ErrStat, ErrMsg, ErrStat, ErrMsg, 'Init_ModalDamping')
+
+   phiT_M = matmul(transpose(eigenvectors), m%LP_MassM_LU) ! after normalization
+
+   CALL AllocAry(p%ModalDampingMat, nDOF, nDOF, 'p%ModalDampingMat', ErrStat, ErrMsg)
+   CALL SetErrStat(ErrStat, ErrMsg, ErrStat, ErrMsg, 'Init_ModalDamping')
+
+   do j = 1, nDOF
+
+      if( j <= numZeta) then
+         Zj = 2.0d0 * omega(j) * zeta(j)
+      else
+         ! Stiffness proportional damping is used past the last prescribed value
+         ! at a rate equal to the last prescribed value.
+         Zj = 2.0d0 * omega(j) * (zeta(numZeta) * omega(j) / omega(numZeta))
+      endif
+
+      p%ModalDampingMat(j, :) = Zj * phiT_M(j, :)
+   end do
+
+   p%ModalDampingMat = matmul(transpose(phiT_M), p%ModalDampingMat)
+
+   ! Debugging / verifying -  recover the zeta values
+   ! phi0T_M_phi0 = matmul(transpose(eigenvectors), matmul(m%LP_MassM_LU, eigenvectors))
+   ! print *, 'Verifying mass orthonormal here.'
+   ! phi0T_M_phi0 = matmul(transpose(eigenvectors), matmul(p%ModalDampingMat, eigenvectors))
+   ! do j = 1,nDOF
+   !    phi0T_M_phi0(j,j) = phi0T_M_phi0(j,j) / omega(j) / 2.0d0
+   ! end do
 
    print *, 'End of Modal damping.'
+
+   CALL CleanupModalInit()
+
+CONTAINS
+
+   SUBROUTINE CleanupModalInit()
+      IF (ALLOCATED(eigenvectors) ) DEALLOCATE(eigenvectors)
+      IF (ALLOCATED(omega) ) DEALLOCATE(omega)
+      IF (ALLOCATED(phi0T_M_phi0) ) DEALLOCATE(phi0T_M_phi0)
+      IF (ALLOCATED(phiT_M) ) DEALLOCATE(phiT_M)
+   END SUBROUTINE CleanupModalInit
 
 END SUBROUTINE
 

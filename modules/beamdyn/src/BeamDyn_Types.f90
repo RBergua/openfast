@@ -212,8 +212,7 @@ IMPLICIT NONE
     LOGICAL  :: RotStates = .false.      !< Orient states in rotating frame during linearization? (flag) [-]
     LOGICAL  :: CompAeroMaps = .FALSE.      !< flag to determine if BeamDyn is computing aero maps (true) or running a normal simulation (false) [-]
     LOGICAL  :: CompAppliedLdAtRoot = .FALSE.      !< flag to determine if BeamDyn should compute the applied loads at root [-]
-    REAL(R8Ki) , DIMENSION(:,:), ALLOCATABLE  :: eigenvectors      !< Mode shape eigenvectors [-]
-    REAL(R8Ki) , DIMENSION(:), ALLOCATABLE  :: omega      !< Modal frequencies [-]
+    REAL(R8Ki) , DIMENSION(:,:), ALLOCATABLE  :: ModalDampingMat      !< Modal damping matrix in the rotating frame [-]
   END TYPE BD_ParameterType
 ! =======================
 ! =========  BD_InputType  =======
@@ -1494,29 +1493,17 @@ subroutine BD_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg)
    DstParamData%RotStates = SrcParamData%RotStates
    DstParamData%CompAeroMaps = SrcParamData%CompAeroMaps
    DstParamData%CompAppliedLdAtRoot = SrcParamData%CompAppliedLdAtRoot
-   if (allocated(SrcParamData%eigenvectors)) then
-      LB(1:2) = lbound(SrcParamData%eigenvectors)
-      UB(1:2) = ubound(SrcParamData%eigenvectors)
-      if (.not. allocated(DstParamData%eigenvectors)) then
-         allocate(DstParamData%eigenvectors(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
+   if (allocated(SrcParamData%ModalDampingMat)) then
+      LB(1:2) = lbound(SrcParamData%ModalDampingMat)
+      UB(1:2) = ubound(SrcParamData%ModalDampingMat)
+      if (.not. allocated(DstParamData%ModalDampingMat)) then
+         allocate(DstParamData%ModalDampingMat(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstParamData%eigenvectors.', ErrStat, ErrMsg, RoutineName)
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstParamData%ModalDampingMat.', ErrStat, ErrMsg, RoutineName)
             return
          end if
       end if
-      DstParamData%eigenvectors = SrcParamData%eigenvectors
-   end if
-   if (allocated(SrcParamData%omega)) then
-      LB(1:1) = lbound(SrcParamData%omega)
-      UB(1:1) = ubound(SrcParamData%omega)
-      if (.not. allocated(DstParamData%omega)) then
-         allocate(DstParamData%omega(LB(1):UB(1)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstParamData%omega.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstParamData%omega = SrcParamData%omega
+      DstParamData%ModalDampingMat = SrcParamData%ModalDampingMat
    end if
 end subroutine
 
@@ -1623,11 +1610,8 @@ subroutine BD_DestroyParam(ParamData, ErrStat, ErrMsg)
    if (allocated(ParamData%FEweight)) then
       deallocate(ParamData%FEweight)
    end if
-   if (allocated(ParamData%eigenvectors)) then
-      deallocate(ParamData%eigenvectors)
-   end if
-   if (allocated(ParamData%omega)) then
-      deallocate(ParamData%omega)
+   if (allocated(ParamData%ModalDampingMat)) then
+      deallocate(ParamData%ModalDampingMat)
    end if
 end subroutine
 
@@ -1722,8 +1706,7 @@ subroutine BD_PackParam(RF, Indata)
    call RegPack(RF, InData%RotStates)
    call RegPack(RF, InData%CompAeroMaps)
    call RegPack(RF, InData%CompAppliedLdAtRoot)
-   call RegPackAlloc(RF, InData%eigenvectors)
-   call RegPackAlloc(RF, InData%omega)
+   call RegPackAlloc(RF, InData%ModalDampingMat)
    if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
@@ -1828,8 +1811,7 @@ subroutine BD_UnPackParam(RF, OutData)
    call RegUnpack(RF, OutData%RotStates); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%CompAeroMaps); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%CompAppliedLdAtRoot); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%eigenvectors); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%omega); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%ModalDampingMat); if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
 subroutine BD_CopyInput(SrcInputData, DstInputData, CtrlCode, ErrStat, ErrMsg)
