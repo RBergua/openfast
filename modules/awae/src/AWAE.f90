@@ -361,6 +361,183 @@ subroutine mergeWakeWAT_k(n_wake, wk_WAT_k, WAT_k)
    WAT_k = sqrt(WAT_k)
 end subroutine mergeWakeWAT_k
 
+! Update K-d Tree with current wake point locations from all turbines
+subroutine CalcWakePointTurbineGridInteractions(p, m, u)
+
+   type(AWAE_ParameterType), intent(in   )  :: p           !< Parameters
+   type(AWAE_MiscVarType),   intent(inout)  :: m           !< Misc/optimization variables
+   type(AWAE_InputType),     intent(in   )  :: u           !< Inputs at Time t
+
+   real(ReKi)     :: WakePointSep   ! Distance between adjacent wake points
+   real(ReKi)     :: MaxWakeRadius  ! maximum wake radius
+   real(ReKi)     :: search_radius  ! radius to search for wakes interacting with grid
+   integer(IntKi) :: n_wake_found
+   integer(IntKi) :: t_src, c_dst, t_dst, i_wp
+   integer(IntKi) :: i, j, k
+
+   ! Maximum wake radius for interaction
+   MaxWakeRadius = p%y(p%NumRadii-1)
+
+   !----------------------------------------------------------------------------
+   ! Update K-d Tree with current wake point locations from all turbines
+   !----------------------------------------------------------------------------
+
+   ! Initialize the maximum wake point separation to zero
+   m%MaxWakePointSep = 0.0_ReKi
+
+   ! Initialize the point counter
+   k = 0
+
+   ! Loop through the turbines in the farm
+   do i = 1, p%NumTurbines
+
+      ! Loop through the plane indices
+      do j = 0, nint(u%NumPlanes(i)) - 1
+
+         ! Increment point counter
+         k = k + 1
+
+         ! Copy point location (X,Y only) into array of points
+         m%AllPlanePoints(:, k) = u%p_plane(:2, j, i)
+
+         ! Copy plane and turbine indices into array
+         m%KdTPointData(:, k) = [j, i]
+
+         ! Calculate distance from current wake point to previous wake point
+         ! Update maximum wake point separation
+         if (j > 0) then
+            WakePointSep = norm2(u%p_plane(:, j, i) - u%p_plane(:, j-1, i))
+            m%MaxWakePointSep = max(m%MaxWakePointSep, WakePointSep)
+         end if
+      end do
+   end do
+
+   ! Update K-d Tree with new wake point locations
+   call kdtree_update(m%KdT, m%AllPlanePoints(:,1:k))
+
+   !----------------------------------------------------------------------------
+   ! Populate start/end plane indices for each source turbine that
+   ! interact with each low-resolution grid destination chunk
+   !----------------------------------------------------------------------------
+
+   ! Initialize start/end plane indices by turbine and chunk to invalid value
+   m%iPlaneTurbChunk = -1
+
+   ! Initialize array of flags that indicate if a chunk has any wake influence
+   m%LowResChunkHasWake = .false.
+
+   ! Loop through low res-grid chunks
+   do c_dst = 1, size(p%LowRes%WakeChunks)
+
+      ! Radius to search for wakes interacting with grid
+      ! max of (grid radius + max wake radius) or half of max wake point separation
+      search_radius = max(p%LowRes%WakeChunks(c_dst)%Radius + MaxWakeRadius, &
+                          m%MaxWakePointSep/2.0_ReKi)
+
+      ! Get indices of wake centers within search radius
+      call kdtree_points_in_radius(m%KdT, p%LowRes%WakeChunks(c_dst)%Center, &
+                                   search_radius, m%KdTResults, n_wake_found)
+
+      ! If no wake points found within search radius, continue to next turbine
+      if (n_wake_found == 0) cycle
+
+      ! Set flag that wake was found in this chunk
+      m%LowResChunkHasWake(c_dst) = .true.
+
+      ! Loop through the wake points found, and group first/last point by turbine
+      do i = 1, n_wake_found
+
+         ! Get the source turbine index for this wake plane point
+         t_src = m%KdTPointData(2, m%KdTResults(i))
+
+         ! Get the plane index of the wake point
+         i_wp = m%KdTPointData(1, m%KdTResults(i)) 
+
+         ! If no start or end plane previously set for this turbine, set both
+         ! Otherwise, if plane index is above or below current bounds, update bounds
+         if (m%iPlaneTurbChunk(1, t_src, c_dst) == -1) then
+            m%iPlaneTurbChunk(:, t_src, c_dst) = i_wp
+         else
+            if (i_wp < m%iPlaneTurbChunk(1, t_src, c_dst)) m%iPlaneTurbChunk(1, t_src, c_dst) = i_wp
+            if (i_wp > m%iPlaneTurbChunk(2, t_src, c_dst)) m%iPlaneTurbChunk(2, t_src, c_dst) = i_wp
+         end if
+      end do
+
+      ! Loop through start and end planes by turbine and expand by one plane if applicable
+      do t_src = 1, p%NumTurbines
+
+         ! Skip turbines with no planes in this grid
+         if (m%iPlaneTurbChunk(1, t_src, c_dst) == -1) cycle
+
+         ! Include the plane before the first or clamp to first plane
+         m%iPlaneTurbChunk(1, t_src, c_dst) = max(0, m%iPlaneTurbChunk(1, t_src, c_dst) - 1)
+
+         ! Include the plane after the last or clamp to last plane
+         m%iPlaneTurbChunk(2, t_src, c_dst) = min(nint(u%NumPlanes(t_src)) - 1, m%iPlaneTurbChunk(2, t_src, c_dst) + 1)
+      end do
+   end do
+
+   !----------------------------------------------------------------------------
+   ! Populate start/end plane indices for each source turbine that
+   ! interact with each destination turbine for the high-resolution grid
+   !----------------------------------------------------------------------------
+
+   ! Initialize start/end plane indices by turbine to invalid value
+   m%iPlaneTurbTurb = -1
+
+   ! Loop through destination turbines
+   do t_dst = 1, p%NumTurbines
+
+      ! Radius to search for wakes interacting with grid
+      ! max of (grid radius + max wake radius) or half of max wake point separation
+      search_radius = max((p%HighRes(t_dst)%Radius + MaxWakeRadius), &
+                           m%MaxWakePointSep/2.0_ReKi)
+
+      ! Get indices of wake centers within search radius
+      call kdtree_points_in_radius(m%KdT, p%HighRes(t_dst)%Center, search_radius, m%KdTResults, n_wake_found)
+
+      ! If no wake points found within search radius, continue to next turbine
+      if (n_wake_found == 0) cycle
+
+      ! Loop through the wake points found, and group first/last point by turbine
+      do i = 1, n_wake_found
+
+         ! Get the source turbine index for this wake plane point
+         t_src = m%KdTPointData(2, m%KdTResults(i))
+
+         ! If this plane belongs to the destination turbine, skip it
+         if (t_dst == t_src) cycle
+
+         ! Get the plane index of the wake point
+         j = m%KdTPointData(1, m%KdTResults(i)) 
+
+         ! If no start or end plane previously set for this turbine, set for both
+         if (m%iPlaneTurbTurb(1, t_src, t_dst) == -1) then
+            m%iPlaneTurbTurb(:, t_src, t_dst) = j
+         else
+            ! Otherwise, if plane index is above or below current bounds, update bounds
+            if (j < m%iPlaneTurbTurb(1, t_src, t_dst)) m%iPlaneTurbTurb(1, t_src, t_dst) = j
+            if (j > m%iPlaneTurbTurb(2, t_src, t_dst)) m%iPlaneTurbTurb(2, t_src, t_dst) = j
+         end if
+      end do
+
+      ! Loop through start and end planes by turbine and expand by one plane if applicable
+      do t_src = 1, p%NumTurbines
+
+         ! Skip turbines with no planes in this grid
+         if (m%iPlaneTurbTurb(1, t_src, t_dst) == -1) cycle
+
+         ! Include the plane before the first or clamp to first plane
+         m%iPlaneTurbTurb(1, t_src, t_dst) = max(0, m%iPlaneTurbTurb(1, t_src, t_dst) - 1)
+
+         ! Include the plane after the last or clamp to last plane
+         m%iPlaneTurbTurb(2, t_src, t_dst) = min(NINT(u%NumPlanes(t_src)) - 1, m%iPlaneTurbTurb(2, t_src, t_dst) + 1)
+
+      end do
+   end do
+
+end subroutine
+
 !----------------------------------------------------------------------------------------------------------------------------------
 !> Loop over the entire grid of low resolution ambient wind data to compute:
 !!    1) the disturbed flow at each point and 2) the averaged disturbed velocity of each wake plane
@@ -405,10 +582,7 @@ subroutine LowResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
    real(ReKi)              :: yHat_plane(3), zHat_plane(3)
    real(SiKi)              :: C_rot(3,3)
    real(SiKi)              :: C_rot_norm
-   integer(IntKi)          :: t_src, c_dst, iwp
-   real(ReKi)              :: MaxWakeRadius    ! maximum wake radius
-   real(ReKi)              :: search_radius      ! radius to search for wakes interacting with grid
-   integer(IntKi)          :: n_wake_found
+   integer(IntKi)          :: t_src, c_dst
    real(ReKi)              :: dist
 
    errStat = ErrID_None
@@ -421,71 +595,6 @@ subroutine LowResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
    call AllocAry(wk_V, 3, maxN_wake, "wk_V", ErrStat2, ErrMsg2); if (Failed()) return
    call AllocAry(wk_WAT_k, maxN_wake, "wk_WAT_k", ErrStat2, ErrMsg2); if (Failed()) return
 
-   !----------------------------------------------------------------------------
-   ! Populate start/end plane indices that for each source turbine that
-   ! interact with each destination chunk
-   !----------------------------------------------------------------------------
-
-   ! Maximum wake radius for interaction
-   MaxWakeRadius = p%y(p%NumRadii-1)
-
-   ! Initialize start/end plane indices by turbine and chunk to invalid value
-   m%iPlaneTurbChunk = -1
-
-   ! Initialize flag that indicates if a chunk has any wake influence
-   m%LowResChunkHasWake = .false.
-
-   ! Loop through destination chunks
-   do c_dst = 1, size(p%LowRes%WakeChunks)
-
-      ! Radius to search for wakes interacting with grid
-      ! max of (grid radius + max wake radius) or half of max wake point separation
-      search_radius = max(p%LowRes%WakeChunks(c_dst)%Radius + MaxWakeRadius, &
-                          m%MaxWakePointSep/2.0_ReKi)
-
-      ! Get indices of wake centers within search radius
-      call kdtree_points_in_radius(m%KdT, p%LowRes%WakeChunks(c_dst)%Center, search_radius, m%KdTResults, n_wake_found)
-
-      ! If no wake points found within search radius, continue to next turbine
-      if (n_wake_found == 0) cycle
-
-      ! Set flag that wake was found in chunk
-      m%LowResChunkHasWake(c_dst) = .true.
-
-      ! Loop through the wake points found, and group first/last point by turbine
-      do i = 1, n_wake_found
-
-         ! Get the source turbine index for this wake plane point
-         t_src = m%KdTPointData(2, m%KdTResults(i))
-
-         ! Get the plane index of the wake point
-         iwp = m%KdTPointData(1, m%KdTResults(i)) 
-
-         ! If no start or end plane previously set for this turbine, set for both
-         if (m%iPlaneTurbChunk(1, t_src, c_dst) == -1) then
-            m%iPlaneTurbChunk(:, t_src, c_dst) = iwp
-         else
-            ! Otherwise, if plane index is above or below current bounds, update bounds
-            if (iwp < m%iPlaneTurbChunk(1, t_src, c_dst)) m%iPlaneTurbChunk(1, t_src, c_dst) = iwp
-            if (iwp > m%iPlaneTurbChunk(2, t_src, c_dst)) m%iPlaneTurbChunk(2, t_src, c_dst) = iwp
-         end if
-      end do
-
-      ! Loop through start and end planes by turbine and expand by one plane if applicable
-      do t_src = 1, p%NumTurbines
-
-         ! Skip turbines with no planes in this grid
-         if (m%iPlaneTurbChunk(1, t_src, c_dst) < 0) cycle
-
-         ! Include the plane before the first or clamp to first plane
-         m%iPlaneTurbChunk(1, t_src, c_dst) = max(0, m%iPlaneTurbChunk(1, t_src, c_dst) - 1)
-
-         ! Include the plane after the last or clamp to last plane
-         m%iPlaneTurbChunk(2, t_src, c_dst) = min(NINT(u%NumPlanes(t_src)) - 1, m%iPlaneTurbChunk(2, t_src, c_dst) + 1)
-
-      end do
-
-   end do
 
    !----------------------------------------------------------------------------
    ! Add wake contribution to each destination turbine's low-res inflow grid
@@ -850,68 +959,6 @@ subroutine HighResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
    !           maxN_wake * 13 * OMP_NUM_THREADS * <precision> = size in bytes
    !     HOWEVER, real world testing shows that for 103 threads with 114 turbines and maxN_wake=101346 is more like
    !           maxN_wake * 40 * <precision> = size in bytes
-
-   !----------------------------------------------------------------------------
-   ! Populate start/end plane indices that for each source turbine that
-   ! interact with each destination turbine
-   !----------------------------------------------------------------------------
-
-   ! Maximum wake radius for interaction
-   MaxWakeRadius = p%y(p%NumRadii-1)
-
-   ! Initialize start/end plane indices by turbine to invalid value
-   m%iPlaneTurbTurb = -1
-
-   ! Loop through destination turbines
-   do t_dst = 1, p%NumTurbines
-
-      ! Radius to search for wakes interacting with grid
-      ! max of (grid radius + max wake radius) or half of max wake point separation
-      search_radius = max((p%HighRes(t_dst)%Radius + MaxWakeRadius), &
-                           m%MaxWakePointSep/2.0_ReKi)
-
-      ! Get indices of wake centers within search radius
-      call kdtree_points_in_radius(m%KdT, p%HighRes(t_dst)%Center, search_radius, m%KdTResults, n_wake_found)
-
-      ! If no wake points found within search radius, continue to next turbine
-      if (n_wake_found == 0) cycle
-
-      ! Loop through the wake points found, and group first/last point by turbine
-      do i = 1, n_wake_found
-
-         ! Get the source turbine index for this wake plane point
-         t_src = m%KdTPointData(2, m%KdTResults(i))
-
-         ! If this plane belongs to the destination turbine, skip it
-         if (t_dst == t_src) cycle
-
-         ! Get the plane index of the wake point
-         j = m%KdTPointData(1, m%KdTResults(i)) 
-
-         ! If no start or end plane previously set for this turbine, set for both
-         if (m%iPlaneTurbTurb(1, t_src, t_dst) == -1) then
-            m%iPlaneTurbTurb(:, t_src, t_dst) = j
-         else
-            ! Otherwise, if plane index is above or below current bounds, update bounds
-            if (j < m%iPlaneTurbTurb(1, t_src, t_dst)) m%iPlaneTurbTurb(1, t_src, t_dst) = j
-            if (j > m%iPlaneTurbTurb(2, t_src, t_dst)) m%iPlaneTurbTurb(2, t_src, t_dst) = j
-         end if
-      end do
-
-      ! Loop through start and end planes by turbine and expand by one plane if applicable
-      do t_src = 1, p%NumTurbines
-
-         ! Skip turbines with no planes in this grid
-         if (m%iPlaneTurbTurb(1, t_src, t_dst) == -1) cycle
-
-         ! Include the plane before the first or clamp to first plane
-         m%iPlaneTurbTurb(1, t_src, t_dst) = max(0, m%iPlaneTurbTurb(1, t_src, t_dst) - 1)
-
-         ! Include the plane after the last or clamp to last plane
-         m%iPlaneTurbTurb(2, t_src, t_dst) = min(NINT(u%NumPlanes(t_src)) - 1, m%iPlaneTurbTurb(2, t_src, t_dst) + 1)
-
-      end do
-   end do
 
    !----------------------------------------------------------------------------
    ! Add wake contribution to each destination turbine's high-res inflow grid
@@ -1366,7 +1413,7 @@ subroutine AWAE_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitO
    call AllocAry(m%iPlaneTurbTurb, 2, p%NumTurbines, p%NumTurbines, "m%iPlaneTurbTurb", ErrStat2, ErrMsg2); if(Failed()) return;
 
    ! Create array to hold the start and end plane index of the source turbine wake for each destination low-res chunk
-   ! array dimensions = (start & end plane index, wake source turbine, destination chunk)
+   ! array dimensions = (start & end plane index, wake source turbine, destination low-res grid chunk)
    call AllocAry(m%iPlaneTurbChunk, 2, p%NumTurbines, size(p%LowRes%WakeChunks), "m%iPlaneTurbChunk", ErrStat2, ErrMsg2); if(Failed()) return;
 
    ! Allocate array for holding flags for if the chunk was updated because it had wake pass through it
@@ -1567,6 +1614,7 @@ subroutine AWAE_UpdateStates( t, n, u, p, x, xd, z, OtherState, m, errStat, errM
    real(ReKi), pointer        :: V_Grid(:,:,:,:)
    real(SiKi), pointer        :: VelUVW(:,:)
    real(ReKi), allocatable    :: AccUVW(:,:)
+   logical                    :: WriteWindVTK
    
    errStat = ErrID_None
    errMsg  = ""
@@ -1590,6 +1638,26 @@ subroutine AWAE_UpdateStates( t, n, u, p, x, xd, z, OtherState, m, errStat, errM
       ! Read from file the ambient flow for the n+1 time step
       call ReadLowResWindFile(n+1, p, m%Vamb_Low, errStat2, errMsg2);   if (Failed()) return;
       
+   ! AMReX-based inflow
+   ! case (2)
+
+   !    ! Set flag to write wind VTK files if requested and it's the correct step
+   !    WriteWindVTK = p%WrDisWind .and. (mod(nint(t / p%dt_low), p%WrDisSkp1) == 0)
+
+   !    ! Loop through low-resolution grid chunks
+   !    do i = 1, size(p%LowRes%WakeChunks)
+
+   !       ! If chunk has wake or VTK wind files are to be written this step, 
+   !       ! copy the ambient wind data into the current chunk
+   !       if (m%LowResChunkHasWake(i) .or. WriteWindVTK) then
+   !          m%Vamb_low(:,&
+   !                   p%LowRes%WakeChunks(i)%iSubGridX(1):p%LowRes%WakeChunks(i)%iSubGridX(2), &
+   !                   p%LowRes%WakeChunks(i)%iSubGridY(1):p%LowRes%WakeChunks(i)%iSubGridY(2), &
+   !                   p%LowRes%WakeChunks(i)%iSubGridZ(1):p%LowRes%WakeChunks(i)%iSubGridZ(2)) = &
+   !                   amr_wind_vel
+   !       end if
+   !    end do
+
    ! InflowWind-based ambient wind (single or multiple instances)
    case (2, 3)
 
@@ -1734,7 +1802,7 @@ subroutine AWAE_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, errStat, errMsg
    character(p%VTK_tWidth)                        :: Tstr        ! string for current VTK write-out step (padded with zeros)
    integer(intKi)                                 :: i, j, k
    integer(intKi)                                 :: PrevPoint
-   real(ReKi)                                     :: WakePointSep ! Distance between adjacent wake points
+
    integer(intKi)                                 :: ErrStat2
    character(ErrMsgLen)                           :: ErrMsg2
    character(*), parameter                        :: RoutineName = 'AWAE_CalcOutput'
@@ -1755,8 +1823,13 @@ subroutine AWAE_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, errStat, errMsg
    ! Set flag to write wind VTK files if it's the correct step
    WriteWindVTK = mod(n, p%WrDisSkp1) == 0
 
-   ! Update the K-d Tree with current wake point locations from all turbines
-   call UpdateKdTreePoints()
+   !----------------------------------------------------------------------------
+   ! Calculate the wake planes that interact with the grids. Populates:
+   !  m%iPlaneTurbChunk(2,p%NumTurbines,size(p%LowRes%WakeChunks)) (Low-res grid)
+   !  m%iPlaneTurbTurb(2,p%NumTurbines,p%NumTurbines) (High-res grid)
+   !----------------------------------------------------------------------------
+
+   call CalcWakePointTurbineGridInteractions(p, m, u)
 
    ! High-resolution grid output
    call HighResGridCalcOutput(n_high, u, p, xd, y, m, ErrStat2, ErrMsg2)
@@ -1835,47 +1908,6 @@ contains
       call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
       Failed =  ErrStat >= AbortErrLev
    end function Failed
-
-   ! Update K-d Tree with current wake point locations from all turbines
-   subroutine UpdateKdTreePoints()
-
-      ! Initialize the maximum wake point separation to zero
-      m%MaxWakePointSep = 0.0_ReKi
-
-      ! Initialize the point counter
-      k = 0
-
-      ! Loop through the turbines
-      do i = 1, p%NumTurbines
-
-         ! Intialize previous point to invalid index
-         PrevPoint = -1
-
-         ! Loop through the plane indices
-         do j = 0, NINT(u%NumPlanes(i)) - 1
-
-            ! Increment point counter
-            k = k + 1
-
-            ! Copy point location (X,Y only) into array of points
-            m%AllPlanePoints(:, k) = u%p_plane(:2, j, i)
-
-            ! Copy plane and turbine indices into array
-            m%KdTPointData(:, k) = [j, i]
-
-            ! Calculate distance from current wake point to previous wake point
-            ! Update maximum wake point separation
-            if (PrevPoint /= -1) then
-               WakePointSep = norm2(u%p_plane(:, j, i) - u%p_plane(:, PrevPoint, i))
-               m%MaxWakePointSep = max(m%MaxWakePointSep, WakePointSep)
-            end if
-
-            ! Update the last point to the current point index
-            PrevPoint = j
-         end do
-      end do
-      call kdtree_update(m%KdT, m%AllPlanePoints(:,1:k))
-   end subroutine
 
 end subroutine AWAE_CalcOutput
 
