@@ -451,7 +451,7 @@ subroutine CalcWakePointTurbineGridInteractions(p, m, u)
          t_src = m%KdTPointData(2, m%KdTResults(i))
 
          ! Get the plane index of the wake point
-         i_wp = m%KdTPointData(1, m%KdTResults(i)) 
+         i_wp = m%KdTPointData(1, m%KdTResults(i))
 
          ! If no start or end plane previously set for this turbine, set both
          ! Otherwise, if plane index is above or below current bounds, update bounds
@@ -509,7 +509,7 @@ subroutine CalcWakePointTurbineGridInteractions(p, m, u)
          if (t_dst == t_src) cycle
 
          ! Get the plane index of the wake point
-         j = m%KdTPointData(1, m%KdTResults(i)) 
+         j = m%KdTPointData(1, m%KdTResults(i))
 
          ! If no start or end plane previously set for this turbine, set for both
          if (m%iPlaneTurbTurb(1, t_src, t_dst) == -1) then
@@ -1423,7 +1423,7 @@ subroutine AWAE_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitO
    call kdtree_build(m%KdT, m%AllPlanePoints(:,1:1), n_max=p%MaxPlanes*p%NumTurbines)
 
    ! Read-in the ambient wind data for the initial calculate output
-   call AWAE_UpdateStates(0.0_DbKi, 0, u, p, x, xd, z, OtherState, m, errStat2, errMsg2 ); if(Failed()) return;
+   call AWAE_UpdateStates(0, u, p, x, xd, z, OtherState, m, errStat2, errMsg2 ); if(Failed()) return;
 
 contains
    subroutine CheckModAmb3Boundaries()
@@ -1588,8 +1588,7 @@ end subroutine AWAE_End
 !> Loose coupling routine for solving for constraint states, integrating continuous states, and updating discrete and other states.
 !! Continuous, constraint, discrete, and other states are updated for t + Interval
 !! Populates the ambient wind data in low and high resolution grids that is needed for t+dt, i.e., n+1
-subroutine AWAE_UpdateStates( t, n, u, p, x, xd, z, OtherState, m, errStat, errMsg )
-   real(DbKi),                       intent(in   ) :: t          !< Current simulation time in seconds
+subroutine AWAE_UpdateStates(n, u, p, x, xd, z, OtherState, m, errStat, errMsg)
    integer(IntKi),                   intent(in   ) :: n          !< Current simulation time step n = 0,1,...
    type(AWAE_InputType),             intent(inout) :: u          !< Inputs at utimes (out only for mesh record-keeping in ExtrapInterp routine)
    type(AWAE_ParameterType),         intent(in   ) :: p          !< Parameters
@@ -1615,6 +1614,7 @@ subroutine AWAE_UpdateStates( t, n, u, p, x, xd, z, OtherState, m, errStat, errM
    real(SiKi), pointer        :: VelUVW(:,:)
    real(ReKi), allocatable    :: AccUVW(:,:)
    logical                    :: WriteWindVTK
+   real(DbKi)                 :: t
    
    errStat = ErrID_None
    errMsg  = ""
@@ -1625,6 +1625,9 @@ subroutine AWAE_UpdateStates( t, n, u, p, x, xd, z, OtherState, m, errStat, errM
    else
       n_high_low = p%n_high_low
    end if
+
+   ! Current simulation time
+   t = n * p%DT_low
 
    !----------------------------------------------------------------------------
    ! Populate low resolution grids based on ambient wind source
