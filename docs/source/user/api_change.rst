@@ -97,6 +97,12 @@ Removed in OpenFAST `dev`
 Module                                        Line     Flag Name            Example Value
 ============================================= ======== ==================== ========================================================================================================================================================================================================
 AeroDyn                                       11       Buoyancy             False         Buoyancy           - Include buoyancy effects? (flag)
+BeamDyn                                       \*                            ---------------------- PITCH ACTUATOR PARAMETERS -------------------------------
+BeamDyn                                       \*       UsePitchAct          False         UsePitchAct - Whether a pitch actuator should be used (flag)
+BeamDyn                                       \*       PitchJ               200           PitchJ      - Pitch actuator inertia (kg-m^2) [used only when UsePitchAct is true]
+BeamDyn                                       \*       PitchK               20000000      PitchK      - Pitch actuator stiffness (kg-m^2/s^2) [used only when UsePitchAct is true]
+BeamDyn                                       \*       PitchC               500000        PitchC      - Pitch actuator damping (kg-m^2/s) [used only when UsePitchAct is true]
+ElastoDyn Blade Input File                    \*                            The PitchAxis column has been removed from the DISTRIBUTED BLADE PROPERTIES table. The table should now only have 5 columns: BlFract, StrcTwst, BMassDen, FlpStff, and EdgStff
 ============================================= ======== ==================== ========================================================================================================================================================================================================
 
 
