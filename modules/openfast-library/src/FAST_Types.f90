@@ -52,6 +52,9 @@ USE OrcaFlexInterface_Types
 USE ExtPtfm_MCKF_Types
 USE NWTC_Library
 IMPLICIT NONE
+    INTEGER(IntKi), PUBLIC, PARAMETER  :: LooseCoupling                    = 1      ! Loose Module Coupling [-]
+    INTEGER(IntKi), PUBLIC, PARAMETER  :: TightCouplingFixed               = 2      ! Tight Module Coupling with fixed Jacobian updates (DT_UJac) [-]
+    INTEGER(IntKi), PUBLIC, PARAMETER  :: TightCouplingAdaptive                = 3      ! Tight Module Coupling with automatic Jacobian updates [-]
     INTEGER(IntKi), PUBLIC, PARAMETER  :: Module_Unknown                   = -1      ! Unknown [-]
     INTEGER(IntKi), PUBLIC, PARAMETER  :: Module_None                      = 0      ! No module selected [-]
     INTEGER(IntKi), PUBLIC, PARAMETER  :: Module_Glue                      = 1      ! Glue code [-]
@@ -131,11 +134,12 @@ IMPLICIT NONE
     INTEGER(IntKi)  :: KMax = 0_IntKi      !< Maximum number of input-output-solve or nonlinear solve residual equation iterations (KMax >= 1) [>0] [-]
     INTEGER(IntKi)  :: numIceLegs = 0_IntKi      !< number of suport-structure legs in contact with ice (IceDyn coupling) [-]
     INTEGER(IntKi) , DIMENSION(:), ALLOCATABLE  :: RotNumBld      !< number of blades in each rotor [-]
-    LOGICAL , DIMENSION(:), ALLOCATABLE  :: RotMirror      !< Array of flags indicating if rotor rotation should be mirrored (true=mirror) [-]
+    LOGICAL , DIMENSION(:), ALLOCATABLE  :: MirrorRotor      !< Array of flags indicating if rotor rotation should be mirrored (true=mirror) [-]
     INTEGER(IntKi)  :: NumBD = 0_IntKi      !< number of BeamDyn instances [-]
     INTEGER(IntKi) , DIMENSION(:), ALLOCATABLE  :: BDRotMap      !< array mapping BeamDyn instance to rotor number [-]
     INTEGER(IntKi) , DIMENSION(:), ALLOCATABLE  :: BDBldMap      !< array mapping BeamDyn instance to blade number [-]
     LOGICAL  :: BD_OutputSibling = .false.      !< flag to determine if BD input is sibling of output mesh [-]
+    INTEGER(IntKi)  :: ModCoupling = 0_IntKi      !< Module coupling type {1=loose; 2=tight with fixed Jacobian updates (DT_UJac); 3=tight with automatic Jacobian updates} [-]
     REAL(DbKi)  :: RhoInf = 0.0_R8Ki      !< Numerical damping parameter for tight coupling generalized-alpha integrator (-) [0.0 to 1.0] [-]
     REAL(DbKi)  :: ConvTol = 0.0_R8Ki      !< Convergence iteration error tolerance for tight coupling generalized alpha integrator (-) [-]
     INTEGER(IntKi)  :: MaxConvIter = 0_IntKi      !< Maximum number of convergence iterations for tight coupling generalized alpha integrator (-) [-]
@@ -1094,17 +1098,17 @@ subroutine FAST_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg)
       end if
       DstParamData%RotNumBld = SrcParamData%RotNumBld
    end if
-   if (allocated(SrcParamData%RotMirror)) then
-      LB(1:1) = lbound(SrcParamData%RotMirror)
-      UB(1:1) = ubound(SrcParamData%RotMirror)
-      if (.not. allocated(DstParamData%RotMirror)) then
-         allocate(DstParamData%RotMirror(LB(1):UB(1)), stat=ErrStat2)
+   if (allocated(SrcParamData%MirrorRotor)) then
+      LB(1:1) = lbound(SrcParamData%MirrorRotor)
+      UB(1:1) = ubound(SrcParamData%MirrorRotor)
+      if (.not. allocated(DstParamData%MirrorRotor)) then
+         allocate(DstParamData%MirrorRotor(LB(1):UB(1)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstParamData%RotMirror.', ErrStat, ErrMsg, RoutineName)
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstParamData%MirrorRotor.', ErrStat, ErrMsg, RoutineName)
             return
          end if
       end if
-      DstParamData%RotMirror = SrcParamData%RotMirror
+      DstParamData%MirrorRotor = SrcParamData%MirrorRotor
    end if
    DstParamData%NumBD = SrcParamData%NumBD
    if (allocated(SrcParamData%BDRotMap)) then
@@ -1132,6 +1136,7 @@ subroutine FAST_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg)
       DstParamData%BDBldMap = SrcParamData%BDBldMap
    end if
    DstParamData%BD_OutputSibling = SrcParamData%BD_OutputSibling
+   DstParamData%ModCoupling = SrcParamData%ModCoupling
    DstParamData%RhoInf = SrcParamData%RhoInf
    DstParamData%ConvTol = SrcParamData%ConvTol
    DstParamData%MaxConvIter = SrcParamData%MaxConvIter
@@ -1309,8 +1314,8 @@ subroutine FAST_DestroyParam(ParamData, ErrStat, ErrMsg)
    if (allocated(ParamData%RotNumBld)) then
       deallocate(ParamData%RotNumBld)
    end if
-   if (allocated(ParamData%RotMirror)) then
-      deallocate(ParamData%RotMirror)
+   if (allocated(ParamData%MirrorRotor)) then
+      deallocate(ParamData%MirrorRotor)
    end if
    if (allocated(ParamData%BDRotMap)) then
       deallocate(ParamData%BDRotMap)
@@ -1353,11 +1358,12 @@ subroutine FAST_PackParam(RF, Indata)
    call RegPack(RF, InData%KMax)
    call RegPack(RF, InData%numIceLegs)
    call RegPackAlloc(RF, InData%RotNumBld)
-   call RegPackAlloc(RF, InData%RotMirror)
+   call RegPackAlloc(RF, InData%MirrorRotor)
    call RegPack(RF, InData%NumBD)
    call RegPackAlloc(RF, InData%BDRotMap)
    call RegPackAlloc(RF, InData%BDBldMap)
    call RegPack(RF, InData%BD_OutputSibling)
+   call RegPack(RF, InData%ModCoupling)
    call RegPack(RF, InData%RhoInf)
    call RegPack(RF, InData%ConvTol)
    call RegPack(RF, InData%MaxConvIter)
@@ -1472,11 +1478,12 @@ subroutine FAST_UnPackParam(RF, OutData)
    call RegUnpack(RF, OutData%KMax); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%numIceLegs); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%RotNumBld); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%RotMirror); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%MirrorRotor); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%NumBD); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%BDRotMap); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%BDBldMap); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%BD_OutputSibling); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%ModCoupling); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%RhoInf); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%ConvTol); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%MaxConvIter); if (RegCheckErr(RF, RoutineName)) return

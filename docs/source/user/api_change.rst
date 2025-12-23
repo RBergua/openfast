@@ -34,14 +34,15 @@ Added in OpenFAST `dev`
 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 Module                                        Line     Flag Name            Example Value
 ============================================= ======== ==================== ========================================================================================================================================================================================================
-OpenFAST                                      16       NRotors              2   NRotors         - Number of rotors in turbine (-)
-OpenFAST                                      50                            ---------------------- INPUT FILES Rotor 2 -------------------------------------
-OpenFAST                                      51       EDFile               "ElastoDyn.dat"   EDFile          - Name of file containing ElastoDyn input parameters (quoted string)
-OpenFAST                                      52       BDBldFile(1)         "BeamDyn.dat"     BDBldFile(1)    - Name of file containing BeamDyn input parameters for blade 1 (quoted string)
-OpenFAST                                      53       BDBldFile(2)         "BeamDyn.dat"     BDBldFile(2)    - Name of file containing BeamDyn input parameters for blade 2 (quoted string)
-OpenFAST                                      54       BDBldFile(3)         "BeamDyn.dat"     BDBldFile(3)    - Name of file containing BeamDyn input parameters for blade 3 (quoted string)
-OpenFAST                                      55       ServoFile            "ServoDyn_R2.dat" ServoFile       - Name of file containing control and electrical-drive input parameters (quoted string)
-OpenFAST                                      56       MirrorRotor          False             MirrorRotor     - Use CW rotor definition definition files for a CCW rotor (-)
+OpenFAST                                      8        ModCoupling          3   ModCoupling  - Module coupling method (switch) {1=loose; 2=tight with fixed Jacobian updates (DT_UJac); 3=tight with automatic Jacobian updates}
+OpenFAST                                      17       NRotors              2   NRotors      - Number of rotors in turbine (-)
+OpenFAST                                      28       MirrorRotor          F   MirrorRotor  - Flag to reverse rotor rotation direction [1 to NRotors] {F=Normal, T=Mirror}
+OpenFAST                                      52                            ---------------------- INPUT FILES Rotor 2 -------------------------------------
+OpenFAST                                      53       EDFile               "ElastoDyn.dat"   EDFile          - Name of file containing ElastoDyn input parameters (quoted string)
+OpenFAST                                      54       BDBldFile(1)         "BeamDyn.dat"     BDBldFile(1)    - Name of file containing BeamDyn input parameters for blade 1 (quoted string)
+OpenFAST                                      55       BDBldFile(2)         "BeamDyn.dat"     BDBldFile(2)    - Name of file containing BeamDyn input parameters for blade 2 (quoted string)
+OpenFAST                                      56       BDBldFile(3)         "BeamDyn.dat"     BDBldFile(3)    - Name of file containing BeamDyn input parameters for blade 3 (quoted string)
+OpenFAST                                      57       ServoFile            "ServoDyn_R2.dat" ServoFile       - Name of file containing control and electrical-drive input parameters (quoted string)
 AeroDyn blade file                                     t_c                  0.8651      [additional column in *Blade Properties* table]
 AeroDyn blade file                                     BlCpn                1.0         [additional column in *Blade Properties* table]
 AeroDyn blade file                                     BlCpt                1.0         [additional column in *Blade Properties* table]

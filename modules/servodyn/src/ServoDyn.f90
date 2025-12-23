@@ -4820,8 +4820,8 @@ CONTAINS
    !> This routine performs the checks on inputs for the high-speed shaft brake.
    SUBROUTINE HSSBr_ValidateData( )
 
-      ! TODO: Implement brake in tight-coupling scheme
-      IF (InputFileData%HSSBrMode /= ControlMode_NONE) then
+         ! If ElastoDyn is tightly coupled, HSSBrMode must be NONE
+      IF (InitInp%TightED .and. (InputFileData%HSSBrMode /= ControlMode_NONE)) then
          CALL SetErrStat( ErrID_Fatal, 'HSSBrMode must be 0 for tight-coupling.', ErrStat, ErrMsg, RoutineName )
       end if
 

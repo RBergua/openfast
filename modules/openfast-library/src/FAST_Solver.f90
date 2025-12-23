@@ -51,6 +51,9 @@ subroutine FAST_SolverInit(p_FAST, p, m, GlueModData, GlueModMaps, Turbine, ErrS
    ! Initialize data in TC structure
    !----------------------------------------------------------------------------
 
+   ! Module coupling method
+   p%ModCoupling = p_FAST%ModCoupling
+
    ! Generalized alpha damping coefficient
    p%RhoInf = p_FAST%RhoInf
 
@@ -107,14 +110,16 @@ subroutine FAST_SolverInit(p_FAST, p, m, GlueModData, GlueModMaps, Turbine, ErrS
                  pack(modInds, ModIDs == Module_ExtLd)]
 
    ! Indices of tight coupling modules
-   p%iModTC = [pack(modInds, ModIDs == Module_ED), &
-               pack(modInds, ModIDs == Module_BD), &
-               pack(modInds, ModIDs == Module_SD)]
+   p%iModTC = [pack(modInds, ModIDs == Module_ED .and. p%ModCoupling /= LooseCoupling), &
+               pack(modInds, ModIDs == Module_BD .and. p%ModCoupling /= LooseCoupling), &
+               pack(modInds, ModIDs == Module_SD .and. p%ModCoupling /= LooseCoupling)]
 
    ! Indices of Option 1 modules
-   p%iModOpt1 = [pack(modInds, ModIDs == Module_SED), &
-                 pack(modInds, ModIDs == Module_AD .and. &
-                      p_FAST%MHK /= MHK_None), &
+   p%iModOpt1 = [pack(modInds, ModIDs == Module_ED .and. p%ModCoupling == LooseCoupling), &
+                 pack(modInds, ModIDs == Module_BD .and. p%ModCoupling == LooseCoupling), &
+                 pack(modInds, ModIDs == Module_SD .and. p%ModCoupling == LooseCoupling), &
+                 pack(modInds, ModIDs == Module_SED), &
+                 pack(modInds, ModIDs == Module_AD .and. p_FAST%MHK /= MHK_None), &
                  pack(modInds, ModIDs == Module_ExtPtfm), &
                  pack(modInds, ModIDs == Module_HD), &
                  pack(modInds, ModIDs == Module_Orca), &
@@ -128,8 +133,7 @@ subroutine FAST_SolverInit(p_FAST, p, m, GlueModData, GlueModMaps, Turbine, ErrS
                  pack(modInds, ModIDs == Module_SD), &
                  pack(modInds, ModIDs == Module_IfW), &
                  pack(modInds, ModIDs == Module_SeaSt), &
-                 pack(modInds, ModIDs == Module_AD .and. &
-                      p_FAST%MHK == MHK_None), &
+                 pack(modInds, ModIDs == Module_AD .and. p_FAST%MHK == MHK_None), &
                  pack(modInds, ModIDs == Module_ADsk), &
                  pack(modInds, ModIDs == Module_ExtLd), &
                  pack(modInds, ModIDs == Module_FEAM), &
@@ -142,18 +146,44 @@ subroutine FAST_SolverInit(p_FAST, p, m, GlueModData, GlueModMaps, Turbine, ErrS
                  pack(modInds, ModIDs == Module_ExtInfw)]
 
    !----------------------------------------------------------------------------
+   ! Set module categories
+   !----------------------------------------------------------------------------
+
+   ! Tight coupling modules
+   do i = 1, size(p%iModTC)
+      GlueModData(p%iModTC(i))%Category = MC_Tight
+   end do
+
+   ! Option 1 modules
+   do i = 1, size(p%iModOpt1)
+      GlueModData(p%iModOpt1(i))%Category = MC_Option1
+   end do
+
+   ! Option 2 modules
+   do i = 1, size(p%iModOpt2)
+      GlueModData(p%iModOpt2(i))%Category = MC_Option2
+   end do
+
+   ! Post-solve modules
+   do i = 1, size(p%iModPost)
+      GlueModData(p%iModPost(i))%Category = MC_Post
+   end do
+
+   !----------------------------------------------------------------------------
    ! Set solve flags and combine relevant modules into TC module
    !----------------------------------------------------------------------------
 
    ! Set VF_Solve flag on Jacobian variables use by the tight coupling solver
    call SetVarSolveFlags()
 
+   ! Add VF_Tight
+
    ! Combination of TC and Option 1 module indices
    iMod = [p%iModTC, p%iModOpt1]
 
    ! Build tight coupling module using solve variables from TC and Option 1 modules
    call ModGlue_CombineModules(m%Mod, GlueModData, GlueModMaps, iMod, &
-                            VF_Solve, .true., ErrStat2, ErrMsg2, Name='Solver')
+                               VF_Solve, .true., ErrStat2, ErrMsg2, Name='Solver')
    if (Failed()) return
 
    !----------------------------------------------------------------------------
@@ -1323,8 +1353,20 @@ subroutine FAST_SolverStep(n_t_global, t_initial, p, m, GlueModData, GlueModMaps
          ! If convergence iteration has reached or exceeded limit
          if (ConvIter >= p%MaxConvIter) then
 
-            ! If Jacobian has not been updated for convergence
-            if (ConvUJac < MaxConvUJac) then
+            ! If module coupling is loose or tight with fixed Jacobian updates
+            if (p%ModCoupling == LooseCoupling .or. &
+                p%ModCoupling == TightCouplingFixed) then
+
+               ! Return with fatal error
+               call SetErrStat(ErrID_Fatal, "Failed to converge in "//trim(Num2LStr(p%MaxConvIter))// &
+                               " iterations on step "//trim(Num2LStr(n_t_global_next))// &
+                               " (error="//trim(Num2LStr(ConvError))// &
+                               ", tolerance="//trim(Num2LStr(p%ConvTol))//").", &
+                               ErrStat, ErrMsg, RoutineName)
+               return
+
+            ! If the Jacobian has not been updated for convergence
+            else if ((ConvUJac < MaxConvUJac)) then
 
                ! Set counter to trigger a Jacobian update on next convergence iteration
                m%UJacIterRemain = 0

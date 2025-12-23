@@ -355,7 +355,7 @@ class InputReader_OpenFAST(object):
         self.fst_vt['Fst']['CompMooring'] = int(f.readline().split()[0])
         self.fst_vt['Fst']['CompIce'] = int(f.readline().split()[0])
         self.fst_vt['Fst']['MHK'] = int(f.readline().split()[0])
-        self.fst_vt['Fst']['RotorDir'] = read_array(f, self.fst_vt['Fst']['NRotors'], array_type=int)
+        self.fst_vt['Fst']['MirrorRotor'] = read_array(f, self.fst_vt['Fst']['NRotors'], array_type=int)
 
         # Environmental conditions
         f.readline()

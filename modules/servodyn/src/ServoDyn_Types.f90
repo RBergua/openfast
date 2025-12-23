@@ -38,6 +38,7 @@ IMPLICIT NONE
   TYPE, PUBLIC :: SrvD_InitInputType
     CHARACTER(1024)  :: InputFile      !< Name of the input file [-]
     LOGICAL  :: Linearize = .FALSE.      !< Flag that tells this module if the glue code wants to linearize. [-]
+    LOGICAL  :: TightED = .false.      !< ElastoDyn is tightly coupled [-]
     INTEGER(IntKi)  :: NumBl = 0_IntKi      !< Number of blades on the turbine [-]
     CHARACTER(1024)  :: RootName      !< RootName for writing output files [-]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: BlPitchInit      !< Initial blade pitch [-]
@@ -663,6 +664,7 @@ subroutine SrvD_CopyInitInput(SrcInitInputData, DstInitInputData, CtrlCode, ErrS
    ErrMsg  = ''
    DstInitInputData%InputFile = SrcInitInputData%InputFile
    DstInitInputData%Linearize = SrcInitInputData%Linearize
+   DstInitInputData%TightED = SrcInitInputData%TightED
    DstInitInputData%NumBl = SrcInitInputData%NumBl
    DstInitInputData%RootName = SrcInitInputData%RootName
    if (allocated(SrcInitInputData%BlPitchInit)) then
@@ -805,6 +807,7 @@ subroutine SrvD_PackInitInput(RF, Indata)
    if (RF%ErrStat >= AbortErrLev) return
    call RegPack(RF, InData%InputFile)
    call RegPack(RF, InData%Linearize)
+   call RegPack(RF, InData%TightED)
    call RegPack(RF, InData%NumBl)
    call RegPack(RF, InData%RootName)
    call RegPackAlloc(RF, InData%BlPitchInit)
@@ -852,6 +855,7 @@ subroutine SrvD_UnPackInitInput(RF, OutData)
    if (RF%ErrStat /= ErrID_None) return
    call RegUnpack(RF, OutData%InputFile); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%Linearize); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%TightED); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%NumBl); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%RootName); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%BlPitchInit); if (RegCheckErr(RF, RoutineName)) return
