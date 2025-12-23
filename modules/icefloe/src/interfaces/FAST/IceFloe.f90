@@ -430,7 +430,6 @@ contains
    function WriteOutputLinName(index) result(name)
       integer(IntKi), intent(in) :: index
       character(LinChanLen)      :: name
-      integer(IntKi)             :: legNum, remIndex
       name = InitOut%WriteOutputHdr(index)//', '//trim(InitOut%WriteOutputUnt(index))
    end function WriteOutputLinName
 end subroutine
