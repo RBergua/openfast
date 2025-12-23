@@ -339,13 +339,27 @@ subroutine IceD_InitVars(u, p, x, y, m, Vars, InputFileData, Linearize, ErrStat,
    ! Continuous State Variables
    !----------------------------------------------------------------------------
 
+   call MV_AddVar(Vars%x, "q", FieldTransDisp, DatLoc(IceD_x_q), &
+                  LinNames=["ice mass displacement, m"])
+   call MV_AddVar(Vars%x, "q", FieldTransVel, DatLoc(IceD_x_dqdt), &
+                  LinNames=["first time derivative of ice mass displacement, m/s"])
+
    !----------------------------------------------------------------------------
    ! Input variables
    !----------------------------------------------------------------------------
 
+   call MV_AddMeshVar(Vars%u, "PointMesh", MotionFields, DatLoc(IceD_u_PointMesh), u%PointMesh)
+
    !----------------------------------------------------------------------------
    ! Output variables
    !----------------------------------------------------------------------------
+
+   call MV_AddMeshVar(Vars%y, "PointMesh", LoadFields, DatLoc(IceD_y_PointMesh), y%PointMesh)
+   call MV_AddVar(Vars%y, "WriteOutput", FieldScalar, DatLoc(IceD_y_WriteOutput), &
+                  Flags=VF_WriteOut, &
+                  Num=p%NumOuts, &
+                  LinNames=["IceDisp, m ", "IceForce, N"])
+
 
    !----------------------------------------------------------------------------
    ! Initialization dependent on linearization
