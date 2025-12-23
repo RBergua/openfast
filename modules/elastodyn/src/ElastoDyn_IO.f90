@@ -1789,6 +1789,14 @@ SUBROUTINE ReadBladeFile ( BldFile, BladeKInputFileData, UnEc, ErrStat, ErrMsg )
    call ParseCom( InFileInfo, CurLine, TmpComment, ErrStat2, ErrMsg2, UnEc ); if (Failed()) return;   ! Separator
    call ParseCom( InFileInfo, CurLine, TmpComment, ErrStat2, ErrMsg2, UnEc ); if (Failed()) return;   ! Col Names
    call ParseCom( InFileInfo, CurLine, TmpComment, ErrStat2, ErrMsg2, UnEc ); if (Failed()) return;   ! Col Units
+
+   call ParseAry( InFileInfo, CurLine, 'Blade input station table', TmpRAry, 6_IntKi, ErrStat2, ErrMsg2, UnEc=0_IntKi );
+   if (ErrStat2 < AbortErrLev) then  ! CurLine won't be incremented if ErrStat2>=AbortErrLev
+      call SetErrStat( ErrID_Fatal,  " The ElastoDyn Blade file, "//trim(InFileInfo%FileList(1))//   &
+                 ", DISTRIBUTED BLADE PROPERTIES table contains the PitchAxis column.  This column is no longer supported and must be removed. ", ErrStat, ErrMsg, RoutineName )
+      return
+   endif
+
    call ParseTable5Col(ErrStat2, ErrMsg2); if (Failed()) return;
 
    !  -------------- BLADE MODE SHAPES --------------------------------------------
