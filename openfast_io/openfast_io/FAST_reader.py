@@ -2658,16 +2658,16 @@ class InputReader_OpenFAST(object):
                 self.fst_vt['SubDyn']['M_COSMID'][i] = -1
         f.readline()
         # MEMBER X-SECTION PROPERTY data 1/3
-        self.fst_vt['SubDyn']['NBCPropSets']  = int_read(f.readline().split()[0])
-        self.fst_vt['SubDyn']['PropSetID1'] = [None]*self.fst_vt['SubDyn']['NBCPropSets']
-        self.fst_vt['SubDyn']['YoungE1']    = [None]*self.fst_vt['SubDyn']['NBCPropSets']
-        self.fst_vt['SubDyn']['ShearG1']    = [None]*self.fst_vt['SubDyn']['NBCPropSets']
-        self.fst_vt['SubDyn']['MatDens1']   = [None]*self.fst_vt['SubDyn']['NBCPropSets']
-        self.fst_vt['SubDyn']['XsecD']      = [None]*self.fst_vt['SubDyn']['NBCPropSets']
-        self.fst_vt['SubDyn']['XsecT']      = [None]*self.fst_vt['SubDyn']['NBCPropSets']
+        self.fst_vt['SubDyn']['NPropSetsCyl']  = int_read(f.readline().split()[0])
+        self.fst_vt['SubDyn']['PropSetID1'] = [None]*self.fst_vt['SubDyn']['NPropSetsCyl']
+        self.fst_vt['SubDyn']['YoungE1']    = [None]*self.fst_vt['SubDyn']['NPropSetsCyl']
+        self.fst_vt['SubDyn']['ShearG1']    = [None]*self.fst_vt['SubDyn']['NPropSetsCyl']
+        self.fst_vt['SubDyn']['MatDens1']   = [None]*self.fst_vt['SubDyn']['NPropSetsCyl']
+        self.fst_vt['SubDyn']['XsecD']      = [None]*self.fst_vt['SubDyn']['NPropSetsCyl']
+        self.fst_vt['SubDyn']['XsecT']      = [None]*self.fst_vt['SubDyn']['NPropSetsCyl']
         ln = f.readline().split()
         ln = f.readline().split()
-        for i in range(self.fst_vt['SubDyn']['NBCPropSets']):
+        for i in range(self.fst_vt['SubDyn']['NPropSetsCyl']):
             ln = f.readline().split()
             self.fst_vt['SubDyn']['PropSetID1'][i] = int(ln[0])
             self.fst_vt['SubDyn']['YoungE1'][i]    = float(ln[1])
@@ -2677,17 +2677,17 @@ class InputReader_OpenFAST(object):
             self.fst_vt['SubDyn']['XsecT'][i]      = float(ln[5])
         f.readline()
         # MEMBER X-SECTION PROPERTY data 2/3
-        self.fst_vt['SubDyn']['NBRPropSets']  = int_read(f.readline().split()[0])
-        self.fst_vt['SubDyn']['PropSetID2'] = [None]*self.fst_vt['SubDyn']['NBRPropSets']
-        self.fst_vt['SubDyn']['YoungE2']    = [None]*self.fst_vt['SubDyn']['NBRPropSets']
-        self.fst_vt['SubDyn']['ShearG2']    = [None]*self.fst_vt['SubDyn']['NBRPropSets']
-        self.fst_vt['SubDyn']['MatDens2']   = [None]*self.fst_vt['SubDyn']['NBRPropSets']
-        self.fst_vt['SubDyn']['XsecSa']     = [None]*self.fst_vt['SubDyn']['NBRPropSets']
-        self.fst_vt['SubDyn']['XsecSb']     = [None]*self.fst_vt['SubDyn']['NBRPropSets']
-        self.fst_vt['SubDyn']['XsecT2']     = [None]*self.fst_vt['SubDyn']['NBRPropSets']
+        self.fst_vt['SubDyn']['NPropSetsRec']  = int_read(f.readline().split()[0])
+        self.fst_vt['SubDyn']['PropSetID2'] = [None]*self.fst_vt['SubDyn']['NPropSetsRec']
+        self.fst_vt['SubDyn']['YoungE2']    = [None]*self.fst_vt['SubDyn']['NPropSetsRec']
+        self.fst_vt['SubDyn']['ShearG2']    = [None]*self.fst_vt['SubDyn']['NPropSetsRec']
+        self.fst_vt['SubDyn']['MatDens2']   = [None]*self.fst_vt['SubDyn']['NPropSetsRec']
+        self.fst_vt['SubDyn']['XsecSa']     = [None]*self.fst_vt['SubDyn']['NPropSetsRec']
+        self.fst_vt['SubDyn']['XsecSb']     = [None]*self.fst_vt['SubDyn']['NPropSetsRec']
+        self.fst_vt['SubDyn']['XsecT2']     = [None]*self.fst_vt['SubDyn']['NPropSetsRec']
         ln = f.readline().split()
         ln = f.readline().split()
-        for i in range(self.fst_vt['SubDyn']['NBRPropSets']):
+        for i in range(self.fst_vt['SubDyn']['NPropSetsRec']):
             ln = f.readline().split()
             self.fst_vt['SubDyn']['PropSetID2'][i] = int(ln[0])
             self.fst_vt['SubDyn']['YoungE2'][i]    = float(ln[1])

@@ -1421,43 +1421,43 @@ IF (Check( p%NMembers < 1 , 'NMembers must be > 0')) return
 
 !------------------ MEMBER CROSS-SECTION PROPERTY data 1/3 [isotropic material for now: use this table if circular-tubular elements ------------------------
 CALL ReadCom  ( UnIn, SDInputFile,                 ' Member CROSS-Section Property Data 1/3 ',ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
-CALL ReadIVar ( UnIn, SDInputFile, Init%NPropSetsBC, 'NPropSets', 'Number of property sets',ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
-CALL ReadCom  ( UnIn, SDInputFile,                 'Property Data 1/2 Header'            ,ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
-CALL ReadCom  ( UnIn, SDInputFile,                 'Property Data 1/2 Units '            ,ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
+CALL ReadIVar ( UnIn, SDInputFile, Init%NPropSetsBC, 'NPropSetsCyl', 'Number of circular beam section property sets',ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
+CALL ReadCom  ( UnIn, SDInputFile,                 'Property Data 1/3 Header'            ,ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
+CALL ReadCom  ( UnIn, SDInputFile,                 'Property Data 1/3 Units '            ,ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
 CALL AllocAry(Init%PropSetsBC, Init%NPropSetsBC, PropSetsBCCol, 'PropSets', ErrStat2, ErrMsg2) ; if(Failed()) return
 DO I = 1, Init%NPropSetsBC
-   CALL ReadAry( UnIn, SDInputFile, Dummy_ReAry, PropSetsBCCol, 'PropSets', 'PropSets number and values ', ErrStat2 , ErrMsg2, UnEc); if(Failed()) return
+   CALL ReadAry( UnIn, SDInputFile, Dummy_ReAry, PropSetsBCCol, 'PropSetsBC', 'PropSetsBC ID and values ', ErrStat2 , ErrMsg2, UnEc); if(Failed()) return
    Init%PropSetsBC(I,:) = Dummy_ReAry(1:PropSetsBCCol)
 ENDDO   
 IF (Check( Init%NPropSetsBC < 0, 'NPropSetsBC must be >=0')) return
 
 !------------------ MEMBER CROSS-SECTION PROPERTY data 2/3 [isotropic material for now: use this table if rectangular-tubular elements ---------------------
 CALL ReadCom  ( UnIn, SDInputFile,                 ' Member CROSS-Section Property Data 2/3 ',ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
-CALL ReadIVar ( UnIn, SDInputFile, Init%NPropSetsBR, 'NPropSets', 'Number of property sets',ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
-CALL ReadCom  ( UnIn, SDInputFile,                 'Property Data 1/2 Header'            ,ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
-CALL ReadCom  ( UnIn, SDInputFile,                 'Property Data 1/2 Units '            ,ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
+CALL ReadIVar ( UnIn, SDInputFile, Init%NPropSetsBR, 'NPropSetsRec', 'Number of rectangular beam section property sets',ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
+CALL ReadCom  ( UnIn, SDInputFile,                 'Property Data 2/3 Header'            ,ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
+CALL ReadCom  ( UnIn, SDInputFile,                 'Property Data 2/3 Units '            ,ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
 CALL AllocAry(Init%PropSetsBR, Init%NPropSetsBR, PropSetsBRCol, 'PropSets', ErrStat2, ErrMsg2) ; if(Failed()) return
 DO I = 1, Init%NPropSetsBR
-   CALL ReadAry( UnIn, SDInputFile, Dummy_ReAry, PropSetsBRCol, 'PropSets', 'PropSets number and values ', ErrStat2 , ErrMsg2, UnEc); if(Failed()) return
+   CALL ReadAry( UnIn, SDInputFile, Dummy_ReAry, PropSetsBRCol, 'PropSetsBR', 'PropSetsBR ID and values ', ErrStat2 , ErrMsg2, UnEc); if(Failed()) return
    Init%PropSetsBR(I,:) = Dummy_ReAry(1:PropSetsBRCol)
 ENDDO
 IF (Check( Init%NPropSetsBR < 0, 'NPropSetsBR must be >=0')) return
 
-!------------------ MEMBER CROSS-SECTION PROPERTY data 2/3 [isotropic material for now: use this table if any section other than circular, however provide COSM(i,j) below) ------------------------
+!------------------ MEMBER CROSS-SECTION PROPERTY data 3/3 [isotropic material for now: use this table if other elements) ----------------------------------
 CALL ReadCom  ( UnIn, SDInputFile,                  'Member CROSS-Section Property Data 3/3 '               ,ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
-CALL ReadIVar ( UnIn, SDInputFile, Init%NPropSetsX, 'NXPropSets', 'Number of non-circular property sets',ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
-CALL ReadCom  ( UnIn, SDInputFile,                  'Property Data 2/2 Header'                          ,ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
-CALL ReadCom  ( UnIn, SDInputFile,                  'Property Data 2/2 Unit  '                          ,ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
-CALL AllocAry(Init%PropSetsX, Init%NPropSetsX, PropSetsXCol, 'XPropSets', ErrStat2, ErrMsg2); if(Failed()) return
+CALL ReadIVar ( UnIn, SDInputFile, Init%NPropSetsX, 'NXPropSets', 'Number of arbitrary beam section property sets',ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
+CALL ReadCom  ( UnIn, SDInputFile,                  'Property Data 3/3 Header'                          ,ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
+CALL ReadCom  ( UnIn, SDInputFile,                  'Property Data 3/3 Units '                          ,ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
+CALL AllocAry(Init%PropSetsX, Init%NPropSetsX, PropSetsXCol, 'PropSetsX', ErrStat2, ErrMsg2); if(Failed()) return
 DO I = 1, Init%NPropSetsX
-   CALL ReadAry( UnIn, SDInputFile, Init%PropSetsX(I,:), PropSetsXCol, 'XPropSets', 'XPropSets ID and values ', ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
+   CALL ReadAry( UnIn, SDInputFile, Init%PropSetsX(I,:), PropSetsXCol, 'PropSetsX', 'PropSetsX ID and values ', ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
 ENDDO   
 IF (Check( Init%NPropSetsX < 0,  'NPropSetsX must be >=0')) return
 
 if (.not. LegacyFormat) then
    !-------------------------- CABLE PROPERTIES  -------------------------------------
    CALL ReadCom  ( UnIn, SDInputFile,                  'Cable properties'                                 ,ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
-   CALL ReadIVar ( UnIn, SDInputFile, Init%NPropSetsC, 'NPropSetsC', 'Number of cable properties' ,ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
+   CALL ReadIVar ( UnIn, SDInputFile, Init%NPropSetsC, 'NCablePropSets', 'Number of cable properties' ,ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
    CALL ReadCom  ( UnIn, SDInputFile,                  'Cable properties Header'                          ,ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
    CALL ReadCom  ( UnIn, SDInputFile,                  'Cable properties Unit  '                          ,ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
    IF (Check( Init%NPropSetsC < 0, 'NPropSetsCable must be >=0')) return
@@ -1489,7 +1489,7 @@ if (.not. LegacyFormat) then
 
    !----------------------- RIGID LINK PROPERTIES ------------------------------------
    CALL ReadCom  ( UnIn, SDInputFile,                  'Rigid link properties'                                 ,ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
-   CALL ReadIVar ( UnIn, SDInputFile, Init%NPropSetsR, 'NPropSetsR', 'Number of rigid link properties' ,ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
+   CALL ReadIVar ( UnIn, SDInputFile, Init%NPropSetsR, 'NRigidPropSets', 'Number of rigid link properties' ,ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
    CALL ReadCom  ( UnIn, SDInputFile,                  'Rigid link properties Header'                          ,ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
    CALL ReadCom  ( UnIn, SDInputFile,                  'Rigid link properties Unit  '                          ,ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
    CALL AllocAry(Init%PropSetsR, Init%NPropSetsR, PropSetsRCol, 'RigidPropSets', ErrStat2, ErrMsg2); if(Failed()) return
@@ -1499,7 +1499,7 @@ if (.not. LegacyFormat) then
    IF (Check( Init%NPropSetsR < 0, 'NPropSetsRigid must be >=0')) return
    !----------------------- SPRING ELEMENT PROPERTIES --------------------------------
    CALL ReadCom  ( UnIn, SDInputFile,                  'Spring element properties'                                 ,ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
-   CALL ReadIVar ( UnIn, SDInputFile, Init%NPropSetsS, 'NPropSetsS', 'Number of spring properties' ,ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
+   CALL ReadIVar ( UnIn, SDInputFile, Init%NPropSetsS, 'NSpringPropSets', 'Number of spring properties' ,ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
    CALL ReadCom  ( UnIn, SDInputFile,                  'Spring element properties Header'                          ,ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
    CALL ReadCom  ( UnIn, SDInputFile,                  'Spring element properties Unit  '                          ,ErrStat2, ErrMsg2, UnEc ); if(Failed()) return
    IF (Check( Init%NPropSetsS < 0, 'NPropSetsSpring must be >=0')) return
