@@ -54,7 +54,7 @@ USE NWTC_Library
 IMPLICIT NONE
     INTEGER(IntKi), PUBLIC, PARAMETER  :: LooseCoupling                    = 1      ! Loose Module Coupling [-]
     INTEGER(IntKi), PUBLIC, PARAMETER  :: TightCouplingFixed               = 2      ! Tight Module Coupling with fixed Jacobian updates (DT_UJac) [-]
-    INTEGER(IntKi), PUBLIC, PARAMETER  :: TightCouplingAdaptive                = 3      ! Tight Module Coupling with automatic Jacobian updates [-]
+    INTEGER(IntKi), PUBLIC, PARAMETER  :: TightCouplingAdaptive            = 3      ! Tight Module Coupling with adaptive Jacobian updates [-]
     INTEGER(IntKi), PUBLIC, PARAMETER  :: Module_Unknown                   = -1      ! Unknown [-]
     INTEGER(IntKi), PUBLIC, PARAMETER  :: Module_None                      = 0      ! No module selected [-]
     INTEGER(IntKi), PUBLIC, PARAMETER  :: Module_Glue                      = 1      ! Glue code [-]

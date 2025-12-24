@@ -39,7 +39,7 @@ usefrom	ExtPtfm_MCKF_Registry.txt
 # Make sure the module identifiers start at 1 and that this order matches the orders in WrOutputLine and FAST_InitOutput!!!
 param	FAST	-	INTEGER	LooseCoupling	-	1	-	"Loose Module Coupling"	-
 param	FAST	-	INTEGER	TightCouplingFixed	-	2	-	"Tight Module Coupling with fixed Jacobian updates (DT_UJac)"	-
-param	FAST	-	INTEGER	TightCouplingAuto	-	3	-	"Tight Module Coupling with automatic Jacobian updates"	-
+param	FAST	-	INTEGER	TightCouplingAdaptive	-	3	-	"Tight Module Coupling with adaptive Jacobian updates"	-
 # Module Identifiers
 param	^	-	INTEGER	Module_Unknown	-	-1	-	"Unknown"	-
 param	^	-	INTEGER	Module_None	-	0	-	"No module selected"	-
