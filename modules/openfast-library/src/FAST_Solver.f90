@@ -176,8 +176,6 @@ subroutine FAST_SolverInit(p_FAST, p, m, GlueModData, GlueModMaps, Turbine, ErrS
    ! Set VF_Solve flag on Jacobian variables use by the tight coupling solver
    call SetVarSolveFlags()
 
-   ! Add VF_Tight
-
    ! Combination of TC and Option 1 module indices
    iMod = [p%iModTC, p%iModOpt1]
 
