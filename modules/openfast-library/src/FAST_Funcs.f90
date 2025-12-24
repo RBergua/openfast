@@ -690,7 +690,7 @@ subroutine FAST_UpdateStates(ModData, t_initial, n_t_global, T, ErrStat, ErrMsg)
 
 contains
    logical function Failed()
-      if (ErrStat2 >= AbortErrLev) call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+      call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
       Failed = ErrStat >= AbortErrLev
    end function
 end subroutine
