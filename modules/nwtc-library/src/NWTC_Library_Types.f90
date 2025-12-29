@@ -63,10 +63,11 @@ IMPLICIT NONE
     INTEGER(IntKi), PUBLIC, PARAMETER  :: VF_DerivOrder2                   = 4096      ! Variable is derivative order 2 in linearization file [-]
     INTEGER(IntKi), PUBLIC, PARAMETER  :: VF_Mapping                       = 8192      ! Variable is used in a module-to-module transfer mapping [-]
     INTEGER(IntKi), PUBLIC, PARAMETER  :: VF_NoLin                         = 16384      ! Variable is used in a module-to-module transfer mapping [-]
-    INTEGER(IntKi), PUBLIC, PARAMETER  :: VC_None                          = 0      !  [-]
-    INTEGER(IntKi), PUBLIC, PARAMETER  :: VC_Tight                         = 1      !  [-]
-    INTEGER(IntKi), PUBLIC, PARAMETER  :: VC_Option1                       = 2      !  [-]
-    INTEGER(IntKi), PUBLIC, PARAMETER  :: VC_Option2                       = 3      !  [-]
+    INTEGER(IntKi), PUBLIC, PARAMETER  :: MC_None                          = 0      !  [-]
+    INTEGER(IntKi), PUBLIC, PARAMETER  :: MC_Tight                         = 1      !  [-]
+    INTEGER(IntKi), PUBLIC, PARAMETER  :: MC_Option1                       = 2      !  [-]
+    INTEGER(IntKi), PUBLIC, PARAMETER  :: MC_Option2                       = 4      !  [-]
+    INTEGER(IntKi), PUBLIC, PARAMETER  :: MC_Post                          = 8      !  [-]
 ! =========  ProgDesc  =======
   TYPE, PUBLIC :: ProgDesc
     CHARACTER(99)  :: Name      !< Name of the program or module [-]
@@ -200,6 +201,7 @@ IMPLICIT NONE
     INTEGER(IntKi)  :: Ins = 0      !< Module instance number [-]
     INTEGER(IntKi)  :: iRotor = 0      !< Module rotor number [-]
     INTEGER(IntKi)  :: SubSteps = 0      !< Module number of substeps per solver time step [-]
+    INTEGER(IntKi)  :: Category = 0      !< Module category tight, option 1, option 2 [-]
     REAL(R8Ki)  :: DT = 0      !< Module time step [-]
     TYPE(ModVarsType)  :: Vars      !< Module variables type [-]
     TYPE(ModLinType)  :: Lin      !< Module linearization arrays and matrices [-]
@@ -1465,6 +1467,7 @@ subroutine NWTC_Library_CopyModDataType(SrcModDataTypeData, DstModDataTypeData, 
    DstModDataTypeData%Ins = SrcModDataTypeData%Ins
    DstModDataTypeData%iRotor = SrcModDataTypeData%iRotor
    DstModDataTypeData%SubSteps = SrcModDataTypeData%SubSteps
+   DstModDataTypeData%Category = SrcModDataTypeData%Category
    DstModDataTypeData%DT = SrcModDataTypeData%DT
    call NWTC_Library_CopyModVarsType(SrcModDataTypeData%Vars, DstModDataTypeData%Vars, CtrlCode, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
@@ -1500,6 +1503,7 @@ subroutine NWTC_Library_PackModDataType(RF, Indata)
    call RegPack(RF, InData%Ins)
    call RegPack(RF, InData%iRotor)
    call RegPack(RF, InData%SubSteps)
+   call RegPack(RF, InData%Category)
    call RegPack(RF, InData%DT)
    call NWTC_Library_PackModVarsType(RF, InData%Vars) 
    call NWTC_Library_PackModLinType(RF, InData%Lin) 
@@ -1517,6 +1521,7 @@ subroutine NWTC_Library_UnPackModDataType(RF, OutData)
    call RegUnpack(RF, OutData%Ins); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%iRotor); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%SubSteps); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%Category); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%DT); if (RegCheckErr(RF, RoutineName)) return
    call NWTC_Library_UnpackModVarsType(RF, OutData%Vars) ! Vars 
    call NWTC_Library_UnpackModLinType(RF, OutData%Lin) ! Lin 

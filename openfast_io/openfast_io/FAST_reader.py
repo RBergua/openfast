@@ -121,7 +121,8 @@ def bool_read(text):
     if 'default' in text.lower():
         return str(text)
     else:
-        if text.lower() == 'true':
+        text = text.lower()
+        if text == 'true' or text == 't':
             return True
         else:
             return False
@@ -334,6 +335,7 @@ class InputReader_OpenFAST(object):
         self.fst_vt['Fst']['AbortLevel'] = quoted_read(f.readline().split()[0])
         self.fst_vt['Fst']['TMax'] = float_read(f.readline().split()[0])
         self.fst_vt['Fst']['DT']  = float_read(f.readline().split()[0])
+        self.fst_vt['Fst']['ModCoupling'] = int(f.readline().split()[0])
         self.fst_vt['Fst']['InterpOrder']  = int(f.readline().split()[0])
         self.fst_vt['Fst']['NumCrctn']  = int(f.readline().split()[0])
         self.fst_vt['Fst']['RhoInf']  = float_read(f.readline().split()[0])
@@ -355,7 +357,7 @@ class InputReader_OpenFAST(object):
         self.fst_vt['Fst']['CompMooring'] = int(f.readline().split()[0])
         self.fst_vt['Fst']['CompIce'] = int(f.readline().split()[0])
         self.fst_vt['Fst']['MHK'] = int(f.readline().split()[0])
-        self.fst_vt['Fst']['RotorDir'] = read_array(f, self.fst_vt['Fst']['NRotors'], array_type=int)
+        self.fst_vt['Fst']['MirrorRotor'] = read_array(f, self.fst_vt['Fst']['NRotors'], array_type=bool)
 
         # Environmental conditions
         f.readline()

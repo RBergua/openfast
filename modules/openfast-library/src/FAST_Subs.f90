@@ -1297,6 +1297,7 @@ SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SE
 
          Init%InData_SrvD%InputFile     = p_FAST%ServoFile(iRot)
          Init%InData_SrvD%RootName      = TRIM(p_FAST%OutFileRoot)//'.'//TRIM(y_FAST%Module_Abrev(Module_SrvD))
+         Init%InData_SrvD%TightED       = (p_FAST%ModCoupling == TightCouplingFixed) .or. (p_FAST%ModCoupling == TightCouplingAdaptive)
          Init%InData_SrvD%NumBl         = p_FAST%RotNumBld(iRot)
          Init%InData_SrvD%Gravity       = [0.0_ReKi, 0.0_ReKi, -p_FAST%Gravity]       ! "Gravitational acceleration vector" m/s^2
          Init%InData_SrvD%TMax          = p_FAST%TMax
@@ -1903,6 +1904,11 @@ SUBROUTINE ValidateInputData(p, m_FAST, ErrStat, ErrMsg)
          CALL SetErrStat( ErrID_Fatal, 'DT must be greater than '//TRIM ( Num2LStr( TmpTime ) )//' seconds.', ErrStat, ErrMsg, RoutineName )
       END IF
    END IF
+
+   ! Validate module coupling method
+   if ((p%ModCoupling < 1) .or. (p%ModCoupling > 3)) then
+      call SetErrStat( ErrID_Fatal, 'ModCoupling must be 1 (loose), 2 (tight with fixed Jacobian updates), or 3 (tight with automatic Jacobian updates).', ErrStat, ErrMsg, RoutineName)
+   end if
 
    IF (p%tolerSquared < EPSILON(p%tolerSquared)) THEN
       CALL SetErrStat( ErrID_Fatal, 'Toler must be larger than sqrt(epsilon).', ErrStat, ErrMsg, RoutineName )
@@ -2615,7 +2621,6 @@ SUBROUTINE FAST_ReadPrimaryFile( InputFile, p, m_FAST, OverrideAbortErrLev, ErrS
 
    CHARACTER(10)                 :: AbortLevel                                ! String that indicates which error level should be used to abort the program: WARNING, SEVERE, or FATAL
    CHARACTER(30)                 :: Line                                      ! string for default entry in input file
-   INTEGER(IntKi), allocatable   :: RotorDir(:)                               ! List of rotor rotation directions [1 to NRotors] {0=CCW, 1=CW}
 
    CHARACTER(*),   PARAMETER     :: RoutineName = 'FAST_ReadPrimaryFile'
 
@@ -2726,6 +2731,11 @@ SUBROUTINE FAST_ReadPrimaryFile( InputFile, p, m_FAST, OverrideAbortErrLev, ErrS
       call cleanup()
       return
    end if
+
+      ! ModCoupling - Module coupling method (switch) {1=loose; 2=tight with fixed Jacobian updates (DT_UJac); 3=tight with automatic Jacobian updates}
+   CALL ReadVar( UnIn, InputFile, p%ModCoupling, "ModCoupling", "Module coupling method (switch) "//&
+                  "{1=loose; 2=tight with fixed Jacobian updates (DT_UJac); 3=tight with automatic Jacobian updates}", ErrStat2, ErrMsg2, UnEc)
+   if (Failed()) return
 
       ! InterpOrder - Interpolation order for inputs and outputs {0=nearest neighbor ,1=linear, 2=quadratic}
    CALL ReadVar( UnIn, InputFile, p%InterpOrder, "InterpOrder", "Interpolation order "//&
@@ -2924,17 +2934,11 @@ SUBROUTINE FAST_ReadPrimaryFile( InputFile, p, m_FAST, OverrideAbortErrLev, ErrS
          if (Failed()) return
 
       ! Allocate array of rotor mirror flags
-   call AllocAry(p%RotMirror, p%NRotors, "p%RotMirror", ErrStat2, ErrMsg2); if (Failed()) return
-   call AllocAry(RotorDir, p%NRotors, "RotorDir", ErrStat2, ErrMsg2); if (Failed()) return
+   call AllocAry(p%MirrorRotor, p%NRotors, "p%MirrorRotor", ErrStat2, ErrMsg2); if (Failed()) return
 
-      ! Read rotor direction list
-   CALL ReadAry( UnIn, InputFile, RotorDir, p%NRotors, "RotorDir", "List of rotor rotation directions [1 to NRotors] {0=CCW, 1=CW}", ErrStat2, ErrMsg2, UnEc)
+      ! Read list of rotor mirror flags
+   CALL ReadAry( UnIn, InputFile, p%MirrorRotor, p%NRotors, "MirrorRotor", "Flag to reverse rotor rotation direction [1 to NRotors] {F=Normal, T=Mirror}", ErrStat2, ErrMsg2, UnEc)
          if (Failed()) return
-
-      ! Convert rotor direction into flags to mirror rotor direction
-   do i = 1, p%NRotors
-      p%RotMirror(i) = RotorDir(i) == 1
-   end do
 
    !---------------------- ENVIRONMENTAL CONDITIONS --------------------------------
 

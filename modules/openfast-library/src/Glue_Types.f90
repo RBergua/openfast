@@ -98,11 +98,12 @@ IMPLICIT NONE
   TYPE, PUBLIC :: Glue_TCParam
     REAL(R8Ki)  :: h = 0.0_R8Ki      !< solution time step [-]
     REAL(R8Ki)  :: ConvTol = 0.0_R8Ki      !< Solution convergence tolerance [-]
+    INTEGER(IntKi)  :: ModCoupling = 0_IntKi      !< Module coupling method {1=loose; 2=tight with fixed Jacobian updates (DT_UJac); 3=tight with automatic Jacobian updates} [-]
     INTEGER(IntKi)  :: NumCrctn = 0_IntKi      !<  [-]
     INTEGER(IntKi)  :: MaxConvIter = 0_IntKi      !<  [-]
     INTEGER(IntKi)  :: NIter_UJac = 0_IntKi      !< Number of solution iterations between updating the Jacobian [-]
     INTEGER(IntKi)  :: NStep_UJac = 0_IntKi      !< Number of global time steps between updating the Jacobian [-]
-    REAL(R8Ki)  :: Scale_UJac = 0.0_R8Ki      !<  [-]
+    REAL(R8Ki)  :: Scale_UJac = 0.0_R8Ki      !< Jacobian load scaling factor [-]
     REAL(R8Ki)  :: RhoInf = 0.0_R8Ki      !< Rho infinity used for calculating Generalized-alpha coefficients [-]
     REAL(R8Ki)  :: AlphaM = 0.0_R8Ki      !< Generalized-alpha alpha_m coefficient [-]
     REAL(R8Ki)  :: AlphaF = 0.0_R8Ki      !< Generalized-alpha alpha_f coefficient [-]
@@ -738,6 +739,7 @@ subroutine Glue_CopyTCParam(SrcTCParamData, DstTCParamData, CtrlCode, ErrStat, E
    ErrMsg  = ''
    DstTCParamData%h = SrcTCParamData%h
    DstTCParamData%ConvTol = SrcTCParamData%ConvTol
+   DstTCParamData%ModCoupling = SrcTCParamData%ModCoupling
    DstTCParamData%NumCrctn = SrcTCParamData%NumCrctn
    DstTCParamData%MaxConvIter = SrcTCParamData%MaxConvIter
    DstTCParamData%NIter_UJac = SrcTCParamData%NIter_UJac
@@ -858,6 +860,7 @@ subroutine Glue_PackTCParam(RF, Indata)
    if (RF%ErrStat >= AbortErrLev) return
    call RegPack(RF, InData%h)
    call RegPack(RF, InData%ConvTol)
+   call RegPack(RF, InData%ModCoupling)
    call RegPack(RF, InData%NumCrctn)
    call RegPack(RF, InData%MaxConvIter)
    call RegPack(RF, InData%NIter_UJac)
@@ -903,6 +906,7 @@ subroutine Glue_UnPackTCParam(RF, OutData)
    if (RF%ErrStat /= ErrID_None) return
    call RegUnpack(RF, OutData%h); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%ConvTol); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%ModCoupling); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%NumCrctn); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%MaxConvIter); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%NIter_UJac); if (RegCheckErr(RF, RoutineName)) return

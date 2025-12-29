@@ -313,7 +313,7 @@ endfunction(py_openfast_io_library_pytest)
 
 # OpenFAST regression tests
 of_regression("AWT_YFix_WSt"                           "openfast;elastodyn;aerodyn;servodyn")
-# of_regression("AWT_WSt_StartUp_HighSpShutDown"         "openfast;elastodyn;aerodyn;servodyn")
+of_regression("AWT_WSt_StartUp_HighSpShutDown"         "openfast;elastodyn;aerodyn;servodyn")
 of_regression("AWT_YFree_WSt"                          "openfast;elastodyn;aerodyn;servodyn")
 of_regression("AWT_YFree_WTurb"                        "openfast;elastodyn;aerodyn;servodyn")
 of_regression("AWT_WSt_StartUpShutDown"                "openfast;elastodyn;aerodyn;servodyn")

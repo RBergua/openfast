@@ -37,7 +37,11 @@ usefrom	ExtPtfm_MCKF_Registry.txt
 # MODULE IDENTIFIERS:
 # NOTE WELL: The order of these modules is the order they get written to the output file;
 # Make sure the module identifiers start at 1 and that this order matches the orders in WrOutputLine and FAST_InitOutput!!!
-param	FAST	-	INTEGER	Module_Unknown	-	-1	-	"Unknown"	-
+param	FAST	-	INTEGER	LooseCoupling	-	1	-	"Loose Module Coupling"	-
+param	FAST	-	INTEGER	TightCouplingFixed	-	2	-	"Tight Module Coupling with fixed Jacobian updates (DT_UJac)"	-
+param	FAST	-	INTEGER	TightCouplingAdaptive	-	3	-	"Tight Module Coupling with adaptive Jacobian updates"	-
+# Module Identifiers
+param	^	-	INTEGER	Module_Unknown	-	-1	-	"Unknown"	-
 param	^	-	INTEGER	Module_None	-	0	-	"No module selected"	-
 param	^	-	INTEGER	Module_Glue	-	1	-	"Glue code"	-
 param	^	-	INTEGER	Module_IfW	-	2	-	"InflowWind"	-
@@ -113,12 +117,13 @@ typedef	^	FAST_ParameterType	IntKi	NumCrctn	-	-	-	"Number of correction iteratio
 typedef	^	FAST_ParameterType	IntKi	KMax	-	-	-	"Maximum number of input-output-solve or nonlinear solve residual equation iterations (KMax >= 1) [>0]"	-
 typedef	^	FAST_ParameterType	IntKi	numIceLegs	-	-	-	"number of suport-structure legs in contact with ice (IceDyn coupling)"	-
 typedef	^	FAST_ParameterType	IntKi	RotNumBld	:	-	-	"number of blades in each rotor"	-
-typedef	^	FAST_ParameterType	logical	RotMirror	:	-	-	"Array of flags indicating if rotor rotation should be mirrored (true=mirror)"	-
+typedef	^	FAST_ParameterType	logical	MirrorRotor	:	-	-	"Array of flags indicating if rotor rotation should be mirrored (true=mirror)"	-
 typedef	^	FAST_ParameterType	IntKi	NumBD	-	-	-	"number of BeamDyn instances"	-
 typedef	^	FAST_ParameterType	IntKi	BDRotMap	:	-	-	"array mapping BeamDyn instance to rotor number"	-
 typedef	^	FAST_ParameterType	IntKi	BDBldMap	:	-	-	"array mapping BeamDyn instance to blade number"	-
 typedef	^	FAST_ParameterType	LOGICAL	BD_OutputSibling	-	-	-	"flag to determine if BD input is sibling of output mesh"	-
 # Data for TC Solver:
+typedef	^	FAST_ParameterType	IntKi	ModCoupling	-	-	-	"Module coupling type {1=loose; 2=tight with fixed Jacobian updates (DT_UJac); 3=tight with automatic Jacobian updates}"	-
 typedef	^	FAST_ParameterType	DbKi	RhoInf	-	-	-	"Numerical damping parameter for tight coupling generalized-alpha integrator (-) [0.0 to 1.0]"	-
 typedef	^	FAST_ParameterType	DbKi	ConvTol	-	-	-	"Convergence iteration error tolerance for tight coupling generalized alpha integrator (-)"	-
 typedef	^	FAST_ParameterType	IntKi	MaxConvIter	-	-	-	"Maximum number of convergence iterations for tight coupling generalized alpha integrator (-)"	-
