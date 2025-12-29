@@ -77,8 +77,8 @@ param       ^       -           IntKi           VF_NoLin           - 16384  -   
 param       ^       -           IntKi           MC_None             -   0   -   ""  -
 param       ^       -           IntKi           MC_Tight            -   1   -   ""  -
 param       ^       -           IntKi           MC_Option1          -   2   -   ""  -
-param       ^       -           IntKi           MC_Option2          -   3   -   ""  -
-param       ^       -           IntKi           MC_Post             -   4   -   ""  -
+param       ^       -           IntKi           MC_Option2          -   4   -   ""  -
+param       ^       -           IntKi           MC_Post             -   8   -   ""  -
 
 typedef     ^       DatLoc      IntKi           Num                 -   0   -   "Mesh number in module"
 typedef     ^       ^           IntKi           i1                  -   0   -   "Index 1"

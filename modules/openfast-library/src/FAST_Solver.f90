@@ -151,22 +151,22 @@ subroutine FAST_SolverInit(p_FAST, p, m, GlueModData, GlueModMaps, Turbine, ErrS
 
    ! Tight coupling modules
    do i = 1, size(p%iModTC)
-      GlueModData(p%iModTC(i))%Category = MC_Tight
+      GlueModData(p%iModTC(i))%Category = ior(GlueModData(p%iModTC(i))%Category, MC_Tight)
    end do
 
    ! Option 1 modules
    do i = 1, size(p%iModOpt1)
-      GlueModData(p%iModOpt1(i))%Category = MC_Option1
+      GlueModData(p%iModOpt1(i))%Category = ior(GlueModData(p%iModOpt1(i))%Category, MC_Option1)
    end do
 
    ! Option 2 modules
    do i = 1, size(p%iModOpt2)
-      GlueModData(p%iModOpt2(i))%Category = MC_Option2
+      GlueModData(p%iModOpt2(i))%Category = ior(GlueModData(p%iModOpt2(i))%Category, MC_Option2)
    end do
 
    ! Post-solve modules
    do i = 1, size(p%iModPost)
-      GlueModData(p%iModPost(i))%Category = MC_Post
+      GlueModData(p%iModPost(i))%Category = ior(GlueModData(p%iModPost(i))%Category, MC_Post)
    end do
 
    !----------------------------------------------------------------------------

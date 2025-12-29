@@ -66,8 +66,8 @@ IMPLICIT NONE
     INTEGER(IntKi), PUBLIC, PARAMETER  :: MC_None                          = 0      !  [-]
     INTEGER(IntKi), PUBLIC, PARAMETER  :: MC_Tight                         = 1      !  [-]
     INTEGER(IntKi), PUBLIC, PARAMETER  :: MC_Option1                       = 2      !  [-]
-    INTEGER(IntKi), PUBLIC, PARAMETER  :: MC_Option2                       = 3      !  [-]
-    INTEGER(IntKi), PUBLIC, PARAMETER  :: MC_Post                          = 4      !  [-]
+    INTEGER(IntKi), PUBLIC, PARAMETER  :: MC_Option2                       = 4      !  [-]
+    INTEGER(IntKi), PUBLIC, PARAMETER  :: MC_Post                          = 8      !  [-]
 ! =========  ProgDesc  =======
   TYPE, PUBLIC :: ProgDesc
     CHARACTER(99)  :: Name      !< Name of the program or module [-]
