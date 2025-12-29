@@ -1689,12 +1689,12 @@ class InputWriter_OpenFAST(object):
 
         f.write('---------------------- STRIP THEORY OPTIONS --------------------------------------\n')
         f.write('{:<22d} {:<11} {:}'.format(self.fst_vt['HydroDyn']['WaveDisp'], 'WaveDisp', '- Method of computing Wave Kinematics {0: use undisplaced position, 1: use displaced position) } (switch)\n'))
-        f.write('{:<22d} {:<11} {:}'.format(self.fst_vt['HydroDyn']['AMMod'], 'AMMod', '- Method of computing distributed added-mass force. (0: Only and always on nodes below SWL at the undisplaced position. 2: Up to the instantaneous free surface) [overwrite to 0 when WaveMod = 0 or 6 or when WaveStMod = 0 in SeaState]\n'))
+        f.write('{:<22d} {:<11} {:}'.format(self.fst_vt['HydroDyn']['AMMod'], 'AMMod', '- Method of computing distributed added-mass force. (0: Only and always on nodes below SWL at the undisplaced position. 1: Up to the instantaneous free surface) [overwrite to 0 when WaveStMod = 0 in SeaState]]\n'))
         
         f.write('---------------------- AXIAL COEFFICIENTS --------------------------------------\n')
         f.write('{:<22d} {:<11} {:}'.format(self.fst_vt['HydroDyn']['NAxCoef'], 'NAxCoef', '- Number of axial coefficients (-)\n'))
         f.write(" ".join(['{:^11s}'.format(i) for i in ['AxCoefID', 'AxCd', 'AxCa', 'AxCp', 'AxFDMod', 'AxVnCOff', 'AxFDLoFSc']])+'\n')
-        f.write(" ".join(['{:^11s}'.format(i) for i in ['(-)']*7])+'\n')
+        f.write(" ".join(['{:^11s}'.format(i) for i in ['(-)','(-)','(-)','(-)','(switch)','(Hz)','(-)']])+'\n')
         for i in range(self.fst_vt['HydroDyn']['NAxCoef']):
             ln = []
             ln.append('{:^11d}'.format(self.fst_vt['HydroDyn']['AxCoefID'][i]))
@@ -2210,10 +2210,10 @@ class InputWriter_OpenFAST(object):
                 ln.append('{:^11}'.format(self.fst_vt['SubDyn']['M_Spin'][i]))
             f.write(" ".join(ln) + '\n')
         f.write('------------------ CIRCULAR BEAM CROSS-SECTION PROPERTIES -----------------------------\n')
-        f.write('{:<22d} {:<11} {:}'.format(self.fst_vt['SubDyn']['NBCPropSets'], 'NPropSets', '- Number of structurally unique circular cross-sections\n'))
+        f.write('{:<22d} {:<11} {:}'.format(self.fst_vt['SubDyn']['NPropSetsCyl'], 'NPropSetsCyl', '- Number of structurally unique circular cross-sections (if 0 the following table is ignored)\n'))
         f.write(" ".join(['{:^11s}'.format(i) for i in ['PropSetID', 'YoungE', 'ShearG', 'MatDens', 'XsecD', 'XsecT']])+'\n')
         f.write(" ".join(['{:^11s}'.format(i) for i in ['(-)','(N/m2)','(N/m2)','(kg/m3)','(m)','(m)']])+'\n')
-        for i in range(self.fst_vt['SubDyn']['NBCPropSets']):
+        for i in range(self.fst_vt['SubDyn']['NPropSetsCyl']):
             ln = []
             ln.append('{:^11d}'.format(self.fst_vt['SubDyn']['PropSetID1'][i]))
             ln.append('{:^11e}'.format(self.fst_vt['SubDyn']['YoungE1'][i]))
@@ -2223,10 +2223,10 @@ class InputWriter_OpenFAST(object):
             ln.append('{:^11}'.format(self.fst_vt['SubDyn']['XsecT'][i]))
             f.write(" ".join(ln) + '\n')
         f.write('------------------ RECTANGULAR BEAM CROSS-SECTION PROPERTIES -----------------------------\n')
-        f.write('{:<22d} {:<11} {:}'.format(self.fst_vt['SubDyn']['NBRPropSets'], 'NPropSets', '- Number of structurally unique rectangular cross-sections\n'))
+        f.write('{:<22d} {:<11} {:}'.format(self.fst_vt['SubDyn']['NPropSetsRec'], 'NPropSetsRec', '- Number of structurally unique rectangular cross-sections (if 0 the following table is ignored)\n'))
         f.write(" ".join(['{:^11s}'.format(i) for i in ['PropSetID', 'YoungE', 'ShearG', 'MatDens', 'XsecSa', 'XsecSb', 'XsecT']])+'\n')
         f.write(" ".join(['{:^11s}'.format(i) for i in ['(-)','(N/m2)','(N/m2)','(kg/m3)','(m)','(m)','(m)']])+'\n')
-        for i in range(self.fst_vt['SubDyn']['NBRPropSets']):
+        for i in range(self.fst_vt['SubDyn']['NPropSetsRec']):
             ln = []
             ln.append('{:^11d}'.format(self.fst_vt['SubDyn']['PropSetID2'][i]))
             ln.append('{:^11e}'.format(self.fst_vt['SubDyn']['YoungE2'][i]))

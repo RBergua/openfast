@@ -546,7 +546,7 @@ thickness, **XsecT**. Note that setting **XsecT** to a value less than
 or equal to zero implies a solid section. Users will need to create an 
 entry in the first table within this section of the input file identified by
 **PropSetID**, for each unique combination of these five properties.
-The member property-set table contains **NPropSets** rows. The member
+The member property-set table contains **NPropSetsCyl** rows. The member
 property sets are referred to by their **PropSetID** in the MEMBERS
 table above. Note, however, that although diameter and thickness will 
 be linearly interpolated within an individual member, SubDyn will not 
@@ -566,11 +566,11 @@ which might not be accurate. This is different from circular sections for
 which the shear area and torsion constant can be automatically computed by 
 SubDyn for arbitrary wall thickness. The properties of unique rectangular 
 beam sections are entered on separate rows of the second table of this input 
-file section. Again, the table should have **NPropSets** rows.
+file section. Again, the table should have **NPropSetsRec** rows.
 
 The third table in this section of the input file have **NXPropSets** 
-rows and have additional entries when compared to the previous
-table, including: cross-sectional area (**XsecA**), cross-sectional
+rows and have additional entries when compared to the two previous
+tables, including: cross-sectional area (**XsecA**), cross-sectional
 shear area along the local principal axes *x* and *y* (**XsecAsx**,
 **XsecAsy**), cross-sectional area second moment of inertia about *x*
 and *y* (**XsecJxx**, **XsecJyy**), cross-sectional polar area 
