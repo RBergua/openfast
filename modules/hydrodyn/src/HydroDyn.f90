@@ -1331,7 +1331,7 @@ END SUBROUTINE HydroDyn_UpdateStates
 
 !----------------------------------------------------------------------------------------------------------------------------------
 !> Routine for computing outputs, used in both loose and tight coupling.
-SUBROUTINE HydroDyn_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg )   
+SUBROUTINE HydroDyn_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg, calcMorisonHstLds )   
    
       REAL(DbKi),                         INTENT(IN   )  :: Time        !< Current simulation time in seconds
       TYPE(HydroDyn_InputType),           INTENT(INOUT)  :: u           !< Inputs at Time (note that this is intent out because we're copying the u%WAMITMesh into m%u_wamit%mesh)
@@ -1345,6 +1345,8 @@ SUBROUTINE HydroDyn_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, ErrStat,
       TYPE(HydroDyn_MiscVarType),         INTENT(INOUT)  :: m           !< Initial misc/optimization variables           
       INTEGER(IntKi),                     INTENT(  OUT)  :: ErrStat     !! Error status of the operation
       CHARACTER(*),                       INTENT(  OUT)  :: ErrMsg      !! Error message if ErrStat /= ErrID_None
+      LOGICAL, OPTIONAL,                  INTENT(IN   )  :: calcMorisonHstLds  !< Flag to calculate the Morison hydrostatic loads (default: .true.)
+                                                                               !! Used to speed up Jacobian calculations when perturbing velocity/acceleration inputs
 
       INTEGER                                            :: I, J        ! Generic counters
       
@@ -1367,11 +1369,18 @@ SUBROUTINE HydroDyn_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, ErrStat,
       CHARACTER(*),    PARAMETER           :: RoutineName = 'HydroDyn_CalcOutput'
       REAL(ReKi),      PARAMETER           :: LrgAngle = 0.261799387799149            ! Threshold for platform roll and pitch rotation (15 deg). This is consistent with the ElastoDyn check.
       LOGICAL,         SAVE                :: FrstWarn_LrgY = .TRUE.
+      logical                              :: calcMorisonHstLdsLocal
 
          ! Initialize ErrStat
          
       ErrStat = ErrID_None         
       ErrMsg  = ""
+
+      if (present(calcMorisonHstLds)) then
+         calcMorisonHstLdsLocal = calcMorisonHstLds
+      else
+         calcMorisonHstLdsLocal = .true.
+      end if
        
       
       ! Write the Hydrodyn-level output file data FROM THE LAST COMPLETED TIME STEP if the user requested module-level output
@@ -1567,7 +1576,8 @@ SUBROUTINE HydroDyn_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, ErrStat,
       IF ( u%Morison%Mesh%Committed ) THEN  ! Make sure we are using Morison / there is a valid mesh
          u%Morison%PtfmRefY = PtfmRefY
          CALL Morison_CalcOutput( Time, u%Morison, p%Morison, x%Morison, xd%Morison,  &
-                                z%Morison, OtherState%Morison, y%Morison, m%Morison, ErrStat2, ErrMsg2 )
+                                 z%Morison, OtherState%Morison, y%Morison, m%Morison, &
+                                 ErrStat2, ErrMsg2, calcMorisonHstLdsLocal )
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       END IF
 
@@ -1774,6 +1784,7 @@ SUBROUTINE HD_JacobianPInput(Vars, t, u, p, x, xd, z, OtherState, y, m, ErrStat,
    INTEGER(IntKi)                :: i, j, k, col
    INTEGER(IntKi)                :: startingI, startingJ, bOffset, offsetI
    integer(IntKi)                :: iVarWaveElev0, iVarHWindSpeed, iVarPLexp, iVarPropagationDir
+   logical                       :: calcMorisonHstLds
    
    ErrStat = ErrID_None
    ErrMsg  = ''
@@ -1816,19 +1827,27 @@ SUBROUTINE HD_JacobianPInput(Vars, t, u, p, x, xd, z, OtherState, y, m, ErrStat,
          ! If variable is extended input, skip
          if (MV_HasFlagsAll(Vars%u(i), VF_ExtLin)) cycle
 
+         ! Calculate Morison hydrostatic loads when perturbing displacement/orientation inputs
+         select case (Vars%u(i)%Field)
+         case (FieldTransDisp, FieldOrientation)
+            calcMorisonHstLds = .true.
+         case default
+            calcMorisonHstLds = .false.
+         end select
+
          ! Loop through number of linearization perturbations in variable
          do j = 1, Vars%u(i)%Num
 
             ! Calculate positive perturbation
             call MV_Perturb(Vars%u(i), j, 1, m%Jac%u, m%Jac%u_perturb)
             call HydroDyn_VarsUnpackInput(Vars, m%Jac%u_perturb, m%u_perturb)
-            call HydroDyn_CalcOutput(t, m%u_perturb, p, x, xd, z, OtherState, m%y_lin, m, ErrStat2, ErrMsg2); if (Failed()) return
+            call HydroDyn_CalcOutput(t, m%u_perturb, p, x, xd, z, OtherState, m%y_lin, m, ErrStat2, ErrMsg2, calcMorisonHstLds); if (Failed()) return
             call HydroDyn_VarsPackOutput(Vars, m%y_lin, m%Jac%y_pos)
 
             ! Calculate negative perturbation
             call MV_Perturb(Vars%u(i), j, -1, m%Jac%u, m%Jac%u_perturb)
             call HydroDyn_VarsUnpackInput(Vars, m%Jac%u_perturb, m%u_perturb)
-            call HydroDyn_CalcOutput(t, m%u_perturb, p, x, xd, z, OtherState, m%y_lin, m, ErrStat2, ErrMsg2); if (Failed()) return
+            call HydroDyn_CalcOutput(t, m%u_perturb, p, x, xd, z, OtherState, m%y_lin, m, ErrStat2, ErrMsg2, calcMorisonHstLds); if (Failed()) return
             call HydroDyn_VarsPackOutput(Vars, m%y_lin, m%Jac%y_neg)
 
             ! Calculate column index
