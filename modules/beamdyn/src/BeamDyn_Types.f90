@@ -70,7 +70,7 @@ IMPLICIT NONE
     REAL(R8Ki) , DIMENSION(:,:,:), ALLOCATABLE  :: stiff0      !< C/S stiffness matrix arrays [-]
     REAL(R8Ki) , DIMENSION(:,:,:), ALLOCATABLE  :: mass0      !< C/S mass matrix arrays [-]
     REAL(R8Ki) , DIMENSION(1:6)  :: beta = 0.0_R8Ki      !< Damping Coefficient [-]
-    INTEGER(IntKi)  :: damp_flag = 0_IntKi      !< Damping Flag: 0-No Damping, 1-Damped [-]
+    INTEGER(IntKi)  :: damp_flag = 0_IntKi      !< Damping Flag: 0-No Damping, 1-Stiffness Prop. Damped, 2-Modal Damping [-]
   END TYPE BladeInputData
 ! =======================
 ! =========  BD_InputFile  =======
@@ -306,6 +306,8 @@ IMPLICIT NONE
     REAL(R8Ki) , DIMENSION(:), ALLOCATABLE  :: LP_RHS      !< Right-hand-side vector [-]
     REAL(R8Ki) , DIMENSION(:,:), ALLOCATABLE  :: LP_StifK_LU      !< Stiffness Matrix for LU [-]
     REAL(R8Ki) , DIMENSION(:), ALLOCATABLE  :: LP_RHS_LU      !< Right-hand-side vector for LU [-]
+    REAL(R8Ki) , DIMENSION(:), ALLOCATABLE  :: DampedVelocities      !< Velocity vector for applying modal damping [-]
+    REAL(R8Ki) , DIMENSION(:), ALLOCATABLE  :: ModalDampingF      !< Modal damping force in the modal damping matrix coordinates [-]
     INTEGER(IntKi) , DIMENSION(:), ALLOCATABLE  :: LP_indx      !< Index vector for LU [-]
     TYPE(BD_InputType)  :: u      !< Inputs converted to the internal BD coordinate system [-]
     TYPE(ModJacType)  :: Jac      !< Jacobian matrices and arrays corresponding to module variables [-]
@@ -2920,6 +2922,30 @@ subroutine BD_CopyMisc(SrcMiscData, DstMiscData, CtrlCode, ErrStat, ErrMsg)
       end if
       DstMiscData%LP_RHS_LU = SrcMiscData%LP_RHS_LU
    end if
+   if (allocated(SrcMiscData%DampedVelocities)) then
+      LB(1:1) = lbound(SrcMiscData%DampedVelocities)
+      UB(1:1) = ubound(SrcMiscData%DampedVelocities)
+      if (.not. allocated(DstMiscData%DampedVelocities)) then
+         allocate(DstMiscData%DampedVelocities(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstMiscData%DampedVelocities.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstMiscData%DampedVelocities = SrcMiscData%DampedVelocities
+   end if
+   if (allocated(SrcMiscData%ModalDampingF)) then
+      LB(1:1) = lbound(SrcMiscData%ModalDampingF)
+      UB(1:1) = ubound(SrcMiscData%ModalDampingF)
+      if (.not. allocated(DstMiscData%ModalDampingF)) then
+         allocate(DstMiscData%ModalDampingF(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstMiscData%ModalDampingF.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstMiscData%ModalDampingF = SrcMiscData%ModalDampingF
+   end if
    if (allocated(SrcMiscData%LP_indx)) then
       LB(1:1) = lbound(SrcMiscData%LP_indx)
       UB(1:1) = ubound(SrcMiscData%LP_indx)
@@ -3062,6 +3088,12 @@ subroutine BD_DestroyMisc(MiscData, ErrStat, ErrMsg)
    if (allocated(MiscData%LP_RHS_LU)) then
       deallocate(MiscData%LP_RHS_LU)
    end if
+   if (allocated(MiscData%DampedVelocities)) then
+      deallocate(MiscData%DampedVelocities)
+   end if
+   if (allocated(MiscData%ModalDampingF)) then
+      deallocate(MiscData%ModalDampingF)
+   end if
    if (allocated(MiscData%LP_indx)) then
       deallocate(MiscData%LP_indx)
    end if
@@ -3121,6 +3153,8 @@ subroutine BD_PackMisc(RF, Indata)
    call RegPackAlloc(RF, InData%LP_RHS)
    call RegPackAlloc(RF, InData%LP_StifK_LU)
    call RegPackAlloc(RF, InData%LP_RHS_LU)
+   call RegPackAlloc(RF, InData%DampedVelocities)
+   call RegPackAlloc(RF, InData%ModalDampingF)
    call RegPackAlloc(RF, InData%LP_indx)
    call BD_PackInput(RF, InData%u) 
    call NWTC_Library_PackModJacType(RF, InData%Jac) 
@@ -3176,6 +3210,8 @@ subroutine BD_UnPackMisc(RF, OutData)
    call RegUnpackAlloc(RF, OutData%LP_RHS); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%LP_StifK_LU); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%LP_RHS_LU); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%DampedVelocities); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%ModalDampingF); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%LP_indx); if (RegCheckErr(RF, RoutineName)) return
    call BD_UnpackInput(RF, OutData%u) ! u 
    call NWTC_Library_UnpackModJacType(RF, OutData%Jac) ! Jac 

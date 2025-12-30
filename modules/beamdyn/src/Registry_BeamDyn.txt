@@ -53,7 +53,7 @@ typedef   ^        BladeInputData     ^       mass0        {:}{:}{:} -     -    
 typedef   ^        BladeInputData     ^       beta             {6} - - "Damping Coefficient" -
 #end of BDKi-type variables
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-typedef   ^        BladeInputData    IntKi    damp_flag    - - - "Damping Flag: 0-No Damping, 1-Damped"
+typedef   ^        BladeInputData    IntKi    damp_flag    - - - "Damping Flag: 0-No Damping, 1-Stiffness Prop. Damped, 2-Modal Damping"
 
 
 # ..... Input file data..............................................................................
@@ -346,6 +346,9 @@ typedef   ^        MiscVarType    ^            LP_MassM_LU  {:}{:}        - - "M
 typedef   ^        MiscVarType    ^            LP_RHS       {:}           - - "Right-hand-side vector" -
 typedef   ^        MiscVarType    ^            LP_StifK_LU  {:}{:}        - - "Stiffness Matrix for LU" -
 typedef   ^        MiscVarType    ^            LP_RHS_LU    {:}           - - "Right-hand-side vector for LU" -
+# Velocity array for modal damping calculation
+typedef   ^        MiscVarType    ^            DampedVelocities    {:}           - - "Velocity vector for applying modal damping" -
+typedef   ^        MiscVarType    ^            ModalDampingF    {:}           - - "Modal damping force in the modal damping matrix coordinates" -
 #end of BDKi-type variables
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 typedef   ^        MiscVarType    IntKi        LP_indx      {:}           - - "Index vector for LU" -

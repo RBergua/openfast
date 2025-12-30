@@ -1799,6 +1799,7 @@ END SUBROUTINE Init_ContinuousStates
 SUBROUTINE Init_ModalDamping(x, OtherState, p, m)
 
    ! TODO : Look at what should be INOUT v. IN
+   ! TODO : Error messages are probably wrong in some way.
 
    TYPE(BD_ContinuousStateType),    INTENT(IN   )  :: x           !< Continuous states at t on input at t + dt on output
    type(BD_OtherStateType),         INTENT(IN   )  :: OtherState        !< Global rotations are stored in otherstate
@@ -1817,6 +1818,9 @@ SUBROUTINE Init_ModalDamping(x, OtherState, p, m)
    REAL(LaKi), ALLOCATABLE                   :: phiT_M (:, :) ! mode shapes transpose times mass matrix
    REAL(LaKi), ALLOCATABLE                   :: phi0T_M_phi0 (:, :) ! normalization calculation of mass matrix
    REAL, DIMENSION(10) :: zeta ! Modal damping values, should be changed to be user input.
+
+   INTEGER(IntKi)                                 :: ErrStat2   ! Temporary Error status
+   CHARACTER(ErrMsgLen)                           :: ErrMsg2    ! Temporary Error message
 
    ErrStat = ErrID_None
    ErrMsg  = ''
@@ -1852,17 +1856,17 @@ SUBROUTINE Init_ModalDamping(x, OtherState, p, m)
    ! For now, calculate all eigenpairs
    nDOF = p%dof_total - 6
 
-   CALL AllocAry(eigenvectors, nDOF, nDOF, 'eigenvectors', ErrStat, ErrMsg)
-   CALL SetErrStat(ErrStat, ErrMsg, ErrStat, ErrMsg, 'Init_ModalDamping')
+   CALL AllocAry(eigenvectors, nDOF, nDOF, 'eigenvectors', ErrStat2, ErrMsg2)
+   CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'Init_ModalDamping')
 
-   CALL AllocAry(omega, nDOF, 'omega', ErrStat, ErrMsg)
-   CALL SetErrStat(ErrStat, ErrMsg, ErrStat, ErrMsg, 'Init_ModalDamping')
+   CALL AllocAry(omega, nDOF, 'omega', ErrStat2, ErrMsg2)
+   CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'Init_ModalDamping')
 
    CALL EigenSolveWrap(m%LP_StifK_LU, m%LP_MassM_LU, nDOF, nDOF, .TRUE., eigenvectors, omega, ErrStat, ErrMsg )
 
    ! Mass-normalize the mode shapes
-   CALL AllocAry(phi0T_M_phi0, nDOF, nDof, 'phi0T_M_phi0', ErrStat, ErrMsg)
-   CALL SetErrStat(ErrStat, ErrMsg, ErrStat, ErrMsg, 'Init_ModalDamping')
+   CALL AllocAry(phi0T_M_phi0, nDOF, nDof, 'phi0T_M_phi0', ErrStat2, ErrMsg2)
+   CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'Init_ModalDamping')
 
    phi0T_M_phi0 = matmul(transpose(eigenvectors), matmul(m%LP_MassM_LU, eigenvectors))
 
@@ -1871,13 +1875,13 @@ SUBROUTINE Init_ModalDamping(x, OtherState, p, m)
    end do
 
    ! 4. Generate damping matrix in original frame
-   CALL AllocAry(phiT_M, nDOF, nDof, 'phiT_M', ErrStat, ErrMsg)
-   CALL SetErrStat(ErrStat, ErrMsg, ErrStat, ErrMsg, 'Init_ModalDamping')
+   CALL AllocAry(phiT_M, nDOF, nDof, 'phiT_M', ErrStat2, ErrMsg2)
+   CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'Init_ModalDamping')
 
    phiT_M = matmul(transpose(eigenvectors), m%LP_MassM_LU) ! after normalization
 
-   CALL AllocAry(p%ModalDampingMat, nDOF, nDOF, 'p%ModalDampingMat', ErrStat, ErrMsg)
-   CALL SetErrStat(ErrStat, ErrMsg, ErrStat, ErrMsg, 'Init_ModalDamping')
+   CALL AllocAry(p%ModalDampingMat, nDOF, nDOF, 'p%ModalDampingMat', ErrStat2, ErrMsg2)
+   CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'Init_ModalDamping')
 
    do j = 1, nDOF
 
@@ -1902,7 +1906,15 @@ SUBROUTINE Init_ModalDamping(x, OtherState, p, m)
    !    phi0T_M_phi0(j,j) = phi0T_M_phi0(j,j) / omega(j) / 2.0d0
    ! end do
 
-   print *, 'End of Modal damping.'
+   ! Allocate memory for the velocity vector that will be multiplied by the modal damping matrix
+   CALL AllocAry(m%DampedVelocities, p%dof_total-6, 'DampedVelocities', ErrStat2, ErrMsg2)
+   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'Init_ModalDamping')
+
+   ! Allocate memory for the velocity vector that will be multiplied by the modal damping matrix
+   CALL AllocAry(m%ModalDampingF, p%dof_total-6, 'ModalDampingF', ErrStat2, ErrMsg2)
+   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'Init_ModalDamping')
+
+   print *, 'End of Modal damping init.'
 
    CALL CleanupModalInit()
 
@@ -2182,7 +2194,7 @@ SUBROUTINE BD_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg, 
       CALL BD_QPDataVelocity( p, x_tmp, m )           ! x%dqdt --> m%qp%vvv, m%qp%vvp
 
       ! calculate accelerations and reaction loads (in m%RHS):
-      CALL BD_CalcForceAcc(m%u, p, OtherState, m, ErrStat2,ErrMsg2)
+      CALL BD_CalcForceAcc(m%u, p, x, OtherState, m, ErrStat2,ErrMsg2)
           CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
    ELSE
@@ -2306,7 +2318,7 @@ SUBROUTINE BD_CalcContStateDeriv( t, u, p, x, xd, z, OtherState, m, dxdt, ErrSta
    CALL BD_QPDataVelocity( p, dxdt, m )           ! x%dqdt --> m%qp%vvv, m%qp%vvp
 
    ! calculate accelerations and reaction loads (in m%RHS):
-   CALL BD_CalcForceAcc(m%u, p, OtherState, m, ErrStat2,ErrMsg2)
+   CALL BD_CalcForceAcc(m%u, p, x, OtherState, m, ErrStat2,ErrMsg2)
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       if (ErrStat >= AbortErrLev) return
       
@@ -5626,7 +5638,7 @@ SUBROUTINE BD_InitAcc( u, p, x, OtherState, m, qdotdot, ErrStat, ErrMsg )
    CALL BD_QPDataVelocity(p, x, m)
 
       ! set misc vars, particularly m%RHS
-   CALL BD_CalcForceAcc( u, p, OtherState, m, ErrStat2, ErrMsg2 )
+   CALL BD_CalcForceAcc( u, p, x, OtherState, m, ErrStat2, ErrMsg2 )
       CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
       ! set accelerations with inputs from the root and BD_CalcForceAcc solution
@@ -5710,10 +5722,11 @@ END SUBROUTINE BD_InitAcc
 !!
 !! The root reaction force is therefore calculated afterwards as
 !! \f$  F_\textrm{root} = f_1 - \sum_{i} m_{1,i} a_{i}  \f$.
-SUBROUTINE BD_CalcForceAcc( u, p, OtherState, m, ErrStat, ErrMsg )
+SUBROUTINE BD_CalcForceAcc( u, p, x, OtherState, m, ErrStat, ErrMsg )
 
    TYPE(BD_InputType),           INTENT(IN   )  :: u           !< Inputs at t
    TYPE(BD_ParameterType),       INTENT(IN   )  :: p           !< Parameters
+   TYPE(BD_ContinuousStateType), INTENT(IN   )  :: x           !< Continuous states
    TYPE(BD_OtherStateType),      INTENT(IN   )  :: OtherState  !< other states (contains ref orientation)
    TYPE(BD_MiscVarType),         INTENT(INOUT)  :: m           !< Misc/optimization variables
    INTEGER(IntKi),               INTENT(  OUT)  :: ErrStat     !< Error status of the operation
@@ -5762,6 +5775,11 @@ SUBROUTINE BD_CalcForceAcc( u, p, OtherState, m, ErrStat, ErrMsg )
 
    ! Add force contributions from root acceleration
    m%LP_RHS_LU = m%LP_RHS_LU - matmul(m%LP_MassM(7:,1:6), RootAcc)
+
+   IF(p%damp_flag .EQ. 2) THEN
+      ! Because modal damping is already global, it wouldn't make sense in BD_AssembleRHS.
+      CALL BD_AddModalDampingRHS(u, p, x, OtherState, m)
+   ENDIF
 
    ! Solve linear equations A * X = B for acceleration (F=ma) for nodes 2:p%node_total
    CALL LAPACK_getrf(n_free, n_free, m%LP_MassM_LU, m%LP_indx, ErrStat2, ErrMsg2)
@@ -5893,6 +5911,57 @@ SUBROUTINE BD_ComputeElementMass(nelem,p,NQPpos,EMass0_GL,elem_mass,elem_CG,elem
    RETURN
 
 END SUBROUTINE BD_ComputeElementMass
+
+!-----------------------------------------------------------------------------------------------------------------------------------
+!> This subroutine calculates the modal damping force
+! Adds modal damping contributions to m%LP_RHS_LU
+SUBROUTINE BD_AddModalDampingRHS(u, p, x, OtherState, m)
+
+   TYPE(BD_InputType),           INTENT(IN   )  :: u           !< Inputs at t
+   TYPE(BD_ParameterType),       INTENT(IN   )  :: p           !< Parameters
+   TYPE(BD_ContinuousStateType), INTENT(IN   )  :: x           !< Continuous states
+   TYPE(BD_OtherStateType),      INTENT(IN   )  :: OtherState  !< other states (contains ref orientation)
+   TYPE(BD_MiscVarType),         INTENT(INOUT)  :: m           !< Misc/optimization variables
+   INTEGER(IntKi)                            :: j ! looping indexing variable
+
+   ! 1. Velocities relative to root
+   do j = 1, size(x%dqdt, 2)-1
+      ! TODO : Is this the correct place to get the velocities?
+      ! m%DampedVelocities((j-1)*6+1:j*6) = x%dqdt(:, j+1) - x%dqdt(:, 0)
+
+
+      ! TODO : Also do a rotation here?
+      m%DampedVelocities((j-1)*6+1:(j-1)*6+3) = matmul(OtherState%GlbRot, x%dqdt(1:3, j+1) - x%dqdt(1:3, 1))
+      m%DampedVelocities((j-1)*6+4:(j-1)*6+6) = matmul(OtherState%GlbRot, x%dqdt(4:6, j+1) - x%dqdt(4:6, 1))
+
+   end do
+
+   ! 2. Velocities represented in rotating frame
+
+   ! OtherState%GlbRot - will use to get rotation into correct coordinate system
+   ! Also might be relevant - u%RootMotion%...
+
+   ! 3. Multiply by modal damping matrix
+   m%ModalDampingF = matmul(p%ModalDampingMat, m%DampedVelocities)
+
+   ! 4. Rotate to correct coordinates and add to m%LP_RHS_LU
+
+   ! TODO: Add or subtract to m%LP_RHS_LU?
+   ! m%LP_RHS_LU = m%LP_RHS_LU - m%ModalDampingF
+
+   do j = 1, size(x%dqdt, 2)-1
+      m%LP_RHS_LU((j-1)*6+1:(j-1)*6+3) = m%LP_RHS_LU((j-1)*6+1:(j-1)*6+3) &
+         - matmul(transpose(OtherState%GlbRot), m%ModalDampingF((j-1)*6+1:(j-1)*6+3))
+
+      m%LP_RHS_LU((j-1)*6+4:(j-1)*6+6) = m%LP_RHS_LU((j-1)*6+4:(j-1)*6+6) &
+         - matmul(transpose(OtherState%GlbRot), m%ModalDampingF((j-1)*6+4:(j-1)*6+6))
+   end do
+
+
+   print *, 'TODO: Add modal damping force to the RHS vector here.'
+   print *, 'TODO: Should force be added or subtracted here? Should be clear in testing...'
+
+END SUBROUTINE BD_AddModalDampingRHS
 
 
 subroutine BD_InitVars(u, p, x, y, m, InitOut, Linearize, ErrStat, ErrMsg)
