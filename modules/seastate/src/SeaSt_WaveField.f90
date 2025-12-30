@@ -39,7 +39,6 @@ FUNCTION WaveField_GetNodeTotalWaveElev( WaveField, WaveField_m, Time, pos, ErrS
    character(ErrMsgLen)                              :: errMsg2
 
    ErrStat   = ErrID_None
-   ErrMsg    = ""
 
    IF (ALLOCATED(WaveField%WaveElev1) .or. ALLOCATED(WaveField%WaveElev2)) then
       CALL WaveField_Interp_Setup3D(Time, pos, WaveField%GridParams, WaveField_m, ErrStat2, ErrMsg2)
@@ -84,7 +83,6 @@ SUBROUTINE WaveField_GetNodeWaveNormal( WaveField, WaveField_m, Time, pos, r, n,
    character(ErrMsgLen)                              :: errMsg2
 
    ErrStat   = ErrID_None
-   ErrMsg    = ""
 
    r1 = MAX(r,real(1.0e-6,ReKi)) ! In case r is zero
 
@@ -134,7 +132,6 @@ SUBROUTINE WaveField_GetNodeWaveKin( WaveField, WaveField_m, Time, pos, forceNod
    character(ErrMsgLen)                              :: errMsg2
 
    ErrStat   = ErrID_None
-   ErrMsg    = ""
 
    posXY    = pos(1:2)
    posXY0   = (/pos(1),pos(2),0.0_ReKi/)
@@ -282,7 +279,6 @@ SUBROUTINE WaveField_GetNodeWaveVel( WaveField, WaveField_m, Time, pos, forceNod
    character(ErrMsgLen)                              :: errMsg2
 
    ErrStat   = ErrID_None
-   ErrMsg    = ""
 
    posXY    = pos(1:2)
    posXY0   = (/pos(1),pos(2),0.0_ReKi/)
@@ -396,7 +392,6 @@ SUBROUTINE WaveField_GetNodeWaveVelAcc( WaveField, WaveField_m, Time, pos, force
    character(ErrMsgLen)                              :: errMsg2
 
    ErrStat   = ErrID_None
-   ErrMsg    = ""
 
    posXY    = pos(1:2)
    posXY0   = (/pos(1),pos(2),0.0_ReKi/)
@@ -526,7 +521,6 @@ SUBROUTINE WaveField_GetWaveKin( WaveField, WaveField_m, Time, pos, forceNodeInW
    real(ReKi),                         allocatable   :: FV_DC(:,:), FA_DC(:,:)
 
    ErrStat   = ErrID_None
-   ErrMsg    = ""
 
    NumPoints = size(pos, dim=2)
    DO i = 1, NumPoints
@@ -561,9 +555,9 @@ contains
       call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       Failed = ErrStat >= AbortErrLev
    end function
-   logical function FailedMsg(ErrMsg2)
-      character(*), intent(in   ) :: ErrMsg2
-      call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+   logical function FailedMsg(ErrMsgTmp)
+      character(*), intent(in   ) :: ErrMsgTmp
+      call SetErrStat( ErrStat2, ErrMsgTmp, ErrStat, ErrMsg, RoutineName )
       FailedMsg = ErrStat >= AbortErrLev
    end function
 end subroutine WaveField_GetWaveKin
@@ -591,7 +585,6 @@ SUBROUTINE WaveField_GetWaveVelAcc_AD( WaveField, WaveField_m, StartNode, Time, 
    character(ErrMsgLen)                              :: errMsg2
 
    ErrStat   = ErrID_None
-   ErrMsg    = ""
 
    MSL2SWL   = WaveField%MSL2SWL
    WtrDpth   = WaveField%EffWtrDpth - MSL2SWL
@@ -668,7 +661,6 @@ SUBROUTINE WaveField_GetMeanDynSurfCurr( WaveField, WaveTMax, WaveDT, CurrVxi0, 
    character(ErrMsgLen)                              :: errMsg2
 
    ErrStat   = ErrID_None
-   ErrMsg    = ""
 
    CurrVxi0 = 0.0_SiKi
    CurrVyi0 = 0.0_SiKi
@@ -726,7 +718,6 @@ subroutine SetCartesianXYIndex(p, pZero, delta, nMax, Indx_Lo, Indx_Hi, isopc, F
    real(ReKi)                       :: Tmp
 
    ErrStat = ErrID_None
-   ErrMsg  = ""
 
    isopc   = -1.0
    Indx_Lo = 0
@@ -792,7 +783,6 @@ subroutine SetCartesianZIndex(p, z_depth, delta, nMax, Indx_Lo, Indx_Hi, isopc, 
    real(ReKi)                        :: Tmp
 
    ErrStat = ErrID_None
-   ErrMsg  = ""
 
    isopc   = -1.0
    Indx_Lo = 0
@@ -849,7 +839,6 @@ subroutine SetTimeIndex(Time, deltaT, nMax, Indx_Lo, Indx_Hi, isopc, ErrStat, Er
    real(ReKi)                        :: Tmp
 
    ErrStat = ErrID_None
-   ErrMsg  = ""
 
    isopc   = -1.0
    Indx_Lo = 0
@@ -905,7 +894,6 @@ subroutine WaveField_Interp_Setup4D( Time, Position, p, m, ErrStat, ErrMsg )
    character(ErrMsgLen)                 :: ErrMsg2
 
    ErrStat = ErrID_None
-   ErrMsg  = ""
 
    ! Find the bounding indices for time
    call SetTimeIndex(Time, p%delta(1), p%n(1), m%Indx_Lo(1), m%Indx_Hi(1), isopc(1), ErrStat2, ErrMsg2)
@@ -974,7 +962,6 @@ subroutine WaveField_Interp_Setup3D( Time, Position, p, m, ErrStat, ErrMsg )
    character(ErrMsgLen)                 :: ErrMsg2
 
    ErrStat = ErrID_None
-   ErrMsg  = ""
 
    ! Find the bounding indices for time
    call SetTimeIndex(Time, p%delta(1), p%n(1), m%Indx_Lo(1), m%Indx_Hi(1), isopc(1), ErrStat2, ErrMsg2)
