@@ -308,6 +308,7 @@ IMPLICIT NONE
     REAL(R8Ki) , DIMENSION(:), ALLOCATABLE  :: LP_RHS_LU      !< Right-hand-side vector for LU [-]
     REAL(R8Ki) , DIMENSION(:), ALLOCATABLE  :: DampedVelocities      !< Velocity vector for applying modal damping [-]
     REAL(R8Ki) , DIMENSION(:), ALLOCATABLE  :: ModalDampingF      !< Modal damping force in the modal damping matrix coordinates [-]
+    REAL(R8Ki) , DIMENSION(1:3,1:3)  :: ModalDampingRot = 0.0_R8Ki      !< Rotation over the current time step for modal damping [-]
     INTEGER(IntKi) , DIMENSION(:), ALLOCATABLE  :: LP_indx      !< Index vector for LU [-]
     TYPE(BD_InputType)  :: u      !< Inputs converted to the internal BD coordinate system [-]
     TYPE(ModJacType)  :: Jac      !< Jacobian matrices and arrays corresponding to module variables [-]
@@ -2946,6 +2947,7 @@ subroutine BD_CopyMisc(SrcMiscData, DstMiscData, CtrlCode, ErrStat, ErrMsg)
       end if
       DstMiscData%ModalDampingF = SrcMiscData%ModalDampingF
    end if
+   DstMiscData%ModalDampingRot = SrcMiscData%ModalDampingRot
    if (allocated(SrcMiscData%LP_indx)) then
       LB(1:1) = lbound(SrcMiscData%LP_indx)
       UB(1:1) = ubound(SrcMiscData%LP_indx)
@@ -3155,6 +3157,7 @@ subroutine BD_PackMisc(RF, Indata)
    call RegPackAlloc(RF, InData%LP_RHS_LU)
    call RegPackAlloc(RF, InData%DampedVelocities)
    call RegPackAlloc(RF, InData%ModalDampingF)
+   call RegPack(RF, InData%ModalDampingRot)
    call RegPackAlloc(RF, InData%LP_indx)
    call BD_PackInput(RF, InData%u) 
    call NWTC_Library_PackModJacType(RF, InData%Jac) 
@@ -3212,6 +3215,7 @@ subroutine BD_UnPackMisc(RF, OutData)
    call RegUnpackAlloc(RF, OutData%LP_RHS_LU); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%DampedVelocities); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%ModalDampingF); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%ModalDampingRot); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%LP_indx); if (RegCheckErr(RF, RoutineName)) return
    call BD_UnpackInput(RF, OutData%u) ! u 
    call NWTC_Library_UnpackModJacType(RF, OutData%Jac) ! Jac 

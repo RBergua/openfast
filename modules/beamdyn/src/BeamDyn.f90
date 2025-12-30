@@ -5922,44 +5922,61 @@ SUBROUTINE BD_AddModalDampingRHS(u, p, x, OtherState, m)
    TYPE(BD_ContinuousStateType), INTENT(IN   )  :: x           !< Continuous states
    TYPE(BD_OtherStateType),      INTENT(IN   )  :: OtherState  !< other states (contains ref orientation)
    TYPE(BD_MiscVarType),         INTENT(INOUT)  :: m           !< Misc/optimization variables
-   INTEGER(IntKi)                            :: j ! looping indexing variable
+
+   INTEGER(IntKi)                            :: j ! looping indexing variable (node number)
+   REAL(R8Ki)                                :: r(3) ! nodal position relative to root
+   INTEGER(IntKi)                            :: elem ! looping indexing for element number
+   INTEGER(IntKi)                            :: elem_node ! looping indexing for node in the element number
+
+
 
    ! 1. Velocities relative to root
+   ! TODO : Is x%dqdt(:, 0) correct for root velocities? Or should I use u%RootMotion%... variables
    do j = 1, size(x%dqdt, 2)-1
-      ! TODO : Is this the correct place to get the velocities?
-      ! m%DampedVelocities((j-1)*6+1:j*6) = x%dqdt(:, j+1) - x%dqdt(:, 0)
 
+      ! 1.a. Velocities minus root velocity
+      m%DampedVelocities((j-1)*6+1:j*6) = x%dqdt(:, j+1) - x%dqdt(:, 0)
 
-      ! TODO : Also do a rotation here?
-      m%DampedVelocities((j-1)*6+1:(j-1)*6+3) = matmul(OtherState%GlbRot, x%dqdt(1:3, j+1) - x%dqdt(1:3, 1))
-      m%DampedVelocities((j-1)*6+4:(j-1)*6+6) = matmul(OtherState%GlbRot, x%dqdt(4:6, j+1) - x%dqdt(4:6, 1))
+      ! 1.b. Subtract out the rigid body rotation of the root here
+      ! position cross rotational velocity
+      elem = j / (p%nodes_per_elem - 1) + 1
+      elem_node = j - (elem-1) * (p%nodes_per_elem - 1)
 
+      ! Vector from root to node (inertial frame)
+      r = p%uuN0(1:3, elem_node, elem) + x%q(1:3, j)
+
+      m%DampedVelocities((j-1)*6+1:(j-1)*6+3) = m%DampedVelocities((j-1)*6+1:(j-1)*6+3) &
+         - Cross_Product(x%dqdt(4:6, 0), r)
    end do
 
-   ! 2. Velocities represented in rotating frame
+   ! 2. rotate velocities by matmul(u%RootMotion%Orientation, OtherState%GlbRot)
+   ! Solve is done at the coordinate system based on time n for states at time n+1
+   ! The damping matrix is technically defined for the n+1 coordinate system since that's where accel is evaluated.
+   ! Therefore, need to resolve the coordinate differences.
+   !
+   ! OtherState%GlbRot = tranpose(u%RootMotion%Orientation(:, :, 1) evaluated at n)
+   ! here, u%RootMotion%Orientation(:, :, 1) is evaluated at n+1
+   m%ModalDampingRot = matmul(u%RootMotion%Orientation(:, :, 1), OtherState%GlbRot)
 
-   ! OtherState%GlbRot - will use to get rotation into correct coordinate system
-   ! Also might be relevant - u%RootMotion%...
+   do j = 1, size(x%dqdt, 2)-1
+      m%DampedVelocities((j-1)*6+1:(j-1)*6+3) = matmul(m%ModalDampingRot, x%dqdt(1:3, j+1) - x%dqdt(1:3, 1))
+      m%DampedVelocities((j-1)*6+4:(j-1)*6+6) = matmul(m%ModalDampingRot, x%dqdt(4:6, j+1) - x%dqdt(4:6, 1))
+   end do
 
    ! 3. Multiply by modal damping matrix
    m%ModalDampingF = matmul(p%ModalDampingMat, m%DampedVelocities)
 
-   ! 4. Rotate to correct coordinates and add to m%LP_RHS_LU
-
-   ! TODO: Add or subtract to m%LP_RHS_LU?
-   ! m%LP_RHS_LU = m%LP_RHS_LU - m%ModalDampingF
-
+   ! 4. Rotate to correct coordinates and subtract from m%LP_RHS_LU
    do j = 1, size(x%dqdt, 2)-1
       m%LP_RHS_LU((j-1)*6+1:(j-1)*6+3) = m%LP_RHS_LU((j-1)*6+1:(j-1)*6+3) &
-         - matmul(transpose(OtherState%GlbRot), m%ModalDampingF((j-1)*6+1:(j-1)*6+3))
+         - matmul(transpose(m%ModalDampingRot), m%ModalDampingF((j-1)*6+1:(j-1)*6+3))
 
       m%LP_RHS_LU((j-1)*6+4:(j-1)*6+6) = m%LP_RHS_LU((j-1)*6+4:(j-1)*6+6) &
-         - matmul(transpose(OtherState%GlbRot), m%ModalDampingF((j-1)*6+4:(j-1)*6+6))
+         - matmul(transpose(m%ModalDampingRot), m%ModalDampingF((j-1)*6+4:(j-1)*6+6))
    end do
 
 
-   print *, 'TODO: Add modal damping force to the RHS vector here.'
-   print *, 'TODO: Should force be added or subtracted here? Should be clear in testing...'
+   print *, 'End of damping force calculation.'
 
 END SUBROUTINE BD_AddModalDampingRHS
 
