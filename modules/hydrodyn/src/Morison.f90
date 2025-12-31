@@ -5233,7 +5233,7 @@ END SUBROUTINE Morison_CalcOutput
       REAL(DbKi)                       :: F_B_3pt_sub(6), F_B_5pt_sub(6)
       REAL(DbKi)                       :: error(6), tmp(6)
       LOGICAL                          :: tolMet
-      INTEGER(IntKi)                   :: i, ib
+      INTEGER(IntKi)                   :: i
       INTEGER(IntKi)                   :: secStatMidL, secStatMidR
       REAL(ReKi)                       :: k_hat_Re(3)
       REAL(ReKi)                       :: y_hat_Re(3)
@@ -5342,8 +5342,8 @@ END SUBROUTINE Morison_CalcOutput
             cycle
          end if
 
-         ! If recursinon limit reached, 
-         ! Set procesed flag, set error flag, and continue
+         ! If recursion limit reached, 
+         ! Set processed flag, set error flag, and continue
          if (SE%level + 1 > maxRecurLvl) then
             SA(i)%processed = .true.
             ErrStat = ErrID_Warn

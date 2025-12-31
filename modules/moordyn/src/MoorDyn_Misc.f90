@@ -1010,7 +1010,7 @@ CONTAINS
       ! SeaState wave kinematics
       case (3)
 
-         ! disable wavekin 3 during IC_gen, otherwise will never find steady state (becasue of waves)
+         ! disable wavekin 3 during IC_gen, otherwise will never find steady state (because of waves)
          if (m%IC_gen) return
 
          ! SeaState throws warning when queried location is out of bounds from the SeaState grid, so no need to handle here
@@ -1019,7 +1019,7 @@ CONTAINS
          !   (only pos needed because time is double in wave field, all other are outputs that will be set by WaveField_GetNodeWaveKin)
          xyz_sp = REAL([x, y, z], SiKi)
 
-         ! for now we will force the node to be in the water (forceNodeInWater = True). Rods handle partial submergence seperately so they need to get information from SeaState 
+         ! for now we will force the node to be in the water (forceNodeInWater = True). Rods handle partial submergence separately so they need to get information from SeaState 
          CALL WaveField_GetNodeWaveKin(p%WaveField, m%WaveField_m, t, xyz_sp, .true., .true., nodeInWater, WaveElev1, WaveElev2, zeta_sp, PDyn_sp, U_sp, Ud_sp, FAMCF, ErrStat2, ErrMsg2 ) ! outputs: nodeInWater, WaveElev1, WaveElev2, FAMCF all unused
          CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
 
