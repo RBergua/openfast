@@ -134,6 +134,7 @@ subroutine ui_seg(iCPStart, iCPEnd, CPs, &
    real(ReKi)              :: norm2_r0        !< Squared length of the segment d = (r1xr2)/r0
    real(ReKi)              :: xa, ya, za, xb, yb, zb !< Coordinates of X-Xa and X-Xb
    real(ReKi)              :: exp_value       !< 
+   real(ReKi)              :: CPs_icp(3)      !< 
 
    ! Branching based on regularization model
    ! NOTE: copy paste of code is done for optimization!
@@ -141,14 +142,15 @@ subroutine ui_seg(iCPStart, iCPEnd, CPs, &
    select case (RegFunction) 
    case ( idRegNone ) ! No vortex core 
       !$OMP PARALLEL default(shared)
-      !$OMP do private(icp,is,Uind,P1,P2,crossprod,denominator,Kv,norm_a,norm_b,norm2_r0,norm2_orth,xa,ya,za,xb,yb,zb) schedule(runtime)
+      !$OMP do private(icp,is,CPs_icp,Uind,P1,P2,crossprod,denominator,Kv,norm_a,norm_b,norm2_r0,norm2_orth,xa,ya,za,xb,yb,zb) schedule(runtime)
       do icp=iCPStart,iCPEnd ! loop on CPs 
+         Uind = 0.0_ReKi
+         CPs_icp = CPs(:,icp)
          do is=iSegStart,iSegEnd ! loop on selected segments 
-            Uind = 0.0_ReKi
             P1   = SegPoints(1:3, SegConnct(1,is)) ! Segment extremity points
             P2   = SegPoints(1:3, SegConnct(2,is))
-            xa=CPs(1,icp)-P1(1); ya=CPs(2,icp)-P1(2); za=CPs(3,icp)-P1(3);
-            xb=CPs(1,icp)-P2(1); yb=CPs(2,icp)-P2(2); zb=CPs(3,icp)-P2(3);
+            xa=CPs_icp(1)-P1(1); ya=CPs_icp(2)-P1(2); za=CPs_icp(3)-P1(3);
+            xb=CPs_icp(1)-P2(1); yb=CPs_icp(2)-P2(2); zb=CPs_icp(3)-P2(3);
             norm_a      = sqrt(xa*xa + ya*ya + za*za)
             norm_b      = sqrt(xb*xb + yb*yb + zb*zb)
             denominator = norm_a*norm_b*(norm_a*norm_b + xa*xb+ya*yb+za*zb)
@@ -162,26 +164,27 @@ subroutine ui_seg(iCPStart, iCPEnd, CPs, &
                      ! --- Far field TODO
                      ! --- NO Regularization (close field)
                      Kv        = SegGamma(is)*fourpi_inv*(norm_a+norm_b)/(denominator + MINDENOM)
-                     Uind(1:3) = Kv*crossprod(1:3)
+                     Uind(1:3) = Uind(1:3) + Kv*crossprod(1:3)
                   end if
                end if
             end if
-            Uind_out(1:3,icp) = Uind_out(1:3,icp)+Uind(1:3)
          end do ! Loop on segments
+         Uind_out(1:3,icp) = Uind_out(1:3,icp)+Uind(1:3)
       enddo ! Loop on control points
       !$OMP END DO 
       !$OMP END PARALLEL
       
    case ( idRegRankine )      ! Rankine
       !$OMP PARALLEL default(shared)
-      !$OMP do private(icp,is,Uind,P1,P2,crossprod,denominator,r_bar2,Kv,norm_a,norm_b,norm2_r0,norm2_orth,xa,ya,za,xb,yb,zb) schedule(runtime)
+      !$OMP do private(icp,is,CPs_icp,Uind,P1,P2,crossprod,denominator,r_bar2,Kv,norm_a,norm_b,norm2_r0,norm2_orth,xa,ya,za,xb,yb,zb) schedule(runtime)
       do icp=iCPStart,iCPEnd ! loop on CPs 
+         Uind = 0.0_ReKi
+         CPs_icp = CPs(:,icp)
          do is=iSegStart,iSegEnd ! loop on selected segments 
-            Uind = 0.0_ReKi
             P1   = SegPoints(1:3, SegConnct(1,is)) ! Segment extremity points
             P2   = SegPoints(1:3, SegConnct(2,is))
-            xa=CPs(1,icp)-P1(1); ya=CPs(2,icp)-P1(2); za=CPs(3,icp)-P1(3);
-            xb=CPs(1,icp)-P2(1); yb=CPs(2,icp)-P2(2); zb=CPs(3,icp)-P2(3);
+            xa=CPs_icp(1)-P1(1); ya=CPs_icp(2)-P1(2); za=CPs_icp(3)-P1(3);
+            xb=CPs_icp(1)-P2(1); yb=CPs_icp(2)-P2(2); zb=CPs_icp(3)-P2(3);
             norm_a      = sqrt(xa*xa + ya*ya + za*za)
             norm_b      = sqrt(xb*xb + yb*yb + zb*zb)
             denominator = norm_a*norm_b*(norm_a*norm_b + xa*xb+ya*yb+za*zb)
@@ -201,26 +204,27 @@ subroutine ui_seg(iCPStart, iCPEnd, CPs, &
                         Kv=1.0_ReKi 
                      end if 
                      Kv        = SegGamma(is)*fourpi_inv*Kv*(norm_a+norm_b)/(denominator + MINDENOM)
-                     Uind(1:3) = Kv*crossprod(1:3)
+                     Uind(1:3) = Uind(1:3) + Kv*crossprod(1:3)
                   end if
                end if ! denominator size or distances too small
             end if ! 
-            Uind_out(1:3,icp) = Uind_out(1:3,icp)+Uind(1:3)
          end do ! Loop on segments
+         Uind_out(1:3,icp) = Uind_out(1:3,icp) + Uind(1:3)
       enddo ! Loop on control points
       !$OMP END DO 
       !$OMP END PARALLEL
 
    case ( idRegLambOseen )      ! LambOseen
       !$OMP PARALLEL default(shared)
-      !$OMP do private(icp,is,Uind,P1,P2,crossprod,denominator,r_bar2,Kv,norm_a,norm_b,norm2_r0,norm2_orth,xa,ya,za,xb,yb,zb,exp_value) schedule(runtime)
+      !$OMP do private(icp,is,CPs_icp,Uind,P1,P2,crossprod,denominator,r_bar2,Kv,norm_a,norm_b,norm2_r0,norm2_orth,xa,ya,za,xb,yb,zb,exp_value) schedule(runtime)
       do icp=iCPStart,iCPEnd ! loop on CPs 
+         Uind = 0.0_ReKi
+         CPs_icp = CPs(:,icp)
          do is=iSegStart,iSegEnd ! loop on selected segments 
-            Uind = 0.0_ReKi
             P1   = SegPoints(1:3, SegConnct(1,is)) ! Segment extremity points
             P2   = SegPoints(1:3, SegConnct(2,is))
-            xa=CPs(1,icp)-P1(1); ya=CPs(2,icp)-P1(2); za=CPs(3,icp)-P1(3);
-            xb=CPs(1,icp)-P2(1); yb=CPs(2,icp)-P2(2); zb=CPs(3,icp)-P2(3);
+            xa=CPs_icp(1)-P1(1); ya=CPs_icp(2)-P1(2); za=CPs_icp(3)-P1(3);
+            xb=CPs_icp(1)-P2(1); yb=CPs_icp(2)-P2(2); zb=CPs_icp(3)-P2(3);
             norm_a      = sqrt(xa*xa + ya*ya + za*za)
             norm_b      = sqrt(xb*xb + yb*yb + zb*zb)
             denominator = norm_a*norm_b*(norm_a*norm_b + xa*xb+ya*yb+za*zb)
@@ -241,61 +245,63 @@ subroutine ui_seg(iCPStart, iCPEnd, CPs, &
                         Kv = 1.0_ReKi-exp(exp_value)
                      endif
                      Kv        = SegGamma(is)*fourpi_inv*Kv*(norm_a+norm_b)/(denominator + MINDENOM)
-                     Uind(1:3) = Kv*crossprod(1:3)
+                     Uind(1:3) = Uind(1:3) + Kv*crossprod(1:3)
                   endif 
                end if ! denominator size or distances too small
             end if ! 
-            Uind_out(1:3,icp) = Uind_out(1:3,icp)+Uind(1:3)
          end do ! Loop on segments
+         Uind_out(1:3,icp) = Uind_out(1:3,icp) + Uind(1:3)
       enddo ! Loop on control points
       !$OMP END DO 
       !$OMP END PARALLEL
 
    case ( idRegVatistas )      ! Vatistas n=2
       !$OMP PARALLEL default(shared)
-      !$OMP do private(icp,is,Uind,P1,P2,crossprod,denominator,r_bar2,Kv,norm_a,norm_b,norm2_r0,norm2_orth,xa,ya,za,xb,yb,zb) schedule(runtime)
+      !$OMP do private(icp,is,CPs_icp,Uind,P1,P2,crossprod,denominator,r_bar2,Kv,norm_a,norm_b,norm2_r0,norm2_orth,xa,ya,za,xb,yb,zb) schedule(runtime)
       do icp=iCPStart,iCPEnd ! loop on CPs 
+         Uind = 0.0_ReKi
+         CPs_icp = CPs(:,icp)
          do is=iSegStart,iSegEnd ! loop on selected segments 
-            Uind = 0.0_ReKi
             P1   = SegPoints(1:3, SegConnct(1,is)) ! Segment extremity points
             P2   = SegPoints(1:3, SegConnct(2,is))
-            xa=CPs(1,icp)-P1(1); ya=CPs(2,icp)-P1(2); za=CPs(3,icp)-P1(3);
-            xb=CPs(1,icp)-P2(1); yb=CPs(2,icp)-P2(2); zb=CPs(3,icp)-P2(3);
+            xa=CPs_icp(1)-P1(1); ya=CPs_icp(2)-P1(2); za=CPs_icp(3)-P1(3);
+            xb=CPs_icp(1)-P2(1); yb=CPs_icp(2)-P2(2); zb=CPs_icp(3)-P2(3);
             norm_a      = sqrt(xa*xa + ya*ya + za*za)
             norm_b      = sqrt(xb*xb + yb*yb + zb*zb)
             denominator = norm_a*norm_b*(norm_a*norm_b + xa*xb+ya*yb+za*zb)
-            if (denominator>PRECISION_UI) then
-               crossprod(1) = ya*zb-za*yb; crossprod(2) = za*xb-xa*zb; crossprod(3) = xa*yb-ya*xb
-               norm2_orth   = crossprod(1)**2 + crossprod(2)**2 + crossprod(3)**2
-               if (norm2_orth>PRECISION_UI) then ! On the singularity, Uind(1:3)=0.0_ReKi
-                  norm2_r0     = (xa-xb)*(xa-xb) + (ya-yb)*(ya-yb) +(za-zb)*(za-zb) 
-                  if (norm2_r0>PRECISION_UI) then
-                     ! --- Far field TODO
-                     ! --- Regularization (close field) --- Vatistas
-                     norm2_orth = norm2_orth/norm2_r0 ! d = (r1xr2)/r0
-                     r_bar2     = norm2_orth/RegParam(is)**2
-                     Kv         = r_bar2/sqrt(1+r_bar2**2)
-                     Kv         = SegGamma(is)*fourpi_inv*Kv*(norm_a+norm_b)/(denominator + MINDENOM)
-                     Uind(1:3)  = Kv*crossprod(1:3)
-                  end if
-               end if ! denominator size or distances too small
-            end if ! 
-            Uind_out(1:3,icp) = Uind_out(1:3,icp)+Uind(1:3)
+            ! denominator size or distances too small
+            if (denominator <= PRECISION_UI) cycle
+            crossprod(1) = ya*zb-za*yb; crossprod(2) = za*xb-xa*zb; crossprod(3) = xa*yb-ya*xb
+            norm2_orth   = crossprod(1)**2 + crossprod(2)**2 + crossprod(3)**2
+            ! On the singularity, cycle
+            if (norm2_orth <= PRECISION_UI) cycle
+            norm2_r0     = (xa-xb)*(xa-xb) + (ya-yb)*(ya-yb) +(za-zb)*(za-zb) 
+            ! segment of zero length
+            if (norm2_r0 <= PRECISION_UI) cycle
+            ! --- Far field TODO
+            ! --- Regularization (close field) --- Vatistas
+            norm2_orth = norm2_orth/norm2_r0 ! d = (r1xr2)/r0
+            r_bar2     = norm2_orth/RegParam(is)**2
+            Kv         = r_bar2/sqrt(1.0_ReKi+r_bar2**2)
+            Kv         = SegGamma(is)*fourpi_inv*Kv*(norm_a+norm_b)/(denominator + MINDENOM)
+            Uind(1:3)  = Uind(1:3) + Kv*crossprod(1:3)
          end do ! Loop on segments
+         Uind_out(1:3,icp) = Uind_out(1:3,icp) + Uind(1:3)
       enddo ! Loop on control points
       !$OMP END DO 
       !$OMP END PARALLEL
 
    case ( idRegOffset )      ! Denominator offset
       !$OMP PARALLEL default(shared)
-      !$OMP do private(icp,is,Uind,P1,P2,crossprod,denominator,r_bar2,Kv,norm_a,norm_b,norm2_r0,norm2_orth,xa,ya,za,xb,yb,zb) schedule(runtime)
+      !$OMP do private(icp,is,CPs_icp,Uind,P1,P2,crossprod,denominator,r_bar2,Kv,norm_a,norm_b,norm2_r0,norm2_orth,xa,ya,za,xb,yb,zb) schedule(runtime)
       do icp=iCPStart,iCPEnd ! loop on CPs 
+         Uind      = 0.0_ReKi
+         CPs_icp = CPs(:,icp)
          do is=iSegStart,iSegEnd ! loop on selected segments 
-            Uind      = 0.0_ReKi
             P1        = SegPoints(1:3, SegConnct(1,is)) ! Segment extremity points
             P2        = SegPoints(1:3, SegConnct(2,is))
-            xa=CPs(1,icp)-P1(1); ya=CPs(2,icp)-P1(2); za=CPs(3,icp)-P1(3);
-            xb=CPs(1,icp)-P2(1); yb=CPs(2,icp)-P2(2); zb=CPs(3,icp)-P2(3);
+            xa=CPs_icp(1)-P1(1); ya=CPs_icp(2)-P1(2); za=CPs_icp(3)-P1(3);
+            xb=CPs_icp(1)-P2(1); yb=CPs_icp(2)-P2(2); zb=CPs_icp(3)-P2(3);
             norm_a      = sqrt(xa*xa + ya*ya + za*za)
             norm_b      = sqrt(xb*xb + yb*yb + zb*zb)
             denominator = norm_a*norm_b*(norm_a*norm_b + xa*xb+ya*yb+za*zb)
@@ -309,12 +315,12 @@ subroutine ui_seg(iCPStart, iCPEnd, CPs, &
                      ! --- Regularization (close field) -- Offset
                      denominator = denominator+RegParam(is)**2*norm2_r0
                      Kv          = SegGamma(is)*fourpi_inv*(norm_a+norm_b)/(denominator + MINDENOM)
-                     Uind(1:3)   = Kv*crossprod(1:3)
+                     Uind(1:3)   = Uind(1:3) + Kv*crossprod(1:3)
                   end if
                end if ! denominator size or distances too small
             end if ! 
-            Uind_out(1:3,icp) = Uind_out(1:3,icp)+Uind(1:3)
          end do ! Loop on segments
+         Uind_out(1:3,icp) = Uind_out(1:3,icp)+Uind(1:3)
       enddo ! Loop on control points
       !$OMP END DO 
       !$OMP END PARALLEL
