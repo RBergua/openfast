@@ -5199,7 +5199,7 @@ END SUBROUTINE Morison_CalcOutput
 
    END SUBROUTINE getElementHstLds_Mod2_Rec
 
-   RECURSIVE SUBROUTINE RefineElementHstLds_Cyl(p, origin, pos1, posMid, pos2, FSPt, r1, rMid, r2, dl, dRdl,secStat1,secStatMid,secStat2, k_hat, y_hat, z_hat, n_hat, dFdl1, dFdlMid, dFdl2, recurLvl, F_B_5pt, ErrStat)
+   SUBROUTINE RefineElementHstLds_Cyl(p, origin, pos1, posMid, pos2, FSPt, r1, rMid, r2, dl, dRdl,secStat1,secStatMid,secStat2, k_hat, y_hat, z_hat, n_hat, dFdl1, dFdlMid, dFdl2, recurLvl, F_B_5pt, ErrStat)
       TYPE(Morison_ParameterType), INTENT( IN    ) :: p
       REAL(DbKi),      INTENT( IN    ) :: origin(3)
       REAL(DbKi),      INTENT( IN    ) :: pos1(3)
@@ -5229,63 +5229,163 @@ END SUBROUTINE Morison_CalcOutput
       REAL(DbKi)                       :: theta1,theta2
       REAL(DbKi)                       :: posMidL(3), posMidR(3)
       REAL(DbKi)                       :: rMidL, rMidR
-      REAL(DbKi)                       :: dFdlMidL(6), dFdlMidR(6), F_B_3pt(6)
+      REAL(DbKi)                       :: dFdlMidL(6), dFdlMidR(6)
+      REAL(DbKi)                       :: F_B_3pt_sub(6), F_B_5pt_sub(6)
       REAL(DbKi)                       :: error(6), tmp(6)
       LOGICAL                          :: tolMet
-      INTEGER(IntKi)                   :: i
+      INTEGER(IntKi)                   :: i, ib
       INTEGER(IntKi)                   :: secStatMidL, secStatMidR
+      REAL(ReKi)                       :: k_hat_Re(3)
+      REAL(ReKi)                       :: y_hat_Re(3)
+      REAL(ReKi)                       :: z_hat_Re(3)
+      REAL(ReKi)                       :: n_hat_Re(3)
       REAL(DbKi),      PARAMETER       :: RelTol      = 1.0E-6
       REAL(DbKi),      PARAMETER       :: AbsTol      = 1.0E-8
       INTEGER(IntKi),  PARAMETER       :: maxRecurLvl = 50
       CHARACTER(*),    PARAMETER       :: RoutineName = "RefineElementHstLds_Cyl"
-      
+
+      type Stack
+         integer(IntKi) :: level
+         logical        :: processed = .false.
+         real(DbKi)     :: pos1(3), posMid(3), pos2(3)
+         real(DbKi)     :: r1, rMid, r2
+         real(DbKi)     :: dl
+         integer(IntKi) :: secStat1, secStatMid, secStat2
+         real(DbKi)     :: dFdl1(6), dFdlMid(6), dFdl2(6)
+      end type
+
+      type (Stack) :: SA(2*maxRecurLvl)  ! Stack array
+      type (Stack) :: SE                 ! Stack element
+
       ErrStat = ErrID_None
 
-      posMidL = 0.5_DbKi*(pos1+posMid)
-      posMidR = 0.5_DbKi*(posMid+pos2)
-      rMidL   = 0.5_DbKi*(r1+rMid)
-      rMidR   = 0.5_DbKi*(rMid+r2)
+      ! Convert unit vectors to ReKi for compatibility with GetSectionFreeSurfaceIntersects_Cyl
+      k_hat_Re = real(k_hat, ReKi)
+      y_hat_Re = real(y_hat, ReKi)
+      z_hat_Re = real(z_hat, ReKi)
+      n_hat_Re = real(n_hat, ReKi)
 
-      ! Avoid sections coincident with the SWL
-      IF ( ABS(k_hat(3)) > 0.999999_ReKi ) THEN ! Vertical member
-         IF ( EqualRealNos( posMidL(3), 0.0_DbKi ) ) THEN
-            posMidL(3) = posMidL(3) - 1.0E-6 * dl
+      ! Initialize first stack element
+      SA(1)%level      = 1
+      SA(1)%processed  = .false.
+      SA(1)%pos1       = pos1
+      SA(1)%posMid     = posMid
+      SA(1)%pos2       = pos2
+      SA(1)%r1         = r1
+      SA(1)%rMid       = rMid
+      SA(1)%r2         = r2
+      SA(1)%dFdl1      = dFdl1 
+      SA(1)%dFdlMid    = dFdlMid
+      SA(1)%dFdl2      = dFdl2
+      SA(1)%dl         = dl
+      SA(1)%secStat1   = secStat1
+      SA(1)%secStatMid = secStatMid
+      SA(1)%secStat2   = secStat2
+
+      ! Initalize stack index
+      i = 1
+
+      ! Initialize output force
+      F_B_5pt = 0.0_DbKi
+
+      ! Loop until all stack elements have been processed
+      do while (.true.)
+
+         ! Find the next unprocessed stack element or exit if all processed
+         do while (SA(i)%processed)
+            i = i - 1
+            if (i == 0) return  ! All stack elements processed
+         end do
+
+         ! Copy current stack element to local variable for processing
+         SE = SA(i)
+
+         ! Compute mid points of left and right sub-elements
+         posMidL = 0.5_DbKi*(SE%pos1 + SE%posMid)
+         posMidR = 0.5_DbKi*(SE%posMid + SE%pos2)
+         rMidL   = 0.5_DbKi*(SE%r1 + SE%rMid)
+         rMidR   = 0.5_DbKi*(SE%rMid + SE%r2)
+
+         ! Avoid sections coincident with the SWL
+         IF ( ABS(k_hat(3)) > 0.999999_ReKi ) THEN ! Vertical member
+            IF ( EqualRealNos( posMidL(3), 0.0_DbKi ) ) THEN
+               posMidL(3) = posMidL(3) - 1.0E-6 * SE%dl
+            END IF
+            IF ( EqualRealNos( posMidR(3), 0.0_DbKi ) ) THEN
+               posMidR(3) = posMidR(3) - 1.0E-6 * SE%dl
+            END IF
          END IF
-         IF ( EqualRealNos( posMidR(3), 0.0_DbKi ) ) THEN
-            posMidR(3) = posMidR(3) - 1.0E-6 * dl
-         END IF
-      END IF
 
-      ! Total hydrostatic load on the element (Simpsons Rule)
-      F_B_3pt = (dFdl1 + 4.0_DbKi*dFdlMid + dFdl2) * dl/6.0_DbKi
+         ! Total hydrostatic load on the element (3 point Simpsons Rule)
+         F_B_3pt_sub = (SE%dFdl1 + 4.0_DbKi*SE%dFdlMid + SE%dFdl2) * SE%dl/6.0_DbKi
 
-      ! Mid point of left section
-      CALL GetSectionFreeSurfaceIntersects_Cyl( posMidL, FSPt, REAL(k_hat,ReKi), REAL(y_hat,ReKi), REAL(z_hat,ReKi), REAL(n_hat,ReKi), rMidL, theta1, theta2, secStatMidL)
-      CALL GetSectionHstLds_Cyl(p, origin, posMidL, k_hat, y_hat, z_hat, rMidL, dRdl, theta1, theta2, dFdlMidL)
+         ! Mid point of left section
+         CALL GetSectionFreeSurfaceIntersects_Cyl( posMidL, FSPt, k_hat_Re, y_hat_Re, z_hat_Re, n_hat_Re, rMidL, theta1, theta2, secStatMidL)
+         CALL GetSectionHstLds_Cyl(p, origin, posMidL, k_hat, y_hat, z_hat, rMidL, dRdl, theta1, theta2, dFdlMidL)
 
-      ! Mid point of right section
-      CALL GetSectionFreeSurfaceIntersects_Cyl( posMidR, FSPt, REAL(k_hat,ReKi), REAL(y_hat,ReKi), REAL(z_hat,ReKi), REAL(n_hat,ReKi), rMidR, theta1, theta2, secStatMidR)
-      CALL GetSectionHstLds_Cyl(p, origin, posMidR, k_hat, y_hat, z_hat, rMidR, dRdl, theta1, theta2, dFdlMidR)
-      
-      F_B_5pt = (dFdl1 + 4.0_DbKi*dFdlMidL + 2.0_DbKi*dFdlMid + 4.0_DbKi*dFdlMidR + dFdl2) * dl/12.0_DbKi
+         ! Mid point of right section
+         CALL GetSectionFreeSurfaceIntersects_Cyl( posMidR, FSPt, k_hat_Re, y_hat_Re, z_hat_Re, n_hat_Re, rMidR, theta1, theta2, secStatMidR)
+         CALL GetSectionHstLds_Cyl(p, origin, posMidR, k_hat, y_hat, z_hat, rMidR, dRdl, theta1, theta2, dFdlMidR)
+         
+         ! Total hydrostatic load on the element (5 point Simpsons Rule)
+         F_B_5pt_sub = (SE%dFdl1 + 4.0_DbKi*dFdlMidL + 2.0_DbKi*SE%dFdlMid + 4.0_DbKi*dFdlMidR + SE%dFdl2) * SE%dl/12.0_DbKi
 
-      ! Calculate error and check against tolerance
-      error = ABS(F_B_3pt - F_B_5pt)
-      tolMet = all(error <= MAX(RelTol*ABS(F_B_5pt),AbsTol))
+         ! Calculate error and check against tolerance
+         error = ABS(F_B_3pt_sub - F_B_5pt_sub)
+         tolMet = all(error <= MAX(RelTol*ABS(F_B_5pt_sub),AbsTol))
+         
+         ! If tolerance was met and (sub)element does not bound the waterplane, 
+         ! Set processed flag, sum force, and continue
+         if (tolMet .and. (ABS(SE%secStat1 - SE%secStat2) <= 1)) then
+            SA(i)%processed = .true.
+            F_B_5pt = F_B_5pt + F_B_5pt_sub
+            cycle
+         end if
 
-      ! If tolerance was met and (sub)element does not bound the waterplane, exit recursion
-      if (tolMet .and. (ABS(secStat1-secStat2) <= 1)) return
+         ! If recursinon limit reached, 
+         ! Set procesed flag, set error flag, and continue
+         if (SE%level + 1 > maxRecurLvl) then
+            SA(i)%processed = .true.
+            ErrStat = ErrID_Warn
+            cycle
+         end if
 
-      ! If maximum recursion level reached, exit recursion with warning
-      if (recurLvl > maxRecurLvl) then
-         ErrStat = ErrID_Warn
-         return
-      end if
+         ! Push new branches onto stack
+         SA(i)%level      = SE%level + 1
+         SA(i)%processed  = .false.
+         SA(i)%pos1       = SE%pos1
+         SA(i)%posMid     = posMidL
+         SA(i)%pos2       = SE%posMid
+         SA(i)%r1         = SE%r1
+         SA(i)%rMid       = rMidL
+         SA(i)%r2         = SE%rMid
+         SA(i)%dl         = 0.5_DbKi * SE%dl
+         SA(i)%secStat1   = SE%secStat1
+         SA(i)%secStatMid = secStatMidL
+         SA(i)%secStat2   = SE%secStatMid
+         SA(i)%dFdl1      = SE%dFdl1 
+         SA(i)%dFdlMid    = dFdlMidL
+         SA(i)%dFdl2      = SE%dFdlMid
 
-      ! Recursively refine the load integration if tolerance not met
-      CALL RefineElementHstLds_Cyl(p,origin,pos1,posMidL,posMid,FSPt,r1,rMidL,rMid,0.5_DbKi*dl,dRdl,secStat1,secStatMidL,secStatMid,k_hat,y_hat,z_hat,n_hat,dFdl1,dFdlMidL,dFdlMid, recurLvl+1, tmp, ErrStat)
-      CALL RefineElementHstLds_Cyl(p,origin,posMid,posMidR,pos2,FSPt,rMid,rMidR,r2,0.5_DbKi*dl,dRdl,secStatMid,secStatMidR,secStat2,k_hat,y_hat,z_hat,n_hat,dFdlMid,dFdlMidR,dFdl2, recurLvl+1, F_B_5pt, ErrStat)
-      F_B_5pt = F_B_5pt + tmp
+         SA(i+1)%level      = SE%level + 1
+         SA(i+1)%processed  = .false.
+         SA(i+1)%pos1       = SE%posMid
+         SA(i+1)%posMid     = posMidR
+         SA(i+1)%pos2       = SE%pos2
+         SA(i+1)%r1         = SE%rMid
+         SA(i+1)%rMid       = rMidR
+         SA(i+1)%r2         = SE%r2
+         SA(i+1)%dl         = 0.5_DbKi * SE%dl
+         SA(i+1)%secStat1   = SE%secStatMid
+         SA(i+1)%secStatMid = secStatMidR
+         SA(i+1)%secStat2   = SE%secStat2
+         SA(i+1)%dFdl1      = SE%dFdlMid
+         SA(i+1)%dFdlMid    = dFdlMidR
+         SA(i+1)%dFdl2      = SE%dFdl2
+
+         ! Increment stack index
+         i = i + 1
+      end do
       
    END SUBROUTINE RefineElementHstLds_Cyl
 
