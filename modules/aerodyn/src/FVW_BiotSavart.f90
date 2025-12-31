@@ -50,55 +50,61 @@ subroutine ui_seg_11(DeltaPa, DeltaPb, SegGamma, RegFunction, RegParam1, Uind)
    real(ReKi)              :: xa, ya, za, xb, yb, zb !< Coordinates of X-Xa and X-Xb
    real(ReKi)              :: exp_value      !< 
    ! 
-   Uind(1:3)=0.0_ReKi
+   Uind(1:3) = 0.0_ReKi
    xa=DeltaPa(1); ya=DeltaPa(2); za=DeltaPa(3)
    xb=DeltaPb(1); yb=DeltaPb(2); zb=DeltaPb(3)
    norm_a      = sqrt(xa*xa + ya*ya + za*za)
    norm_b      = sqrt(xb*xb + yb*yb + zb*zb)
    denominator  = norm_a*norm_b*(norm_a*norm_b + xa*xb+ya*yb+za*zb) ! |r1|*|r2|*(|r1|*|r2| + r1.r2)
-   if (denominator>PRECISION_UI) then
-      crossprod(1) = ya*zb-za*yb; crossprod(2) = za*xb-xa*zb; crossprod(3) = xa*yb-ya*xb
-      norm2_orth   = crossprod(1)**2 + crossprod(2)**2 + crossprod(3)**2
-      if (norm2_orth>PRECISION_UI) then ! On the singularity, Uind(1:3)=0.0_ReKi
-         norm2_r0     = (xa-xb)*(xa-xb) + (ya-yb)*(ya-yb) +(za-zb)*(za-zb) 
-         if (norm2_r0>PRECISION_UI) then ! segment of zero length
-            ! --- Far field TODO
-            ! --- Regularization (close field)
-            norm2_orth   = norm2_orth/norm2_r0 ! d = (r1xr2)/r0
-            select case (RegFunction) !
-            case ( idRegNone )         ! No vortex core model
-               Kv=1.0_ReKi
-            case ( idRegRankine )      ! Rankine
-               r_bar2    = norm2_orth/ RegParam1**2
-               if (r_bar2<1) then 
-                  Kv=r_bar2
-               else
-                  Kv=1.0_ReKi 
-               end if 
-            case ( idRegLambOseen )    ! Lamb-Oseen
-               r_bar2    = norm2_orth/ RegParam1**2
-               exp_value = -1.25643_ReKi*r_bar2
-               if(exp_value<MIN_EXP_VALUE) then ! Remove me when Far distance implemented
-                  Kv = 1.0_ReKi
-               else
-                  Kv = 1.0_ReKi-exp(exp_value)
-               endif
-            case ( idRegVatistas )    ! Vatistas n=2
-               r_bar2 = norm2_orth/ RegParam1**2
-               Kv     = r_bar2/sqrt(1.0_ReKi+r_bar2**2)
-            case ( idRegOffset )      ! Cut-off radius 
-               Kv        = 1.0_ReKi
-               denominator=denominator+RegParam1**2*norm2_r0
-            case default
-               print*,'Unknown SgmtReg', RegFunction
-               STOP ! Will never happen
-               Kv=1.0_ReKi !< Should be an error
-            end select 
-            Kv=SegGamma*fourpi_inv*Kv*(norm_a+norm_b)/denominator
-            Uind(1:3) = Kv*crossprod(1:3)
-         endif
+   
+   if (denominator <= PRECISION_UI) return
+   crossprod(1) = ya*zb-za*yb; crossprod(2) = za*xb-xa*zb; crossprod(3) = xa*yb-ya*xb
+   norm2_orth = crossprod(1)**2 + crossprod(2)**2 + crossprod(3)**2
+
+   ! On the singularity, Uind(1:3)=0.0_ReKi
+   if (norm2_orth <= PRECISION_UI) return
+   norm2_r0 = (xa-xb)*(xa-xb) + (ya-yb)*(ya-yb) + (za-zb)*(za-zb) 
+
+   ! segment of zero length
+   if (norm2_r0 <= PRECISION_UI) return 
+
+   ! --- Far field TODO
+   ! --- Regularization (close field)
+   norm2_orth = norm2_orth/norm2_r0 ! d = (r1xr2)/r0
+
+   select case (RegFunction) !
+   case ( idRegNone )         ! No vortex core model
+      Kv=1.0_ReKi
+   case ( idRegRankine )      ! Rankine
+      r_bar2    = norm2_orth/ RegParam1**2
+      if (r_bar2<1) then 
+         Kv=r_bar2
+      else
+         Kv=1.0_ReKi 
+      end if 
+   case ( idRegLambOseen )    ! Lamb-Oseen
+      r_bar2    = norm2_orth/ RegParam1**2
+      exp_value = -1.25643_ReKi*r_bar2
+      if(exp_value<MIN_EXP_VALUE) then ! Remove me when Far distance implemented
+         Kv = 1.0_ReKi
+      else
+         Kv = 1.0_ReKi-exp(exp_value)
       endif
-   endif
+   case ( idRegVatistas )    ! Vatistas n=2
+      r_bar2 = norm2_orth/ RegParam1**2
+      Kv     = r_bar2/sqrt(1.0_ReKi+r_bar2**2)
+   case ( idRegOffset )      ! Cut-off radius 
+      Kv        = 1.0_ReKi
+      denominator=denominator+RegParam1**2*norm2_r0
+   case default
+      print*,'Unknown SgmtReg', RegFunction
+      STOP ! Will never happen
+      Kv=1.0_ReKi !< Should be an error
+   end select 
+
+   Kv = SegGamma*fourpi_inv*Kv*(norm_a+norm_b)/denominator
+   Uind(1:3) = Kv*crossprod(1:3)
+   
 end subroutine ui_seg_11
 
 
