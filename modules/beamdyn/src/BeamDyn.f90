@@ -5932,21 +5932,34 @@ SUBROUTINE BD_AddModalDampingRHS(u, p, x, OtherState, m)
 
    ! 1. Velocities relative to root
    ! TODO : Is x%dqdt(:, 0) correct for root velocities? Or should I use u%RootMotion%... variables
-   do j = 1, size(x%dqdt, 2)-1
 
-      ! 1.a. Velocities minus root velocity
-      m%DampedVelocities((j-1)*6+1:j*6) = x%dqdt(:, j+1) - x%dqdt(:, 0)
+   ! element loops
+   do elem = 1, p%elem_total
 
-      ! 1.b. Subtract out the rigid body rotation of the root here
-      ! position cross rotational velocity
-      elem = j / (p%nodes_per_elem - 1) + 1
-      elem_node = j - (elem-1) * (p%nodes_per_elem - 1)
+      do elem_node = 1, p%nodes_per_elem
 
-      ! Vector from root to node (inertial frame)
-      r = p%uuN0(1:3, elem_node, elem) + x%q(1:3, j)
+         ! Global node index, excluding root
+         j = (elem - 1) * (p%nodes_per_elem - 1) + elem_node - 1
 
-      m%DampedVelocities((j-1)*6+1:(j-1)*6+3) = m%DampedVelocities((j-1)*6+1:(j-1)*6+3) &
-         - Cross_Product(x%dqdt(4:6, 0), r)
+         if (j > 0) then
+
+            ! 1.a. Velocities minus root velocity
+            ! x%... is at j+1 because skipping the root node and j is 1 at the first node after root.
+            m%DampedVelocities((j-1)*6+1:j*6) = x%dqdt(:, j+1) - x%dqdt(:, 1)
+
+            ! 1.b. Subtract out the rigid body rotation of the root here
+            ! position cross rotational velocity
+
+            ! Vector from root to node (inertial frame)
+            r = p%uuN0(1:3, elem_node, elem) + x%q(1:3, j+1)
+
+            m%DampedVelocities((j-1)*6+1:(j-1)*6+3) = m%DampedVelocities((j-1)*6+1:(j-1)*6+3) &
+               - Cross_Product(x%dqdt(4:6, 1), r)
+         end if
+
+
+      end do
+
    end do
 
    ! 2. rotate velocities by matmul(u%RootMotion%Orientation, OtherState%GlbRot)
@@ -5959,8 +5972,8 @@ SUBROUTINE BD_AddModalDampingRHS(u, p, x, OtherState, m)
    m%ModalDampingRot = matmul(u%RootMotion%Orientation(:, :, 1), OtherState%GlbRot)
 
    do j = 1, size(x%dqdt, 2)-1
-      m%DampedVelocities((j-1)*6+1:(j-1)*6+3) = matmul(m%ModalDampingRot, x%dqdt(1:3, j+1) - x%dqdt(1:3, 1))
-      m%DampedVelocities((j-1)*6+4:(j-1)*6+6) = matmul(m%ModalDampingRot, x%dqdt(4:6, j+1) - x%dqdt(4:6, 1))
+      m%DampedVelocities((j-1)*6+1:(j-1)*6+3) = matmul(m%ModalDampingRot, x%dqdt(1:3, j+1))
+      m%DampedVelocities((j-1)*6+4:(j-1)*6+6) = matmul(m%ModalDampingRot, x%dqdt(4:6, j+1))
    end do
 
    ! 3. Multiply by modal damping matrix
