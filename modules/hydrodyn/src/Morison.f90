@@ -5342,9 +5342,9 @@ END SUBROUTINE Morison_CalcOutput
             cycle
          end if
 
-         ! If recursion limit reached, 
+         ! If recursion limit reached or stack full,
          ! Set processed flag, set error flag, and continue
-         if (SE%level + 1 > maxRecurLvl) then
+         if ((SE%level + 1 > maxRecurLvl) .or. (i + 1 > size(SA))) then
             SA(i)%processed = .true.
             ErrStat = ErrID_Warn
             cycle
