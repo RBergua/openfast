@@ -76,7 +76,7 @@ SUBROUTINE FAST_InitializeAll_T( t_initial, TurbID, Turbine, ErrStat, ErrMsg, In
    CALL FAST_InitializeAll( t_initial, Turbine%m_Glue, Turbine%p_FAST, Turbine%y_FAST, Turbine%m_FAST, &
                Turbine%ED, Turbine%SED, Turbine%BD, Turbine%SrvD, Turbine%AD, Turbine%ADsk, Turbine%ExtLd, Turbine%IfW, Turbine%ExtInfw, &
                Turbine%SeaSt, Turbine%HD, Turbine%SD, Turbine%ExtPtfm, Turbine%MAP, Turbine%FEAM, Turbine%MD, Turbine%Orca, &
-               Turbine%IceF, Turbine%IceD, CompAeroMaps, ErrStat, ErrMsg, InFile, ExternInitData )
+               Turbine%IceF, Turbine%IceD, Turbine%SlD, CompAeroMaps, ErrStat, ErrMsg, InFile, ExternInitData )
    if(ErrStat >= AbortErrLev) return
 
    ! Initialize mappings between modules
@@ -104,7 +104,7 @@ END SUBROUTINE FAST_InitializeAll_T
 !----------------------------------------------------------------------------------------------------------------------------------
 !> Routine to call Init routine for each module. This routine sets all of the init input data for each module.
 SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SED, BD, SrvD, AD, ADsk, ExtLd, IfW, ExtInfw, SeaSt, HD, SD, ExtPtfm, &
-                               MAPp, FEAM, MD, Orca, IceF, IceD, CompAeroMaps, ErrStat, ErrMsg, InFile, ExternInitData )
+                               MAPp, FEAM, MD, Orca, IceF, IceD, SlD, CompAeroMaps, ErrStat, ErrMsg, InFile, ExternInitData )
 
    use ElastoDyn_Parameters, only: Method_RK4
 
@@ -126,6 +126,7 @@ SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SE
    TYPE(SeaState_Data),      INTENT(INOUT) :: SeaSt               !< SeaState data
    TYPE(HydroDyn_Data),      INTENT(INOUT) :: HD                  !< HydroDyn data
    TYPE(SubDyn_Data),        INTENT(INOUT) :: SD                  !< SubDyn data
+   TYPE(SoilDyn_Data),       INTENT(INOUT) :: SlD                 !< SoilDyn data
    TYPE(ExtPtfm_Data),       INTENT(INOUT) :: ExtPtfm             !< ExtPtfm_MCKF data
    TYPE(MAP_Data),           INTENT(INOUT) :: MAPp                !< MAP data
    TYPE(FEAMooring_Data),    INTENT(INOUT) :: FEAM                !< FEAMooring data
@@ -894,6 +895,30 @@ SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SE
       Init%InData_SD%g             = p_FAST%Gravity
       Init%InData_SD%SDInputFile   = p_FAST%SubFile
       Init%InData_SD%RootName      = p_FAST%OutFileRoot
+
+      if (p_FAST%CompSoil == Module_SlD) then
+
+         ! Copy over the soil stiffness matrices
+         if (allocated(SlD%p%Stiffness)) then
+            call AllocAry(Init%InData_SD%SoilStiffness,size(SlD%p%Stiffness,1),size(SlD%p%Stiffness,2),size(SlD%p%Stiffness,3),'SoilStiffness',ErrStat2,ErrMsg2)
+               CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
+            IF (ErrStat >= AbortErrLev) THEN
+               CALL Cleanup()
+               RETURN
+            END IF   
+            Init%InData_SD%SoilStiffness = SlD%p%Stiffness
+         endif
+
+         ! Make a copy of the SoilMesh to pass over
+         if (SlD%Input(1)%SoilMesh%Initialized) then
+            CALL MeshCopy ( SrcMesh  = SlD%y%SoilMesh &
+                          , DestMesh = Init%InData_SD%SoilMesh &
+                          , CtrlCode = MESH_COUSIN      &
+                          , IOS      = COMPONENT_OUTPUT &
+                          , ErrStat  = ErrStat2         &
+                          , ErrMess  = ErrMsg2          ) 
+            endif
+      endif
 
       ! Set the water depth
       if (p_FAST%CompHydro == Module_HD) then
@@ -1767,7 +1792,8 @@ SUBROUTINE FAST_Init( p, m_FAST, y_FAST, t_initial, InputFile, ErrStat, ErrMsg, 
    y_FAST%Module_Ver( Module_Orca   )%Name = 'OrcaFlexInterface'
    y_FAST%Module_Ver( Module_IceF   )%Name = 'IceFloe'
    y_FAST%Module_Ver( Module_IceD   )%Name = 'IceDyn'
-
+   y_FAST%Module_Ver( Module_SlD    )%Name = 'SoilDyn'
+         
    y_FAST%Module_Abrev( Module_Glue   ) = 'FAST'
    y_FAST%Module_Abrev( Module_IfW    ) = 'IfW'
    y_FAST%Module_Abrev( Module_ExtInfw) = 'ExtInfw'
@@ -1788,7 +1814,8 @@ SUBROUTINE FAST_Init( p, m_FAST, y_FAST, t_initial, InputFile, ErrStat, ErrMsg, 
    y_FAST%Module_Abrev( Module_Orca   ) = 'Orca'
    y_FAST%Module_Abrev( Module_IceF   ) = 'IceF'
    y_FAST%Module_Abrev( Module_IceD   ) = 'IceD'
-
+   y_FAST%Module_Abrev( Module_SlD    ) = 'SlD'
+   
    p%BD_OutputSibling = .false.
 
    !...............................................................................................................................
@@ -1950,6 +1977,7 @@ SUBROUTINE ValidateInputData(p, m_FAST, ErrStat, ErrMsg)
       CALL SetErrStat( ErrID_Fatal, 'SeaState must be used when HydroDyn is used. Set CompSeaSt = 1 in the FAST input file.', ErrStat, ErrMsg, RoutineName )
    end if
 
+   IF (p%CompSoil == Module_Unknown) CALL SetErrStat( ErrID_Fatal, 'CompSoil must be 0 (None) or 1 (coupled to SubDyn).', ErrStat, ErrMsg, RoutineName )
    IF (p%CompHydro /= Module_HD) THEN
       IF (p%CompMooring == Module_MAP) THEN
          CALL SetErrStat( ErrID_Fatal, 'HydroDyn must be used when MAP is used. Set CompHydro > 0 or CompMooring = 0 in the FAST input file.', ErrStat, ErrMsg, RoutineName )
@@ -1985,6 +2013,8 @@ SUBROUTINE ValidateInputData(p, m_FAST, ErrStat, ErrMsg)
    END IF
 
    IF (p%CompElast == Module_BD .and. p%CompAero == Module_ADsk) CALL SetErrStat( ErrID_Fatal, 'AeroDisk cannot be used when BeamDyn is used. Change CompAero or CompElast in the FAST input file.', ErrStat, ErrMsg, RoutineName )
+
+   IF (p%CompSoil == Module_SlD .and. .not. p%CompSub  == Module_SD   ) CALL SetErrStat( ErrID_Fatal, 'SoilDyn cannot be used without SubDyn.  Change CompSub or CompSoil in the FAST input file.', ErrStat, ErrMsg, RoutineName )
 
    ! No method at the moment for getting disk average velocity from ExtInfw
    if (p%CompAero == Module_ADsk .and. p%CompInflow == MODULE_ExtInfw) call SetErrStat( ErrID_Fatal, 'AeroDisk cannot be used with ExtInflow or the library interface', ErrStat, ErrMsg, RoutineName ) 
@@ -2216,7 +2246,12 @@ SUBROUTINE FAST_InitOutput( p_FAST, y_FAST, Init, ErrStat, ErrMsg )
       y_FAST%FileDescLines(2)  = TRIM(y_FAST%FileDescLines(2) ) //'; '//TRIM(GetNVD(y_FAST%Module_Ver( Module_IceF )))
    ELSEIF ( p_FAST%CompIce == Module_IceD ) THEN
       y_FAST%Module_Ver( Module_IceD )   = Init%OutData_IceD%Ver
-      y_FAST%FileDescLines(2)  = TRIM(y_FAST%FileDescLines(2) ) //'; '//TRIM(GetNVD(y_FAST%Module_Ver( Module_IceD )))
+      y_FAST%FileDescLines(2)  = TRIM(y_FAST%FileDescLines(2) ) //'; '//TRIM(GetNVD(y_FAST%Module_Ver( Module_IceD )))   
+   END IF      
+
+   IF ( p_FAST%CompSoil == Module_SlD ) THEN
+      y_FAST%Module_Ver( Module_SlD )   = Init%OutData_SlD%Ver
+      y_FAST%FileDescLines(2)  = TRIM(y_FAST%FileDescLines(2) ) //'; '//TRIM(GetNVD(y_FAST%Module_Ver( Module_SlD )))
    END IF
 
    !......................................................
@@ -2258,6 +2293,7 @@ SUBROUTINE FAST_InitOutput( p_FAST, y_FAST, Init, ErrStat, ErrMsg )
    if (allocated(Init%OutData_Orca%WriteOutputHdr))      y_FAST%numOuts(Module_Orca)      = size(Init%OutData_Orca%WriteOutputHdr)
    if (allocated(Init%OutData_IceF%WriteOutputHdr))      y_FAST%numOuts(Module_IceF)      = size(Init%OutData_IceF%WriteOutputHdr)
    if (allocated(Init%OutData_IceD%WriteOutputHdr))      y_FAST%numOuts(Module_IceD)      = size(Init%OutData_IceD%WriteOutputHdr) * p_FAST%numIceLegs
+   IF (allocated(Init%OutData_SlD%WriteOutputHdr))       y_FAST%numOuts(Module_SlD)       = size(Init%OutData_SlD%WriteOutputHdr)
 
    !......................................................
    ! Initialize the output channel names and units
@@ -2485,6 +2521,13 @@ SUBROUTINE FAST_InitOutput( p_FAST, y_FAST, Init, ErrStat, ErrMsg )
          end do
       end do
    end if
+
+   ! SoilDyn
+   do i=1,y_FAST%numOuts(Module_SlD) 
+      y_FAST%ChannelNames(indxNext) = Init%OutData_SlD%WriteOutputHdr(i)
+      y_FAST%ChannelUnits(indxNext) = Init%OutData_SlD%WriteOutputUnt(i)
+      indxNext = indxNext + 1
+   end do
 
    !......................................................
    ! Open the text output file and print the headers
@@ -2927,6 +2970,20 @@ SUBROUTINE FAST_ReadPrimaryFile( InputFile, p, m_FAST, OverrideAbortErrLev, ErrS
       p%CompIce = Module_IceD
    case default
       p%CompIce = Module_Unknown
+   end select
+
+      ! CompSoil - Compute sub-structural dynamics (switch) {0=None; 1=SoilDyn; 2=ExtPtfm_MCKF}:
+   CALL ReadVar( UnIn, InputFile, p%CompSoil, "CompSoil", "Compute soil-structural dynamics (switch) {0=None; 1=SoilDyn}", ErrStat2, ErrMsg2, UnEc)
+      if (Failed()) return
+
+      ! immediately convert to values used inside the code:
+   select case (p%CompSoil)
+   case (0)
+      p%CompSoil = Module_NONE
+   case (1)
+      p%CompSoil = Module_SlD
+   case default
+      p%CompSoil = Module_Unknown
    end select
 
       ! MHK - MHK turbine type (switch) {0=Not an MHK turbine; 1=Fixed MHK turbine; 2=Floating MHK turbine}:
@@ -4519,7 +4576,11 @@ SUBROUTINE FAST_WrSum( p_FAST, y_FAST, m_Glue, ErrStat, ErrMsg )
    IF ( p_FAST%CompIce /= Module_IceD ) DescStr = TRIM(DescStr)//NotUsedTxt
    WRITE (y_FAST%UnSum,Fmt)  TRIM( DescStr )
 
+   DescStr = GetNVD( y_FAST%Module_Ver( Module_SlD ) )
+   IF ( p_FAST%CompSoil /= Module_SlD ) DescStr = TRIM(DescStr)//NotUsedTxt
+   WRITE (y_FAST%UnSum,Fmt)  TRIM( DescStr )
 
+   
    !.......................... Information from FAST input File ......................................
 ! OTHER information we could print here:
 ! current working directory
@@ -4698,7 +4759,7 @@ SUBROUTINE FAST_Solution0_T(Turbine, ErrStat, ErrMsg)
                           Turbine%SeaSt, Turbine%HD, Turbine%SD, &
                           Turbine%ExtPtfm, Turbine%SrvD, Turbine%MAP, &
                           Turbine%FEAM, Turbine%MD, Turbine%Orca, &
-                          Turbine%IceF, Turbine%IceD, &
+                          Turbine%IceF, Turbine%IceD, Turbine%SlD, &
                           ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
 
@@ -4708,7 +4769,7 @@ SUBROUTINE FAST_Solution0_T(Turbine, ErrStat, ErrMsg)
                     Turbine%ED, Turbine%SED, Turbine%BD, Turbine%AD, &
                     Turbine%IfW, Turbine%ExtInfw, Turbine%SeaSt, Turbine%HD, &
                     Turbine%SD, Turbine%ExtPtfm, Turbine%SrvD, Turbine%MAP, &
-                    Turbine%FEAM, Turbine%MD, Turbine%Orca, Turbine%IceF, Turbine%IceD)
+                    Turbine%FEAM, Turbine%MD, Turbine%Orca, Turbine%IceF, Turbine%IceD, Turbine%SlD)
    end if
 
    !----------------------------------------------------------------------------
@@ -5000,7 +5061,7 @@ SUBROUTINE FAST_Solution_T(t_initial, n_t_global, Turbine, ErrStat, ErrMsg )
    call WriteOutputToFile(n_t_global_next, t_global_next, Turbine%p_FAST, Turbine%y_FAST, Turbine%ED, Turbine%SED, Turbine%BD, &
                           Turbine%AD, Turbine%ADsk, Turbine%IfW, Turbine%ExtInfw, Turbine%SeaSt, Turbine%HD, Turbine%SD, &
                           Turbine%ExtPtfm, Turbine%SrvD, Turbine%MAP, Turbine%FEAM, Turbine%MD, Turbine%Orca, &
-                          Turbine%IceF, Turbine%IceD, ErrStat2, ErrMsg2)
+                          Turbine%IceF, Turbine%IceD, Turbine%SlD, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
 
    !----------------------------------------------------------------------------
@@ -5180,7 +5241,7 @@ SUBROUTINE FAST_WriteOutput_T(t_initial, n_t_global, Turbine, ErrStat, ErrMsg )
                           Turbine%ED, Turbine%SED, Turbine%BD, Turbine%AD, Turbine%ADsk, Turbine%IfW, Turbine%ExtInfw, &
                           Turbine%SeaSt, Turbine%HD, Turbine%SD, Turbine%ExtPtfm, &
                           Turbine%SrvD, Turbine%MAP, Turbine%FEAM, Turbine%MD, Turbine%Orca, &
-                          Turbine%IceF, Turbine%IceD, ErrStat2, ErrMsg2)
+                          Turbine%IceF, Turbine%IceD, Turbine%SlD, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
 
    !----------------------------------------------------------------------------
@@ -5218,7 +5279,7 @@ END FUNCTION NeedWriteOutput
 !! calls the routine to write to the files with the output data. It should be called after all the output solves for a given time
 !! have been completed, and assumes y_FAST\%WriteThisStep has been set.
 SUBROUTINE WriteOutputToFile(n_t_global, t_global, p_FAST, y_FAST, ED, SED, BD, AD, ADsk, IfW, ExtInfw, SeaSt, HD, SD, ExtPtfm, &
-                             SrvD, MAPp, FEAM, MD, Orca, IceF, IceD, ErrStat, ErrMsg)
+                             SrvD, MAPp, FEAM, MD, Orca, IceF, IceD, SlD, ErrStat, ErrMsg)
 !...............................................................................................................................
    INTEGER(IntKi),           INTENT(IN   ) :: n_t_global          !< Current global time step
    REAL(DbKi),               INTENT(IN   ) :: t_global            !< Current global time
@@ -5243,6 +5304,7 @@ SUBROUTINE WriteOutputToFile(n_t_global, t_global, p_FAST, y_FAST, ED, SED, BD, 
    TYPE(OrcaFlex_Data),      INTENT(IN   ) :: Orca                !< OrcaFlex interface data
    TYPE(IceFloe_Data),       INTENT(IN   ) :: IceF                !< IceFloe data
    TYPE(IceDyn_Data),        INTENT(IN   ) :: IceD                !< All the IceDyn data used in time-step loop
+   TYPE(SoilDyn_Data),       INTENT(IN   ) :: SlD                 !< SoilDyn data
 
    INTEGER(IntKi),           INTENT(  OUT) :: ErrStat             !< Error status of the operation
    CHARACTER(*),             INTENT(  OUT) :: ErrMsg              !< Error message if ErrStat /= ErrID_None
@@ -5263,13 +5325,13 @@ SUBROUTINE WriteOutputToFile(n_t_global, t_global, p_FAST, y_FAST, ED, SED, BD, 
                            ED%y, SED%y%WriteOutput, AD%y, ADsk%y%WriteOutput, SrvD%y, SeaSt%y%WriteOutput, &
                            HD%y%WriteOutput, SD%y%WriteOutput, ExtPtfm%y%WriteOutput, MAPp%y%WriteOutput, &
                            FEAM%y%WriteOutput, MD%y%WriteOutput, Orca%y%WriteOutput, IceF%y%WriteOutput, &
-                           IceD%y, BD%y, ErrStat, ErrMsg )
+                           IceD%y, SlD%y%WriteOutput, BD%y, ErrStat, ErrMsg )
    ENDIF
 
       ! Write visualization data (and also note that we're ignoring any errors that occur doing so)
    IF ( p_FAST%WrVTK == VTK_Animate ) THEN
       IF ( MOD( n_t_global, p_FAST%n_VTKTime ) == 0 ) THEN
-         call WriteVTK(t_global, p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInfw, SeaSt, HD, SD, ExtPtfm, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD)
+         call WriteVTK(t_global, p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInfw, SeaSt, HD, SD, ExtPtfm, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD, SlD)
       END IF
    END IF
 
@@ -5278,7 +5340,7 @@ END SUBROUTINE WriteOutputToFile
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine writes the module output to the primary output file(s).
 SUBROUTINE WrOutputLine( t, p_FAST, y_FAST, IfWOutput, ExtInfwOutput, y_ED, SEDOutput, y_AD, ADskOutput, y_SrvD, SeaStOutput, HDOutput, SDOutput, ExtPtfmOutput,&
-                        MAPOutput, FEAMOutput, MDOutput, OrcaOutput, IceFOutput, y_IceD, y_BD, ErrStat, ErrMsg)
+                        MAPOutput, FEAMOutput, MDOutput, OrcaOutput, IceFOutput, y_IceD, SlDOutput, y_BD, ErrStat, ErrMsg)
 
    IMPLICIT                        NONE
 
@@ -5305,6 +5367,7 @@ SUBROUTINE WrOutputLine( t, p_FAST, y_FAST, IfWOutput, ExtInfwOutput, y_ED, SEDO
    REAL(ReKi), ALLOCATABLE,  INTENT(IN)    :: OrcaOutput(:)                      !< OrcaFlex interface WriteOutput values
    REAL(ReKi), ALLOCATABLE,  INTENT(IN)    :: IceFOutput(:)                      !< IceFloe WriteOutput values
    TYPE(IceD_OutputType),    INTENT(IN)    :: y_IceD(:)                          !< IceDyn outputs (WriteOutput values are subset)
+   REAL(ReKi), ALLOCATABLE,  INTENT(IN)    :: SlDOutput(:)                       !< SoilDyn WriteOutput values
    TYPE(BD_OutputType),      INTENT(IN)    :: y_BD(:)                            !< BeamDyn outputs (WriteOutput values are subset)
 
    INTEGER(IntKi),           INTENT(OUT)   :: ErrStat                            !< Error status
@@ -5321,7 +5384,7 @@ SUBROUTINE WrOutputLine( t, p_FAST, y_FAST, IfWOutput, ExtInfwOutput, y_ED, SEDO
    ErrMsg  = ''
 
    CALL FillOutputAry(p_FAST, y_FAST, IfWOutput, ExtInfwOutput, y_ED, SEDOutput, y_AD, ADskOutput, y_SrvD, SeaStOutput, HDOutput, SDOutput, ExtPtfmOutput, &
-                      MAPOutput, FEAMOutput, MDOutput, OrcaOutput, IceFOutput, y_IceD, y_BD, OutputAry)
+                      MAPOutput, FEAMOutput, MDOutput, OrcaOutput, IceFOutput, y_IceD, SlDOutput, y_BD, OutputAry)
 
    IF (p_FAST%WrTxtOutFile) THEN
 
@@ -5396,15 +5459,16 @@ SUBROUTINE FillOutputAry_T(T, Outputs)
                       T%Orca%y%WriteOutput, &
                       T%IceF%y%WriteOutput, &
                       T%IceD%y, &
+                      T%SlD%y%WriteOutput, &
                       T%BD%y, &
                       Outputs)
 
-END SUBROUTINE FillOutputAry_T
+END SUBROUTINE FillOutputAry_T                        
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine concatenates all of the WriteOutput values from the module Output into one array to be written to the FAST
 !! output file.
 SUBROUTINE FillOutputAry(p_FAST, y_FAST, IfWOutput, ExtInfwOutput, y_ED, SEDOutput, y_AD, ADskOutput, y_SrvD, SeaStOutput, HDOutput, SDOutput, ExtPtfmOutput, &
-                        MAPOutput, FEAMOutput, MDOutput, OrcaOutput, IceFOutput, y_IceD, y_BD, OutputAry)
+                        MAPOutput, FEAMOutput, MDOutput, OrcaOutput, IceFOutput, y_IceD, SlDOutput, y_BD, OutputAry)
 
    TYPE(FAST_ParameterType), INTENT(IN)    :: p_FAST                             !< Glue-code simulation parameters
    TYPE(FAST_OutputFileType),INTENT(IN)    :: y_FAST                             !< Glue-code simulation outputs
@@ -5426,6 +5490,7 @@ SUBROUTINE FillOutputAry(p_FAST, y_FAST, IfWOutput, ExtInfwOutput, y_ED, SEDOutp
    REAL(ReKi), ALLOCATABLE,  INTENT(IN)    :: OrcaOutput(:)                      !< OrcaFlex interface WriteOutput values
    REAL(ReKi), ALLOCATABLE,  INTENT(IN)    :: IceFOutput(:)                      !< IceFloe WriteOutput values
    TYPE(IceD_OutputType),    INTENT(IN)    :: y_IceD(:)                          !< IceDyn outputs (WriteOutput values are subset)
+   REAL(ReKi), ALLOCATABLE,  INTENT(IN)    :: SlDOutput (:)                      !< SoilDyn WriteOutput values
    TYPE(BD_OutputType),      INTENT(IN)    :: y_BD(:)                            !< BeamDyn outputs (WriteOutput values are subset)
 
    REAL(ReKi),               INTENT(OUT)   :: OutputAry(:)                       !< single array of output
@@ -5569,9 +5634,15 @@ SUBROUTINE FillOutputAry(p_FAST, y_FAST, IfWOutput, ExtInfwOutput, y_ED, SEDOutp
          end do
       end if
 
+      if (y_FAST%numOuts(Module_SlD) > 0) then
+         IndexLast = IndexNext + size(SlDOutput) - 1
+         OutputAry(IndexNext:IndexLast) = SlDOutput
+         IndexNext = IndexLast + 1
+      end if
+
 END SUBROUTINE FillOutputAry
 !----------------------------------------------------------------------------------------------------------------------------------
-SUBROUTINE WriteVTK(t_global, p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInfw, SeaSt, HD, SD, ExtPtfm, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD)
+SUBROUTINE WriteVTK(t_global, p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInfw, SeaSt, HD, SD, ExtPtfm, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD, SlD)
    REAL(DbKi),               INTENT(IN   ) :: t_global            !< Current global time
    TYPE(FAST_ParameterType), INTENT(IN   ) :: p_FAST              !< Parameters for the glue code
    TYPE(FAST_OutputFileType),INTENT(INOUT) :: y_FAST              !< Output variables for the glue code (only because we're updating VTK_LastWaveIndx)
@@ -5593,6 +5664,7 @@ SUBROUTINE WriteVTK(t_global, p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInfw, Sea
    TYPE(OrcaFlex_Data),      INTENT(IN   ) :: Orca                !< OrcaFlex interface data
    TYPE(IceFloe_Data),       INTENT(IN   ) :: IceF                !< IceFloe data
    TYPE(IceDyn_Data),        INTENT(IN   ) :: IceD                !< All the IceDyn data used in time-step loop
+   TYPE(SoilDyn_Data),       INTENT(IN   ) :: SlD                 !< SoilDyn data
 
 
    INTEGER(IntKi)                          :: ErrStat2
@@ -5601,11 +5673,11 @@ SUBROUTINE WriteVTK(t_global, p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInfw, Sea
 
 
       IF ( p_FAST%VTK_Type == VTK_Surf ) THEN
-         CALL WrVTK_Surfaces(t_global, p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInfw, SeaSt, HD, SD, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD)
+         CALL WrVTK_Surfaces(t_global, p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInfw, SeaSt, HD, SD, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD, SlD)
       ELSE IF ( p_FAST%VTK_Type == VTK_Basic ) THEN
-         CALL WrVTK_BasicMeshes(p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInfw, HD, SD, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD)
+         CALL WrVTK_BasicMeshes(p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInfw, HD, SD, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD, SlD)
       ELSE IF ( p_FAST%VTK_Type == VTK_All ) THEN
-         CALL WrVTK_AllMeshes(p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInfw, HD, SD, ExtPtfm, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD)
+         CALL WrVTK_AllMeshes(p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInfw, HD, SD, ExtPtfm, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD, SlD)
       ELSE IF (p_FAST%VTK_Type==VTK_Old) THEN
          if (p_FAST%CompElast /= Module_SED) then     !FIXME: SED is not included in these routines!!!!
          CALL WriteInputMeshesToFile( ED%Input(1,:), AD%Input(1), SD%Input(1), HD%Input(1), MAPp%Input(1), BD%Input(1,:), TRIM(p_FAST%OutFileRoot)//'.InputMeshes.bin', ErrStat2, ErrMsg2)
@@ -5618,7 +5690,7 @@ SUBROUTINE WriteVTK(t_global, p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInfw, Sea
 END SUBROUTINE WriteVTK
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine writes all the committed meshes to VTK-formatted files. It doesn't bother with returning an error code.
-SUBROUTINE WrVTK_AllMeshes(p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInfw, HD, SD, ExtPtfm, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD)
+SUBROUTINE WrVTK_AllMeshes(p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInfw, HD, SD, ExtPtfm, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD, SlD)
    use FVW_IO, only: WrVTK_FVW
 
    TYPE(FAST_ParameterType), INTENT(IN   ) :: p_FAST              !< Parameters for the glue code
@@ -5640,6 +5712,7 @@ SUBROUTINE WrVTK_AllMeshes(p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInfw, HD, SD
    TYPE(OrcaFlex_Data),      INTENT(IN   ) :: Orca                !< OrcaFlex interface data
    TYPE(IceFloe_Data),       INTENT(IN   ) :: IceF                !< IceFloe data
    TYPE(IceDyn_Data),        INTENT(IN   ) :: IceD                !< All the IceDyn data used in time-step loop
+   TYPE(SoilDyn_Data),       INTENT(IN   ) :: SlD                 !< SoilDyn data
 
    INTEGER(IntKi)                          :: k, j, iRot, iBld
 
@@ -5942,12 +6015,19 @@ SUBROUTINE WrVTK_AllMeshes(p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInfw, HD, SD
 
    END IF
 
+! SoilDyn
+   IF ( p_FAST%CompSoil == Module_SlD .and. allocated(SlD%Input)) THEN
+      call MeshWrVTK(p_FAST%TurbinePos, SlD%Input(1)%SoilMesh, trim(p_FAST%VTK_OutFileRoot)//'.SlD_u_SoilMesh', y_FAST%VTK_count, p_FAST%VTK_fields, ErrStat2, ErrMsg2, p_FAST%VTK_tWidth, SlD%y%SoilMesh )
+
+      call MeshWrVTK(p_FAST%TurbinePos, SlD%y%SoilMesh, trim(p_FAST%VTK_OutFileRoot)//'.SlD_y_SoilMesh', y_FAST%VTK_count, p_FAST%VTK_fields, ErrStat2, ErrMsg2, p_FAST%VTK_tWidth, SlD%Input(1)%SoilMesh )
+   END IF
+
 
 END SUBROUTINE WrVTK_AllMeshes
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine writes a minimal subset of meshes (enough to visualize the turbine) to VTK-formatted files. It doesn't bother with
 !! returning an error code.
-SUBROUTINE WrVTK_BasicMeshes(p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInfw, HD, SD, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD)
+SUBROUTINE WrVTK_BasicMeshes(p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInfw, HD, SD, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD, SlD)
 
    TYPE(FAST_ParameterType), INTENT(IN   ) :: p_FAST              !< Parameters for the glue code
    TYPE(FAST_OutputFileType),INTENT(IN   ) :: y_FAST              !< Output variables for the glue code
@@ -5967,6 +6047,7 @@ SUBROUTINE WrVTK_BasicMeshes(p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInfw, HD, 
    TYPE(OrcaFlex_Data),      INTENT(IN   ) :: Orca                !< OrcaFlex interface data
    TYPE(IceFloe_Data),       INTENT(IN   ) :: IceF                !< IceFloe data
    TYPE(IceDyn_Data),        INTENT(IN   ) :: IceD                !< All the IceDyn data used in time-step loop
+   TYPE(SoilDyn_Data),       INTENT(IN   ) :: SlD                 !< SoilDyn data
 
    INTEGER(IntKi)                          :: i, j, k, iRot, iBld
    INTEGER(IntKi)                          :: ErrStat2
@@ -6080,12 +6161,18 @@ SUBROUTINE WrVTK_BasicMeshes(p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInfw, HD, 
    !    call MeshWrVTK(p_FAST%TurbinePos, FEAM%Input(1)%PtFairleadDisplacement, trim(p_FAST%VTK_OutFileRoot)//'FEAM_PtFair_motion', y_FAST%VTK_count, p_FAST%VTK_fields, ErrStat2, ErrMsg2, p_FAST%VTK_tWidth )
    ! END IF
 
+! SoilDyn
+!   IF ( p_FAST%CompSub == Module_SlD ) THEN
+!     call MeshWrVTK(p_FAST%TurbinePos, SlD%Input(1)%SoilMesh, trim(p_FAST%OutFileRoot)//'.SlD_uSoilMesh_motion', y_FAST%VTK_count, OutputFields, ErrStat2, ErrMsg2 )
+!      call MeshWrVTK(p_FAST%TurbinePos, SlD%y%SoilMesh, trim(p_FAST%OutFileRoot)//'.SlD_ySoilMesh_motion', y_FAST%VTK_count, OutputFields, ErrStat2, ErrMsg2 )
+!   END IF
 
-END SUBROUTINE WrVTK_BasicMeshes
+
+END SUBROUTINE WrVTK_BasicMeshes 
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine writes a minimal subset of meshes with surfaces to VTK-formatted files. It doesn't bother with
 !! returning an error code.
-SUBROUTINE WrVTK_Surfaces(t_global, p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInfw, SeaSt, HD, SD, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD)
+SUBROUTINE WrVTK_Surfaces(t_global, p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInfw, SeaSt, HD, SD, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD, SlD)
    use FVW_IO, only: WrVTK_FVW
 
    REAL(DbKi),               INTENT(IN   ) :: t_global            !< Current global time
@@ -6108,6 +6195,7 @@ SUBROUTINE WrVTK_Surfaces(t_global, p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInf
    TYPE(OrcaFlex_Data),      INTENT(IN   ) :: Orca                !< OrcaFlex interface data
    TYPE(IceFloe_Data),       INTENT(IN   ) :: IceF                !< IceFloe data
    TYPE(IceDyn_Data),        INTENT(IN   ) :: IceD                !< All the IceDyn data used in time-step loop
+   TYPE(SoilDyn_Data),       INTENT(IN   ) :: SlD                 !< SoilDyn data
 
 
    logical, parameter                      :: OutputFields = .FALSE. ! due to confusion about what fields mean on a surface, we are going to just output the basic meshes if people ask for fields
@@ -6191,6 +6279,11 @@ SUBROUTINE WrVTK_Surfaces(t_global, p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInf
    !      call MeshWrVTK(p_FAST%TurbinePos, SD%y%y3Mesh, trim(p_FAST%VTK_OutFileRoot)//'.SD_y3Mesh_motion', y_FAST%VTK_count, OutputFields, ErrStat2, ErrMsg2 )
    !   END IF
 
+! SoilDyn
+!   IF ( p_FAST%CompSub == Module_SlD ) THEN
+!     call MeshWrVTK(p_FAST%TurbinePos, SlD%Input(1)%SoilMesh, trim(p_FAST%OutFileRoot)//'.SlD_uSoilMesh_motion', y_FAST%VTK_count, OutputFields, ErrStat2, ErrMsg2 )
+!      call MeshWrVTK(p_FAST%TurbinePos, SlD%y%SoilMesh, trim(p_FAST%OutFileRoot)//'.SlD_ySoilMesh_motion', y_FAST%VTK_count, OutputFields, ErrStat2, ErrMsg2 )
+!   END IF
 
    ! HydroDyn
    IF ( HD%y%Morison%VisMesh%Committed ) THEN
@@ -6227,7 +6320,7 @@ SUBROUTINE WrVTK_Surfaces(t_global, p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInf
    ! END IF
 
    if (p_FAST%VTK_fields) then
-      call WrVTK_BasicMeshes(p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInfw, HD, SD, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD)
+      call WrVTK_BasicMeshes(p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInfw, HD, SD, SrvD, MAPp, FEAM, MD, Orca, IceF, IceD, SlD)
    end if
 
 END SUBROUTINE WrVTK_Surfaces
@@ -6762,7 +6855,7 @@ SUBROUTINE ExitThisProgram_T( Turbine, ErrLevel_in, StopTheProgram, ErrLocMsg, S
       CALL WrVTK_AllMeshes(Turbine%p_FAST, Turbine%y_FAST, Turbine%ED, &
                            Turbine%SED, Turbine%BD, Turbine%AD, Turbine%IfW, Turbine%ExtInfw, &
                            Turbine%HD, Turbine%SD, Turbine%ExtPtfm, Turbine%SrvD, Turbine%MAP, &
-                           Turbine%FEAM, Turbine%MD, Turbine%Orca, Turbine%IceF, Turbine%IceD)
+                           Turbine%FEAM, Turbine%MD, Turbine%Orca, Turbine%IceF, Turbine%IceD, Turbine%SlD)
    end if
 
    ! If we are doing AeroMaps, there is leftover data in AD15 parameters
@@ -7497,7 +7590,7 @@ contains
       ! Write VTK output
       call WriteVTK(TimeVTK, T%p_FAST, T%y_FAST, &
                     T%ED, T%SED, T%BD, T%AD, T%IfW, T%ExtInfw, T%SeaSt, T%HD, T%SD, &
-                    T%ExtPtfm, T%SrvD, T%MAP, T%FEAM, T%MD, T%Orca, T%IceF, T%IceD)
+                    T%ExtPtfm, T%SrvD, T%MAP, T%FEAM, T%MD, T%Orca, T%IceF, T%IceD, T%SlD)
 
    end subroutine
 
