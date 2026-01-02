@@ -88,13 +88,14 @@ IMPLICIT NONE
   TYPE, PUBLIC :: SlD_InitInputType
     CHARACTER(1024)  :: InputFile      !< Name of the input file [-]
     CHARACTER(1024)  :: RootName      !< Root name of the input file [-]
-    LOGICAL  :: Linearize = .FALSE.      !< Flag that tells this module if the glue code wants to linearize. [-]
+    LOGICAL  :: Linearize = .false.      !< Flag that tells this module if the glue code wants to linearize. [-]
     REAL(ReKi)  :: WtrDpth = 0.0_ReKi      !< Water depth to mudline (global coordinates) ['(m)']
-    LOGICAL  :: SlDNonLinearForcePortionOnly = .FALSE.      !< Only the non-linear portion of the reaction forces is returned [-]
+    LOGICAL  :: SlDNonLinearForcePortionOnly = .false.      !< Only the non-linear portion of the reaction forces is returned [-]
   END TYPE SlD_InitInputType
 ! =======================
 ! =========  SlD_InitOutputType  =======
   TYPE, PUBLIC :: SlD_InitOutputType
+    TYPE(ModVarsType)  :: Vars      !< Module Variables [-]
     CHARACTER(ChanLen) , DIMENSION(:), ALLOCATABLE  :: WriteOutputHdr      !< Names of the output-to-file channels [-]
     CHARACTER(ChanLen) , DIMENSION(:), ALLOCATABLE  :: WriteOutputUnt      !< Units of the output-to-file channels [-]
     TYPE(ProgDesc)  :: Ver      !< This module's name, version, and date [-]
@@ -108,7 +109,7 @@ IMPLICIT NONE
 ! =======================
 ! =========  SlD_DiscreteStateType  =======
   TYPE, PUBLIC :: SlD_DiscreteStateType
-    TYPE(REDWINdllStates) , DIMENSION(:), ALLOCATABLE  :: dll_states      !< state data used for REDWIN DLL (we think) [-]
+    TYPE(REDWINdllStates) , DIMENSION(:), ALLOCATABLE  :: dll_states      !< State data used for REDWIN DLL (we think) [-]
   END TYPE SlD_DiscreteStateType
 ! =======================
 ! =========  SlD_ConstraintStateType  =======
@@ -121,19 +122,13 @@ IMPLICIT NONE
     INTEGER(IntKi)  :: DummyOtherState = 0_IntKi      !< Remove this variable if you have other states [-]
   END TYPE SlD_OtherStateType
 ! =======================
-! =========  SlD_MiscVarType  =======
-  TYPE, PUBLIC :: SlD_MiscVarType
-    TYPE(REDWINdllType) , DIMENSION(:), ALLOCATABLE  :: dll_data      !< data used for REDWIN DLL [-]
-    REAL(R8Ki) , DIMENSION(:,:), ALLOCATABLE  :: ForceTotal      !< Total reaction force at each node [-]
-  END TYPE SlD_MiscVarType
-! =======================
 ! =========  SlD_ParameterType  =======
   TYPE, PUBLIC :: SlD_ParameterType
     REAL(DbKi)  :: DT = 0.0_R8Ki      !< Time step for cont. state integration & disc. state update [seconds]
     TYPE(DLL_Type)  :: DLL_Trgt      !< The addresses and names of the Bladed DLL and its procedure [-]
     REAL(DbKi)  :: DLL_DT = 0.0_R8Ki      !< Time step for DLL [seconds]
     CHARACTER(1024)  :: RootName      !< RootName for writing output files [-]
-    LOGICAL  :: UseREDWINinterface = .FALSE.      !< True if interface successfully initialized [-]
+    LOGICAL  :: UseREDWINinterface = .false.      !< True if interface successfully initialized [-]
     CHARACTER(1024)  :: RootFileName      !< Root file name [-]
     CHARACTER(1024)  :: EchoFileName      !< Name of echo file [-]
     CHARACTER(1024)  :: SumFileName      !< Name of summary file [-]
@@ -145,7 +140,7 @@ IMPLICIT NONE
     REAL(ReKi)  :: WtrDepth = 0.0_ReKi      !< Water depth to mudline (global coordinates) ['(m)']
     REAL(R8Ki) , DIMENSION(:,:,:), ALLOCATABLE  :: Stiffness      !< Stiffness matrix ['(N/m,]
     LOGICAL  :: DLL_OnlyStiff = .false.      !< Use only the stiffness matrix in calculating the restoring forces [-]
-    LOGICAL  :: SlDNonLinearForcePortionOnly = .FALSE.      !< Only the non-linear portion of the reaction forces is returned [-]
+    LOGICAL  :: SlDNonLinearForcePortionOnly = .false.      !< Only the non-linear portion of the reaction forces is returned [-]
   END TYPE SlD_ParameterType
 ! =======================
 ! =========  SlD_InputType  =======
@@ -155,16 +150,25 @@ IMPLICIT NONE
 ! =======================
 ! =========  SlD_OutputType  =======
   TYPE, PUBLIC :: SlD_OutputType
-    REAL(ReKi)  :: DummyOutput = 0.0_ReKi      !< Remove this variable if you have output data [-]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: WriteOutput      !< Example of data to be written to an output file [s,-]
     TYPE(MeshType)  :: SoilMesh      !< reaction forces and moments point mesh (may be multiple points) [-]
   END TYPE SlD_OutputType
 ! =======================
+! =========  SlD_MiscVarType  =======
+  TYPE, PUBLIC :: SlD_MiscVarType
+    TYPE(REDWINdllType) , DIMENSION(:), ALLOCATABLE  :: dll_data      !< data used for REDWIN DLL [-]
+    REAL(R8Ki) , DIMENSION(:,:), ALLOCATABLE  :: ForceTotal      !< Total reaction force at each node [-]
+    TYPE(ModJacType)  :: Jac      !< Values corresponding to module variables [-]
+    TYPE(SlD_ContinuousStateType)  :: x_perturb      !< Continuous state perturbation [-]
+    TYPE(SlD_ContinuousStateType)  :: dxdt_lin      !< Continuous state derivative [-]
+    TYPE(SlD_InputType)  :: u_perturb      !< Input perturbation [-]
+    TYPE(SlD_OutputType)  :: y_lin      !< Output [-]
+  END TYPE SlD_MiscVarType
+! =======================
    integer(IntKi), public, parameter :: SlD_x_DummyContState             =   1 ! SlD%DummyContState
    integer(IntKi), public, parameter :: SlD_u_SoilMesh                   =   2 ! SlD%SoilMesh
-   integer(IntKi), public, parameter :: SlD_y_DummyOutput                =   3 ! SlD%DummyOutput
-   integer(IntKi), public, parameter :: SlD_y_WriteOutput                =   4 ! SlD%WriteOutput
-   integer(IntKi), public, parameter :: SlD_y_SoilMesh                   =   5 ! SlD%SoilMesh
+   integer(IntKi), public, parameter :: SlD_y_WriteOutput                =   3 ! SlD%WriteOutput
+   integer(IntKi), public, parameter :: SlD_y_SoilMesh                   =   4 ! SlD%SoilMesh
 
 contains
 
@@ -574,6 +578,9 @@ subroutine SlD_CopyInitOutput(SrcInitOutputData, DstInitOutputData, CtrlCode, Er
    character(*), parameter        :: RoutineName = 'SlD_CopyInitOutput'
    ErrStat = ErrID_None
    ErrMsg  = ''
+   call NWTC_Library_CopyModVarsType(SrcInitOutputData%Vars, DstInitOutputData%Vars, CtrlCode, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if (ErrStat >= AbortErrLev) return
    if (allocated(SrcInitOutputData%WriteOutputHdr)) then
       LB(1:1) = lbound(SrcInitOutputData%WriteOutputHdr)
       UB(1:1) = ubound(SrcInitOutputData%WriteOutputHdr)
@@ -624,6 +631,8 @@ subroutine SlD_DestroyInitOutput(InitOutputData, ErrStat, ErrMsg)
    character(*), parameter        :: RoutineName = 'SlD_DestroyInitOutput'
    ErrStat = ErrID_None
    ErrMsg  = ''
+   call NWTC_Library_DestroyModVarsType(InitOutputData%Vars, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (allocated(InitOutputData%WriteOutputHdr)) then
       deallocate(InitOutputData%WriteOutputHdr)
    end if
@@ -642,6 +651,7 @@ subroutine SlD_PackInitOutput(RF, Indata)
    type(SlD_InitOutputType), intent(in) :: InData
    character(*), parameter         :: RoutineName = 'SlD_PackInitOutput'
    if (RF%ErrStat >= AbortErrLev) return
+   call NWTC_Library_PackModVarsType(RF, InData%Vars) 
    call RegPackAlloc(RF, InData%WriteOutputHdr)
    call RegPackAlloc(RF, InData%WriteOutputUnt)
    call NWTC_Library_PackProgDesc(RF, InData%Ver) 
@@ -657,6 +667,7 @@ subroutine SlD_UnPackInitOutput(RF, OutData)
    integer(IntKi)  :: stat
    logical         :: IsAllocAssoc
    if (RF%ErrStat /= ErrID_None) return
+   call NWTC_Library_UnpackModVarsType(RF, OutData%Vars) ! Vars 
    call RegUnpackAlloc(RF, OutData%WriteOutputHdr); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%WriteOutputUnt); if (RegCheckErr(RF, RoutineName)) return
    call NWTC_Library_UnpackProgDesc(RF, OutData%Ver) ! Ver 
@@ -871,119 +882,6 @@ subroutine SlD_UnPackOtherState(RF, OutData)
    character(*), parameter            :: RoutineName = 'SlD_UnPackOtherState'
    if (RF%ErrStat /= ErrID_None) return
    call RegUnpack(RF, OutData%DummyOtherState); if (RegCheckErr(RF, RoutineName)) return
-end subroutine
-
-subroutine SlD_CopyMisc(SrcMiscData, DstMiscData, CtrlCode, ErrStat, ErrMsg)
-   type(SlD_MiscVarType), intent(in) :: SrcMiscData
-   type(SlD_MiscVarType), intent(inout) :: DstMiscData
-   integer(IntKi),  intent(in   ) :: CtrlCode
-   integer(IntKi),  intent(  out) :: ErrStat
-   character(*),    intent(  out) :: ErrMsg
-   integer(B4Ki)   :: i1, i2
-   integer(B4Ki)                  :: LB(2), UB(2)
-   integer(IntKi)                 :: ErrStat2
-   character(ErrMsgLen)           :: ErrMsg2
-   character(*), parameter        :: RoutineName = 'SlD_CopyMisc'
-   ErrStat = ErrID_None
-   ErrMsg  = ''
-   if (allocated(SrcMiscData%dll_data)) then
-      LB(1:1) = lbound(SrcMiscData%dll_data)
-      UB(1:1) = ubound(SrcMiscData%dll_data)
-      if (.not. allocated(DstMiscData%dll_data)) then
-         allocate(DstMiscData%dll_data(LB(1):UB(1)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstMiscData%dll_data.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      do i1 = LB(1), UB(1)
-         call SlD_CopyREDWINdllType(SrcMiscData%dll_data(i1), DstMiscData%dll_data(i1), CtrlCode, ErrStat2, ErrMsg2)
-         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-         if (ErrStat >= AbortErrLev) return
-      end do
-   end if
-   if (allocated(SrcMiscData%ForceTotal)) then
-      LB(1:2) = lbound(SrcMiscData%ForceTotal)
-      UB(1:2) = ubound(SrcMiscData%ForceTotal)
-      if (.not. allocated(DstMiscData%ForceTotal)) then
-         allocate(DstMiscData%ForceTotal(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstMiscData%ForceTotal.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstMiscData%ForceTotal = SrcMiscData%ForceTotal
-   end if
-end subroutine
-
-subroutine SlD_DestroyMisc(MiscData, ErrStat, ErrMsg)
-   type(SlD_MiscVarType), intent(inout) :: MiscData
-   integer(IntKi),  intent(  out) :: ErrStat
-   character(*),    intent(  out) :: ErrMsg
-   integer(B4Ki)   :: i1, i2
-   integer(B4Ki)   :: LB(2), UB(2)
-   integer(IntKi)                 :: ErrStat2
-   character(ErrMsgLen)           :: ErrMsg2
-   character(*), parameter        :: RoutineName = 'SlD_DestroyMisc'
-   ErrStat = ErrID_None
-   ErrMsg  = ''
-   if (allocated(MiscData%dll_data)) then
-      LB(1:1) = lbound(MiscData%dll_data)
-      UB(1:1) = ubound(MiscData%dll_data)
-      do i1 = LB(1), UB(1)
-         call SlD_DestroyREDWINdllType(MiscData%dll_data(i1), ErrStat2, ErrMsg2)
-         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-      end do
-      deallocate(MiscData%dll_data)
-   end if
-   if (allocated(MiscData%ForceTotal)) then
-      deallocate(MiscData%ForceTotal)
-   end if
-end subroutine
-
-subroutine SlD_PackMisc(RF, Indata)
-   type(RegFile), intent(inout) :: RF
-   type(SlD_MiscVarType), intent(in) :: InData
-   character(*), parameter         :: RoutineName = 'SlD_PackMisc'
-   integer(B4Ki)   :: i1, i2
-   integer(B4Ki)   :: LB(2), UB(2)
-   if (RF%ErrStat >= AbortErrLev) return
-   call RegPack(RF, allocated(InData%dll_data))
-   if (allocated(InData%dll_data)) then
-      call RegPackBounds(RF, 1, lbound(InData%dll_data), ubound(InData%dll_data))
-      LB(1:1) = lbound(InData%dll_data)
-      UB(1:1) = ubound(InData%dll_data)
-      do i1 = LB(1), UB(1)
-         call SlD_PackREDWINdllType(RF, InData%dll_data(i1)) 
-      end do
-   end if
-   call RegPackAlloc(RF, InData%ForceTotal)
-   if (RegCheckErr(RF, RoutineName)) return
-end subroutine
-
-subroutine SlD_UnPackMisc(RF, OutData)
-   type(RegFile), intent(inout)    :: RF
-   type(SlD_MiscVarType), intent(inout) :: OutData
-   character(*), parameter            :: RoutineName = 'SlD_UnPackMisc'
-   integer(B4Ki)   :: i1, i2
-   integer(B4Ki)   :: LB(2), UB(2)
-   integer(IntKi)  :: stat
-   logical         :: IsAllocAssoc
-   if (RF%ErrStat /= ErrID_None) return
-   if (allocated(OutData%dll_data)) deallocate(OutData%dll_data)
-   call RegUnpack(RF, IsAllocAssoc); if (RegCheckErr(RF, RoutineName)) return
-   if (IsAllocAssoc) then
-      call RegUnpackBounds(RF, 1, LB, UB); if (RegCheckErr(RF, RoutineName)) return
-      allocate(OutData%dll_data(LB(1):UB(1)),stat=stat)
-      if (stat /= 0) then 
-         call SetErrStat(ErrID_Fatal, 'Error allocating OutData%dll_data.', RF%ErrStat, RF%ErrMsg, RoutineName)
-         return
-      end if
-      do i1 = LB(1), UB(1)
-         call SlD_UnpackREDWINdllType(RF, OutData%dll_data(i1)) ! dll_data 
-      end do
-   end if
-   call RegUnpackAlloc(RF, OutData%ForceTotal); if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
 subroutine SlD_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg)
@@ -1204,7 +1102,6 @@ subroutine SlD_CopyOutput(SrcOutputData, DstOutputData, CtrlCode, ErrStat, ErrMs
    character(*), parameter        :: RoutineName = 'SlD_CopyOutput'
    ErrStat = ErrID_None
    ErrMsg  = ''
-   DstOutputData%DummyOutput = SrcOutputData%DummyOutput
    if (allocated(SrcOutputData%WriteOutput)) then
       LB(1:1) = lbound(SrcOutputData%WriteOutput)
       UB(1:1) = ubound(SrcOutputData%WriteOutput)
@@ -1243,7 +1140,6 @@ subroutine SlD_PackOutput(RF, Indata)
    type(SlD_OutputType), intent(in) :: InData
    character(*), parameter         :: RoutineName = 'SlD_PackOutput'
    if (RF%ErrStat >= AbortErrLev) return
-   call RegPack(RF, InData%DummyOutput)
    call RegPackAlloc(RF, InData%WriteOutput)
    call MeshPack(RF, InData%SoilMesh) 
    if (RegCheckErr(RF, RoutineName)) return
@@ -1257,9 +1153,156 @@ subroutine SlD_UnPackOutput(RF, OutData)
    integer(IntKi)  :: stat
    logical         :: IsAllocAssoc
    if (RF%ErrStat /= ErrID_None) return
-   call RegUnpack(RF, OutData%DummyOutput); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%WriteOutput); if (RegCheckErr(RF, RoutineName)) return
    call MeshUnpack(RF, OutData%SoilMesh) ! SoilMesh 
+end subroutine
+
+subroutine SlD_CopyMisc(SrcMiscData, DstMiscData, CtrlCode, ErrStat, ErrMsg)
+   type(SlD_MiscVarType), intent(inout) :: SrcMiscData
+   type(SlD_MiscVarType), intent(inout) :: DstMiscData
+   integer(IntKi),  intent(in   ) :: CtrlCode
+   integer(IntKi),  intent(  out) :: ErrStat
+   character(*),    intent(  out) :: ErrMsg
+   integer(B4Ki)   :: i1, i2
+   integer(B4Ki)                  :: LB(2), UB(2)
+   integer(IntKi)                 :: ErrStat2
+   character(ErrMsgLen)           :: ErrMsg2
+   character(*), parameter        :: RoutineName = 'SlD_CopyMisc'
+   ErrStat = ErrID_None
+   ErrMsg  = ''
+   if (allocated(SrcMiscData%dll_data)) then
+      LB(1:1) = lbound(SrcMiscData%dll_data)
+      UB(1:1) = ubound(SrcMiscData%dll_data)
+      if (.not. allocated(DstMiscData%dll_data)) then
+         allocate(DstMiscData%dll_data(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstMiscData%dll_data.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      do i1 = LB(1), UB(1)
+         call SlD_CopyREDWINdllType(SrcMiscData%dll_data(i1), DstMiscData%dll_data(i1), CtrlCode, ErrStat2, ErrMsg2)
+         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+         if (ErrStat >= AbortErrLev) return
+      end do
+   end if
+   if (allocated(SrcMiscData%ForceTotal)) then
+      LB(1:2) = lbound(SrcMiscData%ForceTotal)
+      UB(1:2) = ubound(SrcMiscData%ForceTotal)
+      if (.not. allocated(DstMiscData%ForceTotal)) then
+         allocate(DstMiscData%ForceTotal(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstMiscData%ForceTotal.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstMiscData%ForceTotal = SrcMiscData%ForceTotal
+   end if
+   call NWTC_Library_CopyModJacType(SrcMiscData%Jac, DstMiscData%Jac, CtrlCode, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if (ErrStat >= AbortErrLev) return
+   call SlD_CopyContState(SrcMiscData%x_perturb, DstMiscData%x_perturb, CtrlCode, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if (ErrStat >= AbortErrLev) return
+   call SlD_CopyContState(SrcMiscData%dxdt_lin, DstMiscData%dxdt_lin, CtrlCode, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if (ErrStat >= AbortErrLev) return
+   call SlD_CopyInput(SrcMiscData%u_perturb, DstMiscData%u_perturb, CtrlCode, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if (ErrStat >= AbortErrLev) return
+   call SlD_CopyOutput(SrcMiscData%y_lin, DstMiscData%y_lin, CtrlCode, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if (ErrStat >= AbortErrLev) return
+end subroutine
+
+subroutine SlD_DestroyMisc(MiscData, ErrStat, ErrMsg)
+   type(SlD_MiscVarType), intent(inout) :: MiscData
+   integer(IntKi),  intent(  out) :: ErrStat
+   character(*),    intent(  out) :: ErrMsg
+   integer(B4Ki)   :: i1, i2
+   integer(B4Ki)   :: LB(2), UB(2)
+   integer(IntKi)                 :: ErrStat2
+   character(ErrMsgLen)           :: ErrMsg2
+   character(*), parameter        :: RoutineName = 'SlD_DestroyMisc'
+   ErrStat = ErrID_None
+   ErrMsg  = ''
+   if (allocated(MiscData%dll_data)) then
+      LB(1:1) = lbound(MiscData%dll_data)
+      UB(1:1) = ubound(MiscData%dll_data)
+      do i1 = LB(1), UB(1)
+         call SlD_DestroyREDWINdllType(MiscData%dll_data(i1), ErrStat2, ErrMsg2)
+         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+      end do
+      deallocate(MiscData%dll_data)
+   end if
+   if (allocated(MiscData%ForceTotal)) then
+      deallocate(MiscData%ForceTotal)
+   end if
+   call NWTC_Library_DestroyModJacType(MiscData%Jac, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   call SlD_DestroyContState(MiscData%x_perturb, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   call SlD_DestroyContState(MiscData%dxdt_lin, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   call SlD_DestroyInput(MiscData%u_perturb, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   call SlD_DestroyOutput(MiscData%y_lin, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+end subroutine
+
+subroutine SlD_PackMisc(RF, Indata)
+   type(RegFile), intent(inout) :: RF
+   type(SlD_MiscVarType), intent(in) :: InData
+   character(*), parameter         :: RoutineName = 'SlD_PackMisc'
+   integer(B4Ki)   :: i1, i2
+   integer(B4Ki)   :: LB(2), UB(2)
+   if (RF%ErrStat >= AbortErrLev) return
+   call RegPack(RF, allocated(InData%dll_data))
+   if (allocated(InData%dll_data)) then
+      call RegPackBounds(RF, 1, lbound(InData%dll_data), ubound(InData%dll_data))
+      LB(1:1) = lbound(InData%dll_data)
+      UB(1:1) = ubound(InData%dll_data)
+      do i1 = LB(1), UB(1)
+         call SlD_PackREDWINdllType(RF, InData%dll_data(i1)) 
+      end do
+   end if
+   call RegPackAlloc(RF, InData%ForceTotal)
+   call NWTC_Library_PackModJacType(RF, InData%Jac) 
+   call SlD_PackContState(RF, InData%x_perturb) 
+   call SlD_PackContState(RF, InData%dxdt_lin) 
+   call SlD_PackInput(RF, InData%u_perturb) 
+   call SlD_PackOutput(RF, InData%y_lin) 
+   if (RegCheckErr(RF, RoutineName)) return
+end subroutine
+
+subroutine SlD_UnPackMisc(RF, OutData)
+   type(RegFile), intent(inout)    :: RF
+   type(SlD_MiscVarType), intent(inout) :: OutData
+   character(*), parameter            :: RoutineName = 'SlD_UnPackMisc'
+   integer(B4Ki)   :: i1, i2
+   integer(B4Ki)   :: LB(2), UB(2)
+   integer(IntKi)  :: stat
+   logical         :: IsAllocAssoc
+   if (RF%ErrStat /= ErrID_None) return
+   if (allocated(OutData%dll_data)) deallocate(OutData%dll_data)
+   call RegUnpack(RF, IsAllocAssoc); if (RegCheckErr(RF, RoutineName)) return
+   if (IsAllocAssoc) then
+      call RegUnpackBounds(RF, 1, LB, UB); if (RegCheckErr(RF, RoutineName)) return
+      allocate(OutData%dll_data(LB(1):UB(1)),stat=stat)
+      if (stat /= 0) then 
+         call SetErrStat(ErrID_Fatal, 'Error allocating OutData%dll_data.', RF%ErrStat, RF%ErrMsg, RoutineName)
+         return
+      end if
+      do i1 = LB(1), UB(1)
+         call SlD_UnpackREDWINdllType(RF, OutData%dll_data(i1)) ! dll_data 
+      end do
+   end if
+   call RegUnpackAlloc(RF, OutData%ForceTotal); if (RegCheckErr(RF, RoutineName)) return
+   call NWTC_Library_UnpackModJacType(RF, OutData%Jac) ! Jac 
+   call SlD_UnpackContState(RF, OutData%x_perturb) ! x_perturb 
+   call SlD_UnpackContState(RF, OutData%dxdt_lin) ! dxdt_lin 
+   call SlD_UnpackInput(RF, OutData%u_perturb) ! u_perturb 
+   call SlD_UnpackOutput(RF, OutData%y_lin) ! y_lin 
 end subroutine
 
 subroutine SlD_Input_ExtrapInterp(u, t, u_out, t_out, ErrStat, ErrMsg)
@@ -1515,7 +1558,6 @@ SUBROUTINE SlD_Output_ExtrapInterp1(y1, y2, tin, y_out, tin_out, ErrStat, ErrMsg
    a1 = -(t_out - t(2))/t(2)
    a2 = t_out/t(2)
    
-   y_out%DummyOutput = a1*y1%DummyOutput + a2*y2%DummyOutput
    IF (ALLOCATED(y_out%WriteOutput) .AND. ALLOCATED(y1%WriteOutput)) THEN
       y_out%WriteOutput = a1*y1%WriteOutput + a2*y2%WriteOutput
    END IF ! check if allocated
@@ -1578,7 +1620,6 @@ SUBROUTINE SlD_Output_ExtrapInterp2(y1, y2, y3, tin, y_out, tin_out, ErrStat, Er
    a1 = (t_out - t(2))*(t_out - t(3))/((t(1) - t(2))*(t(1) - t(3)))
    a2 = (t_out - t(1))*(t_out - t(3))/((t(2) - t(1))*(t(2) - t(3)))
    a3 = (t_out - t(1))*(t_out - t(2))/((t(3) - t(1))*(t(3) - t(2)))
-   y_out%DummyOutput = a1*y1%DummyOutput + a2*y2%DummyOutput + a3*y3%DummyOutput
    IF (ALLOCATED(y_out%WriteOutput) .AND. ALLOCATED(y1%WriteOutput)) THEN
       y_out%WriteOutput = a1*y1%WriteOutput + a2*y2%WriteOutput + a3*y3%WriteOutput
    END IF ! check if allocated
@@ -1762,8 +1803,6 @@ subroutine SlD_VarPackOutput(V, y, ValAry)
    real(R8Ki), intent(inout)               :: ValAry(:)
    associate (DL => V%DL, VarVals => ValAry(V%iLoc(1):V%iLoc(2)))
       select case (DL%Num)
-      case (SlD_y_DummyOutput)
-         VarVals(1) = y%DummyOutput                                           ! Scalar
       case (SlD_y_WriteOutput)
          VarVals = y%WriteOutput(V%iLB:V%iUB)                                 ! Rank 1 Array
       case (SlD_y_SoilMesh)
@@ -1790,8 +1829,6 @@ subroutine SlD_VarUnpackOutput(V, ValAry, y)
    type(SlD_OutputType), intent(inout)     :: y
    associate (DL => V%DL, VarVals => ValAry(V%iLoc(1):V%iLoc(2)))
       select case (DL%Num)
-      case (SlD_y_DummyOutput)
-         y%DummyOutput = VarVals(1)                                           ! Scalar
       case (SlD_y_WriteOutput)
          y%WriteOutput(V%iLB:V%iUB) = VarVals                                 ! Rank 1 Array
       case (SlD_y_SoilMesh)
@@ -1804,8 +1841,6 @@ function SlD_OutputFieldName(DL) result(Name)
    type(DatLoc), intent(in)      :: DL
    character(32)                 :: Name
    select case (DL%Num)
-   case (SlD_y_DummyOutput)
-       Name = "y%DummyOutput"
    case (SlD_y_WriteOutput)
        Name = "y%WriteOutput"
    case (SlD_y_SoilMesh)

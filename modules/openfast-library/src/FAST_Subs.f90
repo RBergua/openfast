@@ -45,6 +45,7 @@ MODULE FAST_Subs
    use IceFloe, only: IceFloe_Init
    use IceDyn, only: IceD_Init
    use SeaState, only: SeaSt_Init
+   use SoilDyn, only: SlD_Init
    use SubDyn, only: SD_Init
    use ServoDyn, only: SrvD_Init, &
                        Cmpl4SFun, &
@@ -867,7 +868,51 @@ SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SE
       IF (p_FAST%CompAero == Module_AD) AD%p%FlowField => Init%OutData_ExtInfw%FlowField
    endif
 
- !----------------------------------------------------------------------------
+   !----------------------------------------------------------------------------
+   ! CompSoil (SoilDyn)
+   !----------------------------------------------------------------------------
+
+   ! Allocate module data arrays
+   allocate(SlD%Input           (InputAryLB:InputAryUB), stat=ErrStat2); if (FailedAlloc("SlD%Input")) return
+   allocate(SlD%InputTimes      (InputAryUB           ), stat=ErrStat2); if (FailedAlloc("SlD%InputTimes")) return
+   allocate(SlD%x               (StateAryUB           ), stat=ErrStat2); if (FailedAlloc("SlD%x")) return
+   allocate(SlD%xd              (StateAryUB           ), stat=ErrStat2); if (FailedAlloc("SlD%xd")) return
+   allocate(SlD%z               (StateAryUB           ), stat=ErrStat2); if (FailedAlloc("SlD%z")) return
+   allocate(SlD%OtherSt         (StateAryUB           ), stat=ErrStat2); if (FailedAlloc("SlD%OtherSt")) return
+
+   select case (p_FAST%CompSoil)
+
+   ! SoilDyn
+   case (Module_SlD)
+
+      ! SoilDyn requires SubDyn
+      if (p_FAST%CompSub /= Module_SD) then
+         call SetErrStat(ErrID_Fatal, "SoilDyn requires SubDyn (CompSub = 1)", ErrStat, ErrMsg, RoutineName)
+         return
+      end if
+
+      ! Initialization input   
+      Init%InData_SlD%InputFile = p_FAST%SoilFile
+      Init%InData_SlD%RootName = p_FAST%OutFileRoot
+      Init%InData_SlD%SlDNonLinearForcePortionOnly = .true. ! SoilDyn will only return the Non-Linear portion of the reaction force
+      Init%InData_SlD%WtrDpth = p_FAST%WtrDpth
+
+      ! Initialize SoilDyn
+      dt_module = p_FAST%DT
+      CALL SlD_Init(Init%InData_SlD, SlD%Input(1), SlD%p, &
+                    SlD%x(STATE_CURR), SlD%xd(STATE_CURR), &
+                    SlD%z(STATE_CURR), SlD%OtherSt(STATE_CURR), &
+                    SlD%y, SlD%m, dt_module, Init%OutData_SlD, ErrStat2, ErrMsg2)
+      if (Failed()) return
+
+      ! Add module to list of modules, return on error
+      CALL MV_AddModule(m_Glue%ModData, Module_SlD, 'SlD', 1, dt_module, p_FAST%DT, &
+                        Init%OutData_SlD%Vars, p_FAST%Linearize, ErrStat2, ErrMsg2)
+      if (Failed()) return
+      
+   end select
+
+   !----------------------------------------------------------------------------
    ! CompSub (SubDyn or ExtPtfm)
    !----------------------------------------------------------------------------
 
@@ -896,28 +941,23 @@ SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SE
       Init%InData_SD%SDInputFile   = p_FAST%SubFile
       Init%InData_SD%RootName      = p_FAST%OutFileRoot
 
+      ! If SoilDyn is enabled
       if (p_FAST%CompSoil == Module_SlD) then
 
          ! Copy over the soil stiffness matrices
          if (allocated(SlD%p%Stiffness)) then
-            call AllocAry(Init%InData_SD%SoilStiffness,size(SlD%p%Stiffness,1),size(SlD%p%Stiffness,2),size(SlD%p%Stiffness,3),'SoilStiffness',ErrStat2,ErrMsg2)
-               CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
-            IF (ErrStat >= AbortErrLev) THEN
-               CALL Cleanup()
-               RETURN
-            END IF   
             Init%InData_SD%SoilStiffness = SlD%p%Stiffness
          endif
 
          ! Make a copy of the SoilMesh to pass over
-         if (SlD%Input(1)%SoilMesh%Initialized) then
-            CALL MeshCopy ( SrcMesh  = SlD%y%SoilMesh &
-                          , DestMesh = Init%InData_SD%SoilMesh &
-                          , CtrlCode = MESH_COUSIN      &
-                          , IOS      = COMPONENT_OUTPUT &
-                          , ErrStat  = ErrStat2         &
-                          , ErrMess  = ErrMsg2          ) 
-            endif
+         if (SlD%Input(INPUT_CURR)%SoilMesh%Initialized) then
+            call MeshCopy(SrcMesh  = SlD%y%SoilMesh, &
+                          DestMesh = Init%InData_SD%SoilMesh, &
+                          CtrlCode = MESH_COUSIN, &
+                          IOS      = COMPONENT_OUTPUT, &
+                          ErrStat  = ErrStat2, &
+                          ErrMess  = ErrMsg2) 
+         endif
       endif
 
       ! Set the water depth
@@ -1971,6 +2011,7 @@ SUBROUTINE ValidateInputData(p, m_FAST, ErrStat, ErrMsg)
    IF (p%CompSub     == Module_Unknown) CALL SetErrStat( ErrID_Fatal, 'CompSub must be 0 (None), 1 (SubDyn), or 2 (ExtPtfm_MCKF).', ErrStat, ErrMsg, RoutineName )
    IF (p%CompMooring == Module_Unknown) CALL SetErrStat( ErrID_Fatal, 'CompMooring must be 0 (None), 1 (MAP), 2 (FEAMooring), 3 (MoorDyn), or 4 (OrcaFlex).', ErrStat, ErrMsg, RoutineName )
    IF (p%CompIce     == Module_Unknown) CALL SetErrStat( ErrID_Fatal, 'CompIce must be 0 (None) or 1 (IceFloe).', ErrStat, ErrMsg, RoutineName )
+   IF (p%CompSoil    == Module_Unknown) CALL SetErrStat( ErrID_Fatal, 'CompSoil must be 0 (None) or 1 (coupled to SubDyn).', ErrStat, ErrMsg, RoutineName )
 
       ! NOTE: If future modules consume SeaState data, then their checks should be added to this routine. 12/1/21 GJH
    if (p%CompHydro == Module_HD .and. p%CompSeaSt == Module_None) then
@@ -2014,7 +2055,7 @@ SUBROUTINE ValidateInputData(p, m_FAST, ErrStat, ErrMsg)
 
    IF (p%CompElast == Module_BD .and. p%CompAero == Module_ADsk) CALL SetErrStat( ErrID_Fatal, 'AeroDisk cannot be used when BeamDyn is used. Change CompAero or CompElast in the FAST input file.', ErrStat, ErrMsg, RoutineName )
 
-   IF (p%CompSoil == Module_SlD .and. .not. p%CompSub  == Module_SD   ) CALL SetErrStat( ErrID_Fatal, 'SoilDyn cannot be used without SubDyn.  Change CompSub or CompSoil in the FAST input file.', ErrStat, ErrMsg, RoutineName )
+   IF ((p%CompSoil == Module_SlD) .and. (p%CompSub /= Module_SD)) CALL SetErrStat( ErrID_Fatal, 'SoilDyn cannot be used without SubDyn.  Change CompSub or CompSoil in the FAST input file.', ErrStat, ErrMsg, RoutineName )
 
    ! No method at the moment for getting disk average velocity from ExtInfw
    if (p%CompAero == Module_ADsk .and. p%CompInflow == MODULE_ExtInfw) call SetErrStat( ErrID_Fatal, 'AeroDisk cannot be used with ExtInflow or the library interface', ErrStat, ErrMsg, RoutineName ) 
@@ -2399,11 +2440,8 @@ SUBROUTINE FAST_InitOutput( p_FAST, y_FAST, Init, ErrStat, ErrMsg )
          do i = 1, Init%OutData_ED(iRot)%NumBl
             k = k + 1
             if (.not. allocated(Init%OutData_BD(k)%WriteOutputHdr)) cycle
-            if (p_FAST%NRotors > 1) then
-               prefix = 'R'//trim(Num2LStr(iRot))//'B'//Num2LStr(i)
-            else
-               prefix = 'B'//Num2LStr(i)
-            end if
+            prefix = 'B'//Num2LStr(i)
+            if (p_FAST%NRotors > 1) prefix = 'R'//trim(Num2LStr(iRot))//prefix
             do j = 1, size(Init%OutData_BD(k)%WriteOutputHdr)
                y_FAST%ChannelNames(indxNext) = trim(prefix)//Init%OutData_BD(k)%WriteOutputHdr(j)
                y_FAST%ChannelUnits(indxNext) = Init%OutData_BD(k)%WriteOutputUnt(j)
@@ -3101,6 +3139,11 @@ SUBROUTINE FAST_ReadPrimaryFile( InputFile, p, m_FAST, OverrideAbortErrLev, ErrS
    CALL ReadVar( UnIn, InputFile, p%IceFile, "IceFile", "Name of file containing ice input parameters (-)", ErrStat2, ErrMsg2, UnEc)
    if (Failed()) return
    IF ( PathIsRelative( p%IceFile ) ) p%IceFile = TRIM(PriPath)//TRIM(p%IceFile)
+
+      ! SoilFile - Name of file containing soil-structural input parameters (-):
+   CALL ReadVar( UnIn, InputFile, p%SoilFile, "SoilFile", "Name of file containing soil-structural input parameters (-)", ErrStat2, ErrMsg2, UnEc)
+   if (Failed()) return
+   IF ( PathIsRelative( p%SoilFile ) ) p%SoilFile = TRIM(PriPath)//TRIM(p%SoilFile)
 
    ! Read subsequent rotor input files
    do iRot = 2, p%NRotors
@@ -6015,13 +6058,11 @@ SUBROUTINE WrVTK_AllMeshes(p_FAST, y_FAST, ED, SED, BD, AD, IfW, ExtInfw, HD, SD
 
    END IF
 
-! SoilDyn
+   ! SoilDyn
    IF ( p_FAST%CompSoil == Module_SlD .and. allocated(SlD%Input)) THEN
-      call MeshWrVTK(p_FAST%TurbinePos, SlD%Input(1)%SoilMesh, trim(p_FAST%VTK_OutFileRoot)//'.SlD_u_SoilMesh', y_FAST%VTK_count, p_FAST%VTK_fields, ErrStat2, ErrMsg2, p_FAST%VTK_tWidth, SlD%y%SoilMesh )
-
       call MeshWrVTK(p_FAST%TurbinePos, SlD%y%SoilMesh, trim(p_FAST%VTK_OutFileRoot)//'.SlD_y_SoilMesh', y_FAST%VTK_count, p_FAST%VTK_fields, ErrStat2, ErrMsg2, p_FAST%VTK_tWidth, SlD%Input(1)%SoilMesh )
+      ! call MeshWrVTK(p_FAST%TurbinePos, SlD%Input(1)%SoilMesh, trim(p_FAST%VTK_OutFileRoot)//'.SlD_u_SoilMesh', y_FAST%VTK_count, p_FAST%VTK_fields, ErrStat2, ErrMsg2, p_FAST%VTK_tWidth, SlD%y%SoilMesh )
    END IF
-
 
 END SUBROUTINE WrVTK_AllMeshes
 !----------------------------------------------------------------------------------------------------------------------------------

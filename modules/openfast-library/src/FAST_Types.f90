@@ -429,10 +429,11 @@ IMPLICIT NONE
 ! =======================
 ! =========  SoilDyn_Data  =======
   TYPE, PUBLIC :: SoilDyn_Data
-    TYPE(SlD_ContinuousStateType) , DIMENSION(1:2)  :: x      !< Continuous states [-]
-    TYPE(SlD_DiscreteStateType) , DIMENSION(1:2)  :: xd      !< Discrete states [-]
-    TYPE(SlD_ConstraintStateType) , DIMENSION(1:2)  :: z      !< Constraint states [-]
-    TYPE(SlD_OtherStateType) , DIMENSION(1:2)  :: OtherSt      !< Other states [-]
+    TYPE(SlD_ContinuousStateType) , DIMENSION(:), ALLOCATABLE  :: x      !< Continuous states [-]
+    TYPE(SlD_ContinuousStateType)  :: dxdt      !< Continuous state derivatives [-]
+    TYPE(SlD_DiscreteStateType) , DIMENSION(:), ALLOCATABLE  :: xd      !< Discrete states [-]
+    TYPE(SlD_ConstraintStateType) , DIMENSION(:), ALLOCATABLE  :: z      !< Constraint states [-]
+    TYPE(SlD_OtherStateType) , DIMENSION(:), ALLOCATABLE  :: OtherSt      !< Other states [-]
     TYPE(SlD_ParameterType)  :: p      !< Parameters [-]
     TYPE(SlD_InputType)  :: u      !< System inputs [-]
     TYPE(SlD_OutputType)  :: y      !< System outputs [-]
@@ -5812,34 +5813,73 @@ subroutine FAST_CopySoilDyn_Data(SrcSoilDyn_DataData, DstSoilDyn_DataData, CtrlC
    character(*), parameter        :: RoutineName = 'FAST_CopySoilDyn_Data'
    ErrStat = ErrID_None
    ErrMsg  = ''
-   LB(1:1) = lbound(SrcSoilDyn_DataData%x)
-   UB(1:1) = ubound(SrcSoilDyn_DataData%x)
-   do i1 = LB(1), UB(1)
-      call SlD_CopyContState(SrcSoilDyn_DataData%x(i1), DstSoilDyn_DataData%x(i1), CtrlCode, ErrStat2, ErrMsg2)
-      call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-      if (ErrStat >= AbortErrLev) return
-   end do
-   LB(1:1) = lbound(SrcSoilDyn_DataData%xd)
-   UB(1:1) = ubound(SrcSoilDyn_DataData%xd)
-   do i1 = LB(1), UB(1)
-      call SlD_CopyDiscState(SrcSoilDyn_DataData%xd(i1), DstSoilDyn_DataData%xd(i1), CtrlCode, ErrStat2, ErrMsg2)
-      call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-      if (ErrStat >= AbortErrLev) return
-   end do
-   LB(1:1) = lbound(SrcSoilDyn_DataData%z)
-   UB(1:1) = ubound(SrcSoilDyn_DataData%z)
-   do i1 = LB(1), UB(1)
-      call SlD_CopyConstrState(SrcSoilDyn_DataData%z(i1), DstSoilDyn_DataData%z(i1), CtrlCode, ErrStat2, ErrMsg2)
-      call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-      if (ErrStat >= AbortErrLev) return
-   end do
-   LB(1:1) = lbound(SrcSoilDyn_DataData%OtherSt)
-   UB(1:1) = ubound(SrcSoilDyn_DataData%OtherSt)
-   do i1 = LB(1), UB(1)
-      call SlD_CopyOtherState(SrcSoilDyn_DataData%OtherSt(i1), DstSoilDyn_DataData%OtherSt(i1), CtrlCode, ErrStat2, ErrMsg2)
-      call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-      if (ErrStat >= AbortErrLev) return
-   end do
+   if (allocated(SrcSoilDyn_DataData%x)) then
+      LB(1:1) = lbound(SrcSoilDyn_DataData%x)
+      UB(1:1) = ubound(SrcSoilDyn_DataData%x)
+      if (.not. allocated(DstSoilDyn_DataData%x)) then
+         allocate(DstSoilDyn_DataData%x(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstSoilDyn_DataData%x.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      do i1 = LB(1), UB(1)
+         call SlD_CopyContState(SrcSoilDyn_DataData%x(i1), DstSoilDyn_DataData%x(i1), CtrlCode, ErrStat2, ErrMsg2)
+         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+         if (ErrStat >= AbortErrLev) return
+      end do
+   end if
+   call SlD_CopyContState(SrcSoilDyn_DataData%dxdt, DstSoilDyn_DataData%dxdt, CtrlCode, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if (ErrStat >= AbortErrLev) return
+   if (allocated(SrcSoilDyn_DataData%xd)) then
+      LB(1:1) = lbound(SrcSoilDyn_DataData%xd)
+      UB(1:1) = ubound(SrcSoilDyn_DataData%xd)
+      if (.not. allocated(DstSoilDyn_DataData%xd)) then
+         allocate(DstSoilDyn_DataData%xd(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstSoilDyn_DataData%xd.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      do i1 = LB(1), UB(1)
+         call SlD_CopyDiscState(SrcSoilDyn_DataData%xd(i1), DstSoilDyn_DataData%xd(i1), CtrlCode, ErrStat2, ErrMsg2)
+         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+         if (ErrStat >= AbortErrLev) return
+      end do
+   end if
+   if (allocated(SrcSoilDyn_DataData%z)) then
+      LB(1:1) = lbound(SrcSoilDyn_DataData%z)
+      UB(1:1) = ubound(SrcSoilDyn_DataData%z)
+      if (.not. allocated(DstSoilDyn_DataData%z)) then
+         allocate(DstSoilDyn_DataData%z(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstSoilDyn_DataData%z.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      do i1 = LB(1), UB(1)
+         call SlD_CopyConstrState(SrcSoilDyn_DataData%z(i1), DstSoilDyn_DataData%z(i1), CtrlCode, ErrStat2, ErrMsg2)
+         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+         if (ErrStat >= AbortErrLev) return
+      end do
+   end if
+   if (allocated(SrcSoilDyn_DataData%OtherSt)) then
+      LB(1:1) = lbound(SrcSoilDyn_DataData%OtherSt)
+      UB(1:1) = ubound(SrcSoilDyn_DataData%OtherSt)
+      if (.not. allocated(DstSoilDyn_DataData%OtherSt)) then
+         allocate(DstSoilDyn_DataData%OtherSt(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstSoilDyn_DataData%OtherSt.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      do i1 = LB(1), UB(1)
+         call SlD_CopyOtherState(SrcSoilDyn_DataData%OtherSt(i1), DstSoilDyn_DataData%OtherSt(i1), CtrlCode, ErrStat2, ErrMsg2)
+         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+         if (ErrStat >= AbortErrLev) return
+      end do
+   end if
    call SlD_CopyParam(SrcSoilDyn_DataData%p, DstSoilDyn_DataData%p, CtrlCode, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (ErrStat >= AbortErrLev) return
@@ -5893,30 +5933,44 @@ subroutine FAST_DestroySoilDyn_Data(SoilDyn_DataData, ErrStat, ErrMsg)
    character(*), parameter        :: RoutineName = 'FAST_DestroySoilDyn_Data'
    ErrStat = ErrID_None
    ErrMsg  = ''
-   LB(1:1) = lbound(SoilDyn_DataData%x)
-   UB(1:1) = ubound(SoilDyn_DataData%x)
-   do i1 = LB(1), UB(1)
-      call SlD_DestroyContState(SoilDyn_DataData%x(i1), ErrStat2, ErrMsg2)
-      call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-   end do
-   LB(1:1) = lbound(SoilDyn_DataData%xd)
-   UB(1:1) = ubound(SoilDyn_DataData%xd)
-   do i1 = LB(1), UB(1)
-      call SlD_DestroyDiscState(SoilDyn_DataData%xd(i1), ErrStat2, ErrMsg2)
-      call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-   end do
-   LB(1:1) = lbound(SoilDyn_DataData%z)
-   UB(1:1) = ubound(SoilDyn_DataData%z)
-   do i1 = LB(1), UB(1)
-      call SlD_DestroyConstrState(SoilDyn_DataData%z(i1), ErrStat2, ErrMsg2)
-      call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-   end do
-   LB(1:1) = lbound(SoilDyn_DataData%OtherSt)
-   UB(1:1) = ubound(SoilDyn_DataData%OtherSt)
-   do i1 = LB(1), UB(1)
-      call SlD_DestroyOtherState(SoilDyn_DataData%OtherSt(i1), ErrStat2, ErrMsg2)
-      call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-   end do
+   if (allocated(SoilDyn_DataData%x)) then
+      LB(1:1) = lbound(SoilDyn_DataData%x)
+      UB(1:1) = ubound(SoilDyn_DataData%x)
+      do i1 = LB(1), UB(1)
+         call SlD_DestroyContState(SoilDyn_DataData%x(i1), ErrStat2, ErrMsg2)
+         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+      end do
+      deallocate(SoilDyn_DataData%x)
+   end if
+   call SlD_DestroyContState(SoilDyn_DataData%dxdt, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if (allocated(SoilDyn_DataData%xd)) then
+      LB(1:1) = lbound(SoilDyn_DataData%xd)
+      UB(1:1) = ubound(SoilDyn_DataData%xd)
+      do i1 = LB(1), UB(1)
+         call SlD_DestroyDiscState(SoilDyn_DataData%xd(i1), ErrStat2, ErrMsg2)
+         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+      end do
+      deallocate(SoilDyn_DataData%xd)
+   end if
+   if (allocated(SoilDyn_DataData%z)) then
+      LB(1:1) = lbound(SoilDyn_DataData%z)
+      UB(1:1) = ubound(SoilDyn_DataData%z)
+      do i1 = LB(1), UB(1)
+         call SlD_DestroyConstrState(SoilDyn_DataData%z(i1), ErrStat2, ErrMsg2)
+         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+      end do
+      deallocate(SoilDyn_DataData%z)
+   end if
+   if (allocated(SoilDyn_DataData%OtherSt)) then
+      LB(1:1) = lbound(SoilDyn_DataData%OtherSt)
+      UB(1:1) = ubound(SoilDyn_DataData%OtherSt)
+      do i1 = LB(1), UB(1)
+         call SlD_DestroyOtherState(SoilDyn_DataData%OtherSt(i1), ErrStat2, ErrMsg2)
+         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+      end do
+      deallocate(SoilDyn_DataData%OtherSt)
+   end if
    call SlD_DestroyParam(SoilDyn_DataData%p, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    call SlD_DestroyInput(SoilDyn_DataData%u, ErrStat2, ErrMsg2)
@@ -5946,26 +6000,43 @@ subroutine FAST_PackSoilDyn_Data(RF, Indata)
    integer(B4Ki)   :: i1
    integer(B4Ki)   :: LB(1), UB(1)
    if (RF%ErrStat >= AbortErrLev) return
-   LB(1:1) = lbound(InData%x)
-   UB(1:1) = ubound(InData%x)
-   do i1 = LB(1), UB(1)
-      call SlD_PackContState(RF, InData%x(i1)) 
-   end do
-   LB(1:1) = lbound(InData%xd)
-   UB(1:1) = ubound(InData%xd)
-   do i1 = LB(1), UB(1)
-      call SlD_PackDiscState(RF, InData%xd(i1)) 
-   end do
-   LB(1:1) = lbound(InData%z)
-   UB(1:1) = ubound(InData%z)
-   do i1 = LB(1), UB(1)
-      call SlD_PackConstrState(RF, InData%z(i1)) 
-   end do
-   LB(1:1) = lbound(InData%OtherSt)
-   UB(1:1) = ubound(InData%OtherSt)
-   do i1 = LB(1), UB(1)
-      call SlD_PackOtherState(RF, InData%OtherSt(i1)) 
-   end do
+   call RegPack(RF, allocated(InData%x))
+   if (allocated(InData%x)) then
+      call RegPackBounds(RF, 1, lbound(InData%x), ubound(InData%x))
+      LB(1:1) = lbound(InData%x)
+      UB(1:1) = ubound(InData%x)
+      do i1 = LB(1), UB(1)
+         call SlD_PackContState(RF, InData%x(i1)) 
+      end do
+   end if
+   call SlD_PackContState(RF, InData%dxdt) 
+   call RegPack(RF, allocated(InData%xd))
+   if (allocated(InData%xd)) then
+      call RegPackBounds(RF, 1, lbound(InData%xd), ubound(InData%xd))
+      LB(1:1) = lbound(InData%xd)
+      UB(1:1) = ubound(InData%xd)
+      do i1 = LB(1), UB(1)
+         call SlD_PackDiscState(RF, InData%xd(i1)) 
+      end do
+   end if
+   call RegPack(RF, allocated(InData%z))
+   if (allocated(InData%z)) then
+      call RegPackBounds(RF, 1, lbound(InData%z), ubound(InData%z))
+      LB(1:1) = lbound(InData%z)
+      UB(1:1) = ubound(InData%z)
+      do i1 = LB(1), UB(1)
+         call SlD_PackConstrState(RF, InData%z(i1)) 
+      end do
+   end if
+   call RegPack(RF, allocated(InData%OtherSt))
+   if (allocated(InData%OtherSt)) then
+      call RegPackBounds(RF, 1, lbound(InData%OtherSt), ubound(InData%OtherSt))
+      LB(1:1) = lbound(InData%OtherSt)
+      UB(1:1) = ubound(InData%OtherSt)
+      do i1 = LB(1), UB(1)
+         call SlD_PackOtherState(RF, InData%OtherSt(i1)) 
+      end do
+   end if
    call SlD_PackParam(RF, InData%p) 
    call SlD_PackInput(RF, InData%u) 
    call SlD_PackOutput(RF, InData%y) 
@@ -5992,26 +6063,59 @@ subroutine FAST_UnPackSoilDyn_Data(RF, OutData)
    integer(IntKi)  :: stat
    logical         :: IsAllocAssoc
    if (RF%ErrStat /= ErrID_None) return
-   LB(1:1) = lbound(OutData%x)
-   UB(1:1) = ubound(OutData%x)
-   do i1 = LB(1), UB(1)
-      call SlD_UnpackContState(RF, OutData%x(i1)) ! x 
-   end do
-   LB(1:1) = lbound(OutData%xd)
-   UB(1:1) = ubound(OutData%xd)
-   do i1 = LB(1), UB(1)
-      call SlD_UnpackDiscState(RF, OutData%xd(i1)) ! xd 
-   end do
-   LB(1:1) = lbound(OutData%z)
-   UB(1:1) = ubound(OutData%z)
-   do i1 = LB(1), UB(1)
-      call SlD_UnpackConstrState(RF, OutData%z(i1)) ! z 
-   end do
-   LB(1:1) = lbound(OutData%OtherSt)
-   UB(1:1) = ubound(OutData%OtherSt)
-   do i1 = LB(1), UB(1)
-      call SlD_UnpackOtherState(RF, OutData%OtherSt(i1)) ! OtherSt 
-   end do
+   if (allocated(OutData%x)) deallocate(OutData%x)
+   call RegUnpack(RF, IsAllocAssoc); if (RegCheckErr(RF, RoutineName)) return
+   if (IsAllocAssoc) then
+      call RegUnpackBounds(RF, 1, LB, UB); if (RegCheckErr(RF, RoutineName)) return
+      allocate(OutData%x(LB(1):UB(1)),stat=stat)
+      if (stat /= 0) then 
+         call SetErrStat(ErrID_Fatal, 'Error allocating OutData%x.', RF%ErrStat, RF%ErrMsg, RoutineName)
+         return
+      end if
+      do i1 = LB(1), UB(1)
+         call SlD_UnpackContState(RF, OutData%x(i1)) ! x 
+      end do
+   end if
+   call SlD_UnpackContState(RF, OutData%dxdt) ! dxdt 
+   if (allocated(OutData%xd)) deallocate(OutData%xd)
+   call RegUnpack(RF, IsAllocAssoc); if (RegCheckErr(RF, RoutineName)) return
+   if (IsAllocAssoc) then
+      call RegUnpackBounds(RF, 1, LB, UB); if (RegCheckErr(RF, RoutineName)) return
+      allocate(OutData%xd(LB(1):UB(1)),stat=stat)
+      if (stat /= 0) then 
+         call SetErrStat(ErrID_Fatal, 'Error allocating OutData%xd.', RF%ErrStat, RF%ErrMsg, RoutineName)
+         return
+      end if
+      do i1 = LB(1), UB(1)
+         call SlD_UnpackDiscState(RF, OutData%xd(i1)) ! xd 
+      end do
+   end if
+   if (allocated(OutData%z)) deallocate(OutData%z)
+   call RegUnpack(RF, IsAllocAssoc); if (RegCheckErr(RF, RoutineName)) return
+   if (IsAllocAssoc) then
+      call RegUnpackBounds(RF, 1, LB, UB); if (RegCheckErr(RF, RoutineName)) return
+      allocate(OutData%z(LB(1):UB(1)),stat=stat)
+      if (stat /= 0) then 
+         call SetErrStat(ErrID_Fatal, 'Error allocating OutData%z.', RF%ErrStat, RF%ErrMsg, RoutineName)
+         return
+      end if
+      do i1 = LB(1), UB(1)
+         call SlD_UnpackConstrState(RF, OutData%z(i1)) ! z 
+      end do
+   end if
+   if (allocated(OutData%OtherSt)) deallocate(OutData%OtherSt)
+   call RegUnpack(RF, IsAllocAssoc); if (RegCheckErr(RF, RoutineName)) return
+   if (IsAllocAssoc) then
+      call RegUnpackBounds(RF, 1, LB, UB); if (RegCheckErr(RF, RoutineName)) return
+      allocate(OutData%OtherSt(LB(1):UB(1)),stat=stat)
+      if (stat /= 0) then 
+         call SetErrStat(ErrID_Fatal, 'Error allocating OutData%OtherSt.', RF%ErrStat, RF%ErrMsg, RoutineName)
+         return
+      end if
+      do i1 = LB(1), UB(1)
+         call SlD_UnpackOtherState(RF, OutData%OtherSt(i1)) ! OtherSt 
+      end do
+   end if
    call SlD_UnpackParam(RF, OutData%p) ! p 
    call SlD_UnpackInput(RF, OutData%u) ! u 
    call SlD_UnpackOutput(RF, OutData%y) ! y 
