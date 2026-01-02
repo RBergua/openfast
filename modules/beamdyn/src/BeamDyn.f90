@@ -1830,6 +1830,8 @@ SUBROUTINE Init_ModalDamping(x, OtherState, p, m)
    ! TODO : Take actual user input for zeta
    ! zeta is fraction of critical damping.
    zeta = (/ 0.001d0, 0.003d0, 0.0015d0, 0.0045d0, 0.002d0, 0.006d0, 0.007d0, 0.008d0, 0.009d0, 0.010d0 /)
+   ! zeta = (/ 0.1d0, 0.3d0, 0.15d0, 0.45d0, 0.2d0, 0.6d0, 0.7d0, 0.8d0, 0.9d0, 1.0d0 /)
+   ! zeta = (/ 0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0 /)
    numZeta = size(zeta, 1)
 
    ! 0. Setup quadrature points
@@ -1897,6 +1899,9 @@ SUBROUTINE Init_ModalDamping(x, OtherState, p, m)
    end do
 
    p%ModalDampingMat = matmul(transpose(phiT_M), p%ModalDampingMat)
+
+   print *, 'Frequencies at modal damping init [Hz]'
+   print *, omega / 2.0d0 / 3.1415926535d0
 
    ! Debugging / verifying -  recover the zeta values
    ! phi0T_M_phi0 = matmul(transpose(eigenvectors), matmul(m%LP_MassM_LU, eigenvectors))
@@ -5969,11 +5974,18 @@ SUBROUTINE BD_AddModalDampingRHS(u, p, x, OtherState, m)
    !
    ! OtherState%GlbRot = tranpose(u%RootMotion%Orientation(:, :, 1) evaluated at n)
    ! here, u%RootMotion%Orientation(:, :, 1) is evaluated at n+1
-   m%ModalDampingRot = matmul(u%RootMotion%Orientation(:, :, 1), OtherState%GlbRot)
+
+   ! m%ModalDampingRot = matmul(u%RootMotion%Orientation(:, :, 1), OtherState%GlbRot)
+
+   ! TODO : Use an actual rotation matrix here for the step, the option above is wrong and
+   ! diverges from identity instead of just being slightly different at all times.
+   m%ModalDampingRot = reshape((/ 1.0d0, 0.0d0, 0.0d0, &
+                                 0.0d0, 1.0d0, 0.0d0, &
+                                 0.0d0, 0.0d0, 1.0d0 /), shape(m%ModalDampingRot))
 
    do j = 1, size(x%dqdt, 2)-1
-      m%DampedVelocities((j-1)*6+1:(j-1)*6+3) = matmul(m%ModalDampingRot, x%dqdt(1:3, j+1))
-      m%DampedVelocities((j-1)*6+4:(j-1)*6+6) = matmul(m%ModalDampingRot, x%dqdt(4:6, j+1))
+      m%DampedVelocities((j-1)*6+1:(j-1)*6+3) = matmul(m%ModalDampingRot, m%DampedVelocities((j-1)*6+1:(j-1)*6+3))
+      m%DampedVelocities((j-1)*6+4:(j-1)*6+6) = matmul(m%ModalDampingRot, m%DampedVelocities((j-1)*6+4:(j-1)*6+6))
    end do
 
    ! 3. Multiply by modal damping matrix
@@ -5989,7 +6001,7 @@ SUBROUTINE BD_AddModalDampingRHS(u, p, x, OtherState, m)
    end do
 
 
-   print *, 'End of damping force calculation.'
+   ! print *, 'End of damping force calculation.'
 
 END SUBROUTINE BD_AddModalDampingRHS
 
