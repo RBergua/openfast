@@ -5929,10 +5929,10 @@ SUBROUTINE BD_AddModalDampingRHS(u, p, x, OtherState, m)
    TYPE(BD_MiscVarType),         INTENT(INOUT)  :: m           !< Misc/optimization variables
 
    INTEGER(IntKi)                            :: j ! looping indexing variable (node number)
-   REAL(R8Ki)                                :: r(3) ! nodal position relative to root
    INTEGER(IntKi)                            :: elem ! looping indexing for element number
    INTEGER(IntKi)                            :: elem_node ! looping indexing for node in the element number
-
+   REAL(R8Ki)                                :: r(3) ! nodal position relative to root
+   real(R8Ki)                                :: ModalDampingRot(3, 3)
 
 
    ! 1. Velocities relative to root
@@ -5973,19 +5973,13 @@ SUBROUTINE BD_AddModalDampingRHS(u, p, x, OtherState, m)
    ! Therefore, need to resolve the coordinate differences.
    !
    ! OtherState%GlbRot = tranpose(u%RootMotion%Orientation(:, :, 1) evaluated at n)
-   ! here, u%RootMotion%Orientation(:, :, 1) is evaluated at n+1
+   ! here, u%RootMotion%Orientation(:, :, 1) is evaluated at n+1, but is tranposed at this point
 
-   ! m%ModalDampingRot = matmul(u%RootMotion%Orientation(:, :, 1), OtherState%GlbRot)
-
-   ! TODO : Use an actual rotation matrix here for the step, the option above is wrong and
-   ! diverges from identity instead of just being slightly different at all times.
-   m%ModalDampingRot = reshape((/ 1.0d0, 0.0d0, 0.0d0, &
-                                 0.0d0, 1.0d0, 0.0d0, &
-                                 0.0d0, 0.0d0, 1.0d0 /), shape(m%ModalDampingRot))
+   ModalDampingRot = matmul(transpose(u%RootMotion%Orientation(:, :, 1)), OtherState%GlbRot)
 
    do j = 1, size(x%dqdt, 2)-1
-      m%DampedVelocities((j-1)*6+1:(j-1)*6+3) = matmul(m%ModalDampingRot, m%DampedVelocities((j-1)*6+1:(j-1)*6+3))
-      m%DampedVelocities((j-1)*6+4:(j-1)*6+6) = matmul(m%ModalDampingRot, m%DampedVelocities((j-1)*6+4:(j-1)*6+6))
+      m%DampedVelocities((j-1)*6+1:(j-1)*6+3) = matmul(ModalDampingRot, m%DampedVelocities((j-1)*6+1:(j-1)*6+3))
+      m%DampedVelocities((j-1)*6+4:(j-1)*6+6) = matmul(ModalDampingRot, m%DampedVelocities((j-1)*6+4:(j-1)*6+6))
    end do
 
    ! 3. Multiply by modal damping matrix
@@ -5994,10 +5988,10 @@ SUBROUTINE BD_AddModalDampingRHS(u, p, x, OtherState, m)
    ! 4. Rotate to correct coordinates and subtract from m%LP_RHS_LU
    do j = 1, size(x%dqdt, 2)-1
       m%LP_RHS_LU((j-1)*6+1:(j-1)*6+3) = m%LP_RHS_LU((j-1)*6+1:(j-1)*6+3) &
-         - matmul(transpose(m%ModalDampingRot), m%ModalDampingF((j-1)*6+1:(j-1)*6+3))
+         - matmul(transpose(ModalDampingRot), m%ModalDampingF((j-1)*6+1:(j-1)*6+3))
 
       m%LP_RHS_LU((j-1)*6+4:(j-1)*6+6) = m%LP_RHS_LU((j-1)*6+4:(j-1)*6+6) &
-         - matmul(transpose(m%ModalDampingRot), m%ModalDampingF((j-1)*6+4:(j-1)*6+6))
+         - matmul(transpose(ModalDampingRot), m%ModalDampingF((j-1)*6+4:(j-1)*6+6))
    end do
 
 
