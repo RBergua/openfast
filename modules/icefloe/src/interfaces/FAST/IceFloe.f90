@@ -321,7 +321,7 @@ SUBROUTINE IceFloe_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
 
 
    ! set up outputs to write to FAST
-   ! need to know how many legs and whethter loads applied to all or just one set of effective loads
+   ! need to know how many legs and whether loads applied to all or just one set of effective loads
       numOuts = 4*p%numLegs  ! 2 velocities and 2 forces
       if (p%singleLoad .and. p%numLegs > 1) numOuts = 5
       CALL AllocAry( InitOut%WriteOutputHdr, numOuts, 'WriteOutputHdr', ErrStat, ErrMsg )
@@ -350,7 +350,7 @@ SUBROUTINE IceFloe_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
       endif
 
       ! Initialize module variables
-      CALL IceFloe_InitVars(u, p, x, y, m, InitOut%Vars, .false., ErrStat, ErrMsg)
+      CALL IceFloe_InitVars(u, p, x, y, m, InitOut, InitOut%Vars, .false., ErrStat, ErrMsg)
       call iceErrorHndlr (iceLog, ErrStat, 'Error in allocation of output memory', 1)
       if (ErrStat >= AbortErrLev) return  
       
@@ -371,12 +371,13 @@ SUBROUTINE IceFloe_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, In
 END SUBROUTINE IceFloe_Init
 
 
-subroutine IceFloe_InitVars(u, p, x, y, m, Vars, Linearize, ErrStat, ErrMsg)
+subroutine IceFloe_InitVars(u, p, x, y, m, InitOut, Vars, Linearize, ErrStat, ErrMsg)
    type(IceFloe_InputType),            intent(inout)  :: u              !< An initial guess for the input; input mesh must be defined
    type(IceFloe_ParameterType),        intent(inout)  :: p              !< Parameters
    type(IceFloe_ContinuousStateType),  intent(inout)  :: x              !< Continuous state
    type(IceFloe_OutputType),           intent(inout)  :: y              !< Initial system outputs (outputs are not calculated;
    type(IceFloe_MiscVarType),          intent(inout)  :: m              !< Misc variables for optimization (not copied in glue code)
+   type(IceFloe_InitOutputType),       intent(in)     :: InitOut        ! Output for initialization routine
    type(ModVarsType),                  intent(inout)  :: Vars           !< Module variables
    logical,                            intent(in)     :: Linearize      !< Flag to initialize linearization variables
    integer(IntKi),                     intent(out)    :: ErrStat        !< Error status of the operation
@@ -385,6 +386,7 @@ subroutine IceFloe_InitVars(u, p, x, y, m, Vars, Linearize, ErrStat, ErrMsg)
    character(*), parameter             :: RoutineName = 'IceFloe_InitVars'
    integer(IntKi)                      :: ErrStat2
    character(ErrMsgLen)                :: ErrMsg2
+   integer(IntKi)                      :: i
 
    ErrStat = ErrID_None
    ErrMsg = ""
@@ -392,14 +394,22 @@ subroutine IceFloe_InitVars(u, p, x, y, m, Vars, Linearize, ErrStat, ErrMsg)
    !----------------------------------------------------------------------------
    ! Continuous State Variables
    !----------------------------------------------------------------------------
-
+   
    !----------------------------------------------------------------------------
    ! Input variables
    !----------------------------------------------------------------------------
 
+   call MV_AddMeshVar(Vars%u, 'iceMesh', MotionFields, DatLoc(IceFloe_u_iceMesh), u%iceMesh)
+   
    !----------------------------------------------------------------------------
    ! Output variables
    !----------------------------------------------------------------------------
+
+   call MV_AddMeshVar(Vars%y, 'iceMesh', MotionFields, DatLoc(IceFloe_y_iceMesh), y%iceMesh)
+   call MV_AddVar(Vars%y, "WriteOutput", FieldScalar, DatLoc(IceFloe_y_WriteOutput), &
+                  Flags=VF_WriteOut, &
+                  Num=size(y%WriteOutput), &
+                  LinNames=[(WriteOutputLinName(i), i=1,size(y%WriteOutput))])
 
    !----------------------------------------------------------------------------
    ! Initialization dependent on linearization
@@ -417,6 +427,11 @@ contains
       call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName) 
       Failed =  ErrStat >= AbortErrLev
    end function Failed
+   function WriteOutputLinName(index) result(name)
+      integer(IntKi), intent(in) :: index
+      character(LinChanLen)      :: name
+      name = InitOut%WriteOutputHdr(index)//', '//trim(InitOut%WriteOutputUnt(index))
+   end function WriteOutputLinName
 end subroutine
 
 !----------------------------------------------------------------------------------------------------------------------------------

@@ -1028,7 +1028,7 @@ subroutine FARM_InitialCO(farm, ErrStat, ErrMsg)
    farm%AWAE%u%Vy_wake    = 0.0_ReKi     ! Horizontal wake velocity deficit at wake planes, distributed radially, for each turbine
    farm%AWAE%u%Vz_wake    = 0.0_ReKi     ! "Vertical" wake velocity deficit at wake planes, distributed radially, for each turbine
    farm%AWAE%u%D_wake     = 0.0_ReKi     ! Wake diameters at wake planes for each turbine      
-   
+
       !--------------------
       ! 1b. CALL AWAE_CO      
    call AWAE_CalcOutput( 0.0_DbKi, farm%AWAE%u, farm%AWAE%p, farm%AWAE%x, farm%AWAE%xd, farm%AWAE%z, &
@@ -1084,7 +1084,7 @@ subroutine FARM_InitialCO(farm, ErrStat, ErrMsg)
    !.......................................................................................
    ! CALL AWAE_CO
    !.......................................................................................
-   
+
    call AWAE_CalcOutput( 0.0_DbKi, farm%AWAE%u, farm%AWAE%p, farm%AWAE%x, farm%AWAE%xd, farm%AWAE%z, &
                      farm%AWAE%OtherSt, farm%AWAE%y, farm%AWAE%m, ErrStat2, ErrMsg2 )         
          call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
@@ -1124,7 +1124,7 @@ subroutine FARM_UpdateStates(t, n, farm, ErrStat, ErrMsg)
    INTEGER(IntKi)                          :: n_ss                      
    INTEGER(IntKi)                          :: n_FMD   
    REAL(DbKi)                              :: t2                              ! time within the FAST-MoorDyn substepping loop for shared moorings
-   INTEGER(IntKi)                          :: ErrStatAWAE, ErrStatMD, ErrStat2 
+   INTEGER(IntKi)                          :: ErrStatMD, ErrStat2
    CHARACTER(ErrMsgLen)                    :: ErrMsg2
    CHARACTER(ErrMsgLen)                    :: ErrMsgAWAE
    CHARACTER(ErrMsgLen)                    :: ErrMsgMD
@@ -1251,21 +1251,11 @@ subroutine FARM_UpdateStates(t, n, farm, ErrStat, ErrMsg)
    !  write(*,*) 'Total FAST and Moordyn for FF_US took '//trim(num2lstr(tm2-tm1))//' seconds.'
    !#endif 
 
-   call AWAE_UpdateStates( t, n, farm%AWAE%u, farm%AWAE%p, farm%AWAE%x, farm%AWAE%xd, farm%AWAE%z, &
-                     farm%AWAE%OtherSt, farm%AWAE%m, ErrStatAWAE, ErrMsgAWAE )       
-
-   !#ifdef printthreads   
-   !  tm3 = omp_get_wtime()
-   !  write(*,*) 'AWAE_US took '//trim(num2lstr(tm3-tm2))//' seconds.'
-   !  write(*,*) 'Total Farm_US took '//trim(num2lstr(tm3-tm1))//' seconds.'
-   !#endif 
    
    ! update error messages from FAST's and AWAE's time steps
    DO nt = 1,farm%p%NumTurbines 
       call SetErrStat(ErrStatF(nt), ErrMsgF(nt), ErrStat, ErrMsg, 'T'//trim(num2lstr(nt))//':FARM_UpdateStates') ! FAST error status
    END DO
-   
-   call SetErrStat(ErrStatAWAE, ErrMsgAWAE, ErrStat, ErrMsg, 'FARM_UpdateStates')  ! AWAE error status
    
    ! calculate outputs from FAST as needed by FAST.Farm
    do nt = 1,farm%p%NumTurbines
@@ -1569,6 +1559,9 @@ subroutine FARM_CalcOutput(t, farm, ErrStat, ErrMsg)
    
   ! tm1 = omp_get_wtime()
    
+   ! Determine time step number
+   n = nint(t/farm%p%DT_low)
+
    !.......................................................................................
    ! calculate module outputs and perform some input-output solves (steps 1. and 2. and 3. can be done in parallel,
    !  but be careful that step 3 doesn't modify the inputs to steps 1 or 2)
@@ -1614,6 +1607,12 @@ subroutine FARM_CalcOutput(t, farm, ErrStat, ErrMsg)
    !.......................................................................................
    
       !--------------------
+      ! 0. call AWAE_UpdateStates to get the ambient wind and calculate wake-grid interactions
+   call AWAE_UpdateStates( n, farm%AWAE%u, farm%AWAE%p, farm%AWAE%x, farm%AWAE%xd, farm%AWAE%z, &
+                     farm%AWAE%OtherSt, farm%AWAE%m, ErrStat2, ErrMsg2 )    
+         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+
+      !--------------------
       ! 1. call AWAE_CO 
    call AWAE_CalcOutput( t, farm%AWAE%u, farm%AWAE%p, farm%AWAE%x, farm%AWAE%xd, farm%AWAE%z, &
                      farm%AWAE%OtherSt, farm%AWAE%y, farm%AWAE%m, ErrStat2, ErrMsg2 )         
@@ -1628,7 +1627,6 @@ subroutine FARM_CalcOutput(t, farm, ErrStat, ErrMsg)
    ! Write Output to File
    !.......................................................................................
       ! NOTE: Visualization data is output via the AWAE module
-   n = nint(t/farm%p%DT_low)
    call Farm_WriteOutput(n, t, farm, ErrStat2, ErrMsg2)
       call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    

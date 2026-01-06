@@ -401,20 +401,6 @@ Material Parameter
 ``BldFile`` is the file name of the blade input file. This name should
 be in quotations and can contain an absolute path or a relative path.
 
-Pitch Actuator Parameter
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-In this release, the pitch actuator implemented in BeamDyn is not
-available. The ``UsePitchAct`` should be set to “FALSE” in this
-version, whereby the input blade-pitch angle prescribed by the driver
-code is used to orient the blade directly. ``PitchJ``, ``PitchK``,
-and ``PitchC`` specify the pitch actuator inertial, stiffness, and
-damping coefficient, respectively. In future releases, specifying
-``UsePitchAct`` :math:`=` TRUE will enable a second-order pitch
-actuator, whereby the pitch angular orientation, velocity, and
-acceleration are determined by the actuator based on the input
-blade-pitch angle prescribed by the driver code.
-
 .. _BD-Outputs:
 
 Outputs

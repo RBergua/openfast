@@ -40,12 +40,14 @@ use AeroDyn, only:   AD_JacobianPInput, &
 use BeamDyn, only:   BD_JacobianPInput, &
                      BD_JacobianPContState, &
                      BD_CalcContStateDeriv, &
+                     BD_UpdateStates, &
                      BD_CalcOutput, &
                      BD_End
 
 use ElastoDyn, only: ED_JacobianPInput, &
                      ED_JacobianPContState, &
                      ED_CalcContStateDeriv, &
+                     ED_UpdateStates, &
                      ED_CalcOutput, &
                      ED_End, &
                      ED_PackExtInputAry
@@ -131,6 +133,7 @@ use ServoDyn, only:     SrvD_JacobianPInput, &
 use SubDyn, only:       SD_JacobianPInput, &
                         SD_JacobianPContState, &
                         SD_CalcContStateDeriv, &
+                        SD_UpdateStates, &
                         SD_CalcOutput, &
                         SD_End
 
@@ -435,6 +438,9 @@ subroutine FAST_UpdateStates(ModData, t_initial, n_t_global, T, ErrStat, ErrMsg)
    ErrStat = ErrID_None
    ErrMsg = ''
 
+   ! Skip modules in the tight coupling category because the solver handles state updates
+   if (iand(ModData%Category, MC_Tight) /= 0) return
+
    ! Select based on module ID
    select case (ModData%ID)
 
@@ -472,10 +478,32 @@ subroutine FAST_UpdateStates(ModData, t_initial, n_t_global, T, ErrStat, ErrMsg)
       end do
 
    case (Module_BD)
-      ! State update is handled by tight coupling solver
+      call FAST_CopyStates(ModData, T, STATE_CURR, STATE_PRED, MESH_UPDATECOPY, ErrStat2, ErrMsg2)
+      if (Failed()) return
+
+      do j_ss = 1, ModData%SubSteps
+         n_t_module = n_t_global*ModData%SubSteps + j_ss - 1
+         t_module = n_t_module*ModData%DT + t_initial
+         call BD_UpdateStates(t_module, n_t_module, T%BD%Input(1:,ModData%Ins), T%BD%InputTimes(:,ModData%Ins), T%BD%p(ModData%Ins), &
+                                T%BD%x(ModData%Ins, STATE_PRED), T%BD%xd(ModData%Ins, STATE_PRED), &
+                                T%BD%z(ModData%Ins, STATE_PRED), T%BD%OtherSt(ModData%Ins, STATE_PRED), &
+                                T%BD%m(ModData%Ins), ErrStat2, ErrMsg2)
+         if (Failed()) return
+      end do
 
    case (Module_ED)
-      ! State update is handled by tight coupling solver
+      call FAST_CopyStates(ModData, T, STATE_CURR, STATE_PRED, MESH_UPDATECOPY, ErrStat2, ErrMsg2)
+      if (Failed()) return
+
+      do j_ss = 1, ModData%SubSteps
+         n_t_module = n_t_global*ModData%SubSteps + j_ss - 1
+         t_module = n_t_module*ModData%DT + t_initial
+         call ED_UpdateStates(t_module, n_t_module, T%ED%Input(1:,ModData%Ins), T%ED%InputTimes(:,ModData%Ins), T%ED%p(ModData%Ins), &
+                                T%ED%x(ModData%Ins, STATE_PRED), T%ED%xd(ModData%Ins, STATE_PRED), &
+                                T%ED%z(ModData%Ins, STATE_PRED), T%ED%OtherSt(ModData%Ins, STATE_PRED), &
+                                T%ED%m(ModData%Ins), ErrStat2, ErrMsg2)
+         if (Failed()) return
+      end do
 
    case (Module_SED)
       call FAST_CopyStates(ModData, T, STATE_CURR, STATE_PRED, MESH_UPDATECOPY, ErrStat2, ErrMsg2)
@@ -599,8 +627,6 @@ subroutine FAST_UpdateStates(ModData, t_initial, n_t_global, T, ErrStat, ErrMsg)
          if (Failed()) return
       end do
 
-!  case (Module_OpFM)
-
    case (Module_Orca)
       call FAST_CopyStates(ModData, T, STATE_CURR, STATE_PRED, MESH_UPDATECOPY, ErrStat2, ErrMsg2)
       if (Failed()) return
@@ -616,7 +642,18 @@ subroutine FAST_UpdateStates(ModData, t_initial, n_t_global, T, ErrStat, ErrMsg)
       end do
 
    case (Module_SD)
-      ! State update is handled by tight coupling solver
+      call FAST_CopyStates(ModData, T, STATE_CURR, STATE_PRED, MESH_UPDATECOPY, ErrStat2, ErrMsg2)
+      if (Failed()) return
+
+      do j_ss = 1, ModData%SubSteps
+         n_t_module = n_t_global*ModData%SubSteps + j_ss - 1
+         t_module = n_t_module*ModData%DT + t_initial
+         call SD_UpdateStates(t_module, n_t_module, T%SD%Input(1:), T%SD%InputTimes, T%SD%p, &
+                                 T%SD%x(STATE_PRED), T%SD%xd(STATE_PRED), &
+                                 T%SD%z(STATE_PRED), T%SD%OtherSt(STATE_PRED), &
+                                 T%SD%m, ErrStat2, ErrMsg2)
+         if (Failed()) return
+      end do
 
    case (Module_SeaSt)
       call FAST_CopyStates(ModData, T, STATE_CURR, STATE_PRED, MESH_UPDATECOPY, ErrStat2, ErrMsg2)

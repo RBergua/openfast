@@ -10076,7 +10076,7 @@ IF (.NOT. p%BD4Blades) THEN
       WRITE (UnSu,'(A)')  ' (-)      (-)      (m)      (m)     (deg)    (kg/m)     (Nm^2)     (Nm^2)'
 
       DO I=1,p%BldNodes
-         WRITE(UnSu,'(I4,3F9.3,3F10.3,2ES11.3)')  I, p%RNodesNorm(I), p%RNodes(I) + p%HubRad, p%DRNodes(I), &
+         WRITE(UnSu,'(I4,3F9.3,2F10.3,2ES11.3)')  I, p%RNodesNorm(I), p%RNodes(I) + p%HubRad, p%DRNodes(I), &
                                                       p%ThetaS(K,I)*R2D, p%MassB(K,I), &
                                                       p%StiffBF(K,I), p%StiffBE(K,I)
       ENDDO ! I
