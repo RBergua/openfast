@@ -1817,7 +1817,11 @@ SUBROUTINE Init_ModalDamping(x, OtherState, p, m)
    REAL(R8Ki), ALLOCATABLE                   :: omega (:) ! modal frequencies (rad/s)
    REAL(LaKi), ALLOCATABLE                   :: phiT_M (:, :) ! mode shapes transpose times mass matrix
    REAL(LaKi), ALLOCATABLE                   :: phi0T_M_phi0 (:, :) ! normalization calculation of mass matrix
-   REAL, DIMENSION(10) :: zeta ! Modal damping values, should be changed to be user input.
+   REAL, DIMENSION(40) :: zeta ! Modal damping values, should be changed to be user input.
+
+   REAL(LaKi), ALLOCATABLE                   :: modal_participation (:, :) ! Modal participation factor
+   INTEGER(IntKi)                            :: bdModesFile ! Unit numbers for file with BD modes
+
 
    INTEGER(IntKi)                                 :: ErrStat2   ! Temporary Error status
    CHARACTER(ErrMsgLen)                           :: ErrMsg2    ! Temporary Error message
@@ -1829,9 +1833,21 @@ SUBROUTINE Init_ModalDamping(x, OtherState, p, m)
 
    ! TODO : Take actual user input for zeta
    ! zeta is fraction of critical damping.
-   zeta = (/ 0.001d0, 0.003d0, 0.0015d0, 0.0045d0, 0.002d0, 0.006d0, 0.007d0, 0.008d0, 0.009d0, 0.010d0 /)
    ! zeta = (/ 0.1d0, 0.3d0, 0.15d0, 0.45d0, 0.2d0, 0.6d0, 0.7d0, 0.8d0, 0.9d0, 1.0d0 /)
    ! zeta = (/ 0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0 /)
+
+   ! ! Zeta for Damped_Beam tests
+   ! zeta = (/ 0.001d0, 0.003d0, 0.0015d0, 0.0045d0, 0.002d0, 0.006d0, 0.007d0, 0.008d0, 0.009d0, 0.010d0 /)
+
+   ! Zeta for IEA 22 test
+   zeta = (/  0.00481431, 0.00501452, 0.01319441, 0.01365751, 0.02704056, 0.02928076, &
+               0.03943607, 0.0133448, 0.05628846, 0.05935411, 0.01490789, 0.08727722, &
+               0.08508602, 0.01754962, 0.12212305, 0.12607313, 0.02324255, 0.03571866, &
+               0.13962916, 0.00848232, 0.16332203, 0.0405824, 0.28314572, 0.05114984, &
+               0.40216838, 0.3507376, 0.022072, 0.0540725, 0.06678422, 0.03625773, &
+               0.0484979, 0.8516855, 0.98869347, 0.05778878, 0.06610646, 0.0764022, &
+               0.08499995, 0.09210838, 0.13037341, 0.13997288 /)
+
    numZeta = size(zeta, 1)
 
    ! 0. Setup quadrature points
@@ -1911,6 +1927,8 @@ SUBROUTINE Init_ModalDamping(x, OtherState, p, m)
    !    phi0T_M_phi0(j,j) = phi0T_M_phi0(j,j) / omega(j) / 2.0d0
    ! end do
 
+   CALL CalcModalParticipation()
+
    ! Allocate memory for the velocity vector that will be multiplied by the modal damping matrix
    CALL AllocAry(m%DampedVelocities, p%dof_total-6, 'DampedVelocities', ErrStat2, ErrMsg2)
    CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'Init_ModalDamping')
@@ -1931,6 +1949,39 @@ CONTAINS
       IF (ALLOCATED(phi0T_M_phi0) ) DEALLOCATE(phi0T_M_phi0)
       IF (ALLOCATED(phiT_M) ) DEALLOCATE(phiT_M)
    END SUBROUTINE CleanupModalInit
+
+   SUBROUTINE CalcModalParticipation()
+
+      ! Theory based on Abaqus documentation
+      ! Only using rotational DOFs for rotations and not including
+      ! contributions from translations
+
+      CALL AllocAry(modal_participation, nDOF, 6, 'modal_participation', ErrStat2, ErrMsg2)
+      CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'Init_ModalDamping')
+
+      do j = 1, 6
+         modal_participation(:, j) = sum(phiT_M(:, j::6)*phiT_M(:, j::6), dim=2)
+      end do
+
+      ! Write to a file instead
+      CALL GetNewUnit( bdModesFile )
+      open(unit=bdModesFile, file='beamdyn_modes.csv')
+
+      write(bdModesFile,*) '#Frequency [Hz], Zeta [Frac. Critical], &
+         &Participation X, Participation Y, Participation Z, &
+         &Participation RX, Participation RY, Participation RZ'
+
+      ! Write to a file
+      do j = 1, numZeta
+         write(bdModesFile, ' (1F12.4,1F12.8,6E14.5) ') omega(j)/6.28318530d0, &
+            zeta(j), modal_participation(j, :) / sum(modal_participation(j, :))
+      end do
+
+      close(bdModesFile)
+
+      IF (ALLOCATED(modal_participation) ) DEALLOCATE(modal_participation)
+
+   END SUBROUTINE
 
 END SUBROUTINE
 
