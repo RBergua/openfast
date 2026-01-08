@@ -5922,40 +5922,34 @@ SUBROUTINE BD_AddModalDampingRHS(u, p, x, OtherState, m)
    TYPE(BD_OtherStateType),      INTENT(IN   )  :: OtherState  !< other states (contains ref orientation)
    TYPE(BD_MiscVarType),         INTENT(INOUT)  :: m           !< Misc/optimization variables
 
-   INTEGER(IntKi)                            :: j ! looping indexing variable (node number)
-   INTEGER(IntKi)                            :: elem ! looping indexing for element number
-   INTEGER(IntKi)                            :: elem_node ! looping indexing for node in the element number
-   REAL(R8Ki)                                :: r(3) ! nodal position relative to root
-   real(R8Ki)                                :: ModalDampingRot(3, 3)
-   real(R8Ki)                                :: NodeRot(3, 3)
-
+   integer(IntKi)    :: j, k        ! looping indexing variable
+   integer(IntKi)    :: elem        ! looping indexing for element number
+   integer(IntKi)    :: elem_node   ! looping indexing for node in the element number
+   real(R8Ki)        :: r(3)        ! nodal position relative to root
+   real(R8Ki)        :: NodeRot(3, 3)
 
    ! 1. Velocities relative to root
    ! element loops
    do elem = 1, p%elem_total
 
-      do elem_node = 1, p%nodes_per_elem
+      do elem_node = 2, p%nodes_per_elem
 
          ! Global node index, excluding root
-         j = (elem - 1) * (p%nodes_per_elem - 1) + elem_node - 1
+         j = (elem - 1) * (p%nodes_per_elem - 1) + elem_node
 
-         if (j > 0) then
+         ! DOF index
+         k = (j - 2) * 6
 
-            ! 1.a. Velocities minus root velocity
-            ! x%... is at j+1 because skipping the root node and j is 1 at the first node after root.
-            m%DampedVelocities((j-1)*6+1:j*6) = x%dqdt(:, j+1) - x%dqdt(:, 1)
+         ! 1.a. Node translational velocity minus root velocity
+         ! x%... is at j+1 because skipping the root node and j is 1 at the first node after root.
+         m%DampedVelocities(k+1:k+6) = x%dqdt(:, j) - x%dqdt(:, 1)
 
-            ! 1.b. Subtract out the rigid body rotation of the root here
-            ! position cross rotational velocity
+         ! 1.b. Subtract out the rigid body rotational velocity based on the blade root rotation
 
-            ! Vector from root to node (inertial frame)
-            r = p%uuN0(1:3, elem_node, elem) + x%q(1:3, j+1)
+         ! Vector from root to node
+         r = p%uuN0(1:3, elem_node, elem) + x%q(1:3, j)
 
-            m%DampedVelocities((j-1)*6+1:(j-1)*6+3) = m%DampedVelocities((j-1)*6+1:(j-1)*6+3) &
-               - Cross_Product(x%dqdt(4:6, 1), r)
-         end if
-
-
+         m%DampedVelocities(k+1:k+3) = m%DampedVelocities(k+1:k+3) - Cross_Product(x%dqdt(4:6, 1), r)
       end do
 
    end do
@@ -5968,38 +5962,28 @@ SUBROUTINE BD_AddModalDampingRHS(u, p, x, OtherState, m)
    ! OtherState%GlbRot = tranpose(u%RootMotion%Orientation(:, :, 1) evaluated at n)
    ! here, u%RootMotion%Orientation(:, :, 1) is evaluated at n+1, but is tranposed at this point
 
-   ModalDampingRot = matmul(transpose(u%RootMotion%Orientation(:, :, 1)), OtherState%GlbRot)
-
-   do j = 1, p%node_total-1
+   do j = 2, p%node_total
 
       ! Loop over the nodes that apply to the damping matrix, so don't include the root node.
-      call BD_CrvMatrixR(x%q(4:6, j+1), NodeRot)
+      call BD_CrvMatrixR(x%q(4:6, j), NodeRot)
 
-      m%DampedVelocities((j-1)*6+1:(j-1)*6+3) = matmul(matmul(transpose(NodeRot), ModalDampingRot), &
-               m%DampedVelocities((j-1)*6+1:(j-1)*6+3))
-      m%DampedVelocities((j-1)*6+4:(j-1)*6+6) = matmul(matmul(transpose(NodeRot), ModalDampingRot), &
-               m%DampedVelocities((j-1)*6+4:(j-1)*6+6))
+      k = (j - 2) * 6
+      m%DampedVelocities(k+1:k+3) = matmul(transpose(NodeRot), m%DampedVelocities(k+1:k+3))
+      m%DampedVelocities(k+4:k+6) = matmul(transpose(NodeRot), m%DampedVelocities(k+4:k+6))
    end do
 
    ! 3. Multiply by modal damping matrix
    m%ModalDampingF = matmul(p%ModalDampingMat, m%DampedVelocities)
 
    ! 4. Rotate to correct coordinates and subtract from m%LP_RHS_LU
-   do j = 1, p%node_total-1
+   do j = 2, p%node_total
 
-      call BD_CrvMatrixR(x%q(4:6, j+1), NodeRot)
+      call BD_CrvMatrixR(x%q(4:6, j), NodeRot)
 
-      m%LP_RHS_LU((j-1)*6+1:(j-1)*6+3) = m%LP_RHS_LU((j-1)*6+1:(j-1)*6+3) &
-         - matmul(matmul(transpose(ModalDampingRot), NodeRot), &
-            m%ModalDampingF((j-1)*6+1:(j-1)*6+3))
-
-      m%LP_RHS_LU((j-1)*6+4:(j-1)*6+6) = m%LP_RHS_LU((j-1)*6+4:(j-1)*6+6) &
-         - matmul(matmul(transpose(ModalDampingRot), NodeRot), &
-            m%ModalDampingF((j-1)*6+4:(j-1)*6+6))
+      k = (j - 2) * 6
+      m%LP_RHS_LU(k+1:k+3) = m%LP_RHS_LU(k+1:k+3) - matmul(NodeRot, m%ModalDampingF(k+1:k+3))
+      m%LP_RHS_LU(k+4:k+6) = m%LP_RHS_LU(k+4:k+6) - matmul(NodeRot, m%ModalDampingF(k+4:k+6))
    end do
-
-
-   ! print *, 'End of damping force calculation.'
 
 END SUBROUTINE BD_AddModalDampingRHS
 
