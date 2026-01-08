@@ -228,7 +228,7 @@ When :math:`\omega=0`, the yaw-bearing static or dynamic friction is formulated 
 Blade pitch dynamics
 --------------------
 
-Prior to OpenFAST v5, the blade pitch angles were either fixed or prescribed based on the pitch command from ServoDyn. The blade root pitch velocity and acceleration are always zero despite the pitch angle potentially changing following ServoDyn pitch command. There is also no pitch moment due to blade pitch inertia if the blades are modeled in ElastoDyn. Note that when BeamDyn is used to model the blades, only the blade root nodes have zero pitch velocity and acceleration. The pitch inertia and twisting of the rest of the blades following the root node are still accounted for, partially capturing the blade pitch dynamics.
+Prior to OpenFAST v5, the blade pitch angles were either fixed or prescribed based on the pitch command from ServoDyn. The blade root pitch velocity and acceleration were always zero despite the pitch angle potentially changing following ServoDyn pitch command. There was also no pitch moment due to blade pitch inertia if the blades are modeled in ElastoDyn. Note that when BeamDyn was used to model the blades, only the blade root nodes had zero pitch velocity and acceleration. The pitch inertia and twisting of the rest of the blades following the root node were still accounted for, partially capturing the blade pitch dynamics.
 
 In OpenFAST v5, new blade pitch degrees of freedom, ``PitchDOF``, are introduced in ElastoDyn. By setting ``PitchDOF`` to true, blade pitching can now be simulated dynamically in ElastoDyn. To use this feature, users need to provide the moments of inertia of the pitch actuators/bearings about the pitch axis through the new ``PBrIner(I)`` inputs added to the ElastoDyn input file. If the blades are also modeled in ElastoDyn instead of BeamDyn, the total moments of inertia of the undeflected blades about the pitch axis must also be provided through the new ``BlPIner(I)`` inputs. Note that because ElastoDyn does not model blade twisting, it is not necessary to specify distributed blade pitch inertia. Furthermore, the effective blade pitch moments of inertia during the simulation might be higher than ``BlPIner(I)`` due to additional contributions coming from blade bending. When ElastoDyn is used to model the blades, ``PBrIner(I)`` and ``BlPIner(I)`` are simply added together to obtain the total pitch moment of inertia needed in the equations of motion. The results from the simulation will be the same as long as the sum of ``PBrIner(I)`` and ``BlPIner(I)`` remains unchanged. When BeamDyn is used to model the blades, ``BlPIner(I)`` is ignored because the distributions of pitch moment of inertia along the blades are considered in BeamDyn, which also models blade twisting. It is, however, still necessary to have realistic values for ``PBrIner(I)`` in ElastoDyn. Setting ``PBrIner(I)`` to zero or close to zero will result in numerical issues in ElastoDyn.
 
@@ -240,7 +240,7 @@ The pitch actuator stiffness/spring constant ``PitSpr`` and damping ``PitDamp`` 
 
 When active blade pitch control is on in ServoDyn, ``BlPitchCom`` is computed by the turbine controller. When active blade pitch control is off (``PCMode=0`` or during ``t<TPCOn`` when ``PCMode>0``), ``BlPitchCom`` is given by the neutral blade pitch position ``PitNeut(I)`` in the ServoDyn input file. Finally, during pitch maneuver, ``BlPitchCom`` approaches the final pitch position at a constant rate given by ``PitManRat(I)`` in the ServoDyn input file.
 
-In addition to pitch position commands, pitch rate commands ``BlPRateCom`` are also added to ServoDyn. Currently, ``BlPRateCom`` is only available with DLL controllers (``PCMode=5``). During normal operation, the pitch rate commands are estimated using finite differencing based on the pitch set points from two consecutive controller steps. During pitch maneuver, the pitch rate command is simply set to ``PitManRat(I)`` in the ServoDyn input file until the final pitch position is reached. ``BlPRateCom`` is zero when ``PCMode`` is 0, 3, or 4 or after pitch maneuver is completed.
+In addition to pitch position commands, pitch rate commands ``BlPRateCom`` are also added to ServoDyn. Currently, ``BlPRateCom`` is only available with DLL controllers (``PCMode=5``) or during override pitch maneuvers. During normal operation, the pitch rate commands are estimated using finite differencing based on the pitch set points from two consecutive controller steps. During pitch maneuvers, the pitch rate command is simply set to ``PitManRat(I)`` in the ServoDyn input file until the final pitch position is reached. ``BlPRateCom`` is zero when ``PCMode`` is 0, 3, or 4 or after the pitch maneuver is completed.
 
 When ``PitchDOF`` is true in ElastoDyn, the following ServoDyn settings are recommended:
 
@@ -248,7 +248,11 @@ When ``PitchDOF`` is true in ElastoDyn, the following ServoDyn settings are reco
 
 * For consistency with the pitch rate command estimated using finite differencing, set ``DLL_Ramp`` to true. This can reduce small jitters in the actuator moment when ``DLL_DT`` is larger than the simulation time step.
 
-* Finally, the pitch actuator stiffness and damping must be set appropriately to obtain a reasonable time constant (on the order of a quarter of a second) and damping ratio (about 0.7). Higher ``PitSpr(I)`` and ``PitDamp(I)`` will require a smaller time step for numerical stability.
+* Finally, the pitch actuator stiffness and damping must be set appropriately to obtain a reasonable time constant (on the order of a quarter of a second) and damping ratio (about 0.7). Higher ``PitSpr(I)`` and ``PitDamp(I)`` will require a smaller time step for numerical stability. To achieve a given damped period ``Td`` and damping ratio ``zeta``, the following equations can be used to obtain initial estimates of ``PitSpr(I)`` and ``PitDamp(I)``:
+
+``PitSpr  = 4 * pi^2 * ( PBrIner + BlPIner ) / ( Td^2 * ( 1 - zeta^2 ) )``
+
+``PitDamp = 2 * zeta * sqrt( PitSpr * ( PBrIner + BlPIner ) )``
 
 When ``PitchDOF`` is true, the following new output channels from ElastoDyn become available:
 
@@ -268,7 +272,7 @@ These output channels are valid only if ``PitchDOF`` is true with positive value
 
 If ``PitchDOF`` is false in ElastoDyn, OpenFAST will function as before with the blade root pitch angles either fixed to the initial positions defined in ElastoDyn when ServoDyn is disabled or set to the pitch commands from ServoDyn. Setting ``PitchDOF`` to false does not mean the blade pitch angles will be constant. ``PBrIner(I)`` and ``BlPIner(I)`` in the ElastoDyn input file are both ignored when ``PitchDOF`` is false. The pitch actuator torques from ServoDyn are also ignored by ElastoDyn. Finally, note that the initial blade pitch positions specified in ElastoDyn will be superseded by ``PitNeut(I)`` in ServoDyn if ServoDyn is enabled but active blade pitch control is off (``PCMode=0`` or during ``t<TPCOn`` when ``PCMode>0``). 
 
-*Usage guidance*
+**Usage guidance**
 
 The effect of enabling ``PitchDOF`` on blade root loads tends to be more significant when the blades are modeled in ElastoDyn. This is because ElastoDyn will entirely ignore the blade pitch inertia otherwise. When the blades are modeled in BeamDyn, the effect tends to be less significant because blade pitch inertia (except that of the root node) and blade twisting will always be accounted for. In this case, enabling ``PitchDOF`` in ElastoDyn allows the pitch inertia of the entire blade, including that of the root node, to be included in the dynamics.
 
@@ -304,4 +308,5 @@ The following (partial) list of coordinate systems are defined internally by Ela
 -  `rf` : rotor furl coordinate system 
 -  `tf` : tail furl coordinate system 
 -  `g` : hub coordinate system 
+
 
