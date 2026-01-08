@@ -194,7 +194,7 @@ SUBROUTINE BD_Init( InitInp, u, p, x, xd, z, OtherState, y, MiscVar, Interval, I
    ! Calculation of modal damping here
 
    IF(p%damp_flag .EQ. 2) THEN
-      call Init_ModalDamping(x, OtherState, p, MiscVar)
+      call Init_ModalDamping(x, OtherState, p, MiscVar, ErrStat2, ErrMsg2); if (Failed()) return
    ENDIF
 
       !.................................
@@ -1109,7 +1109,16 @@ subroutine SetParameters(InitInp, InputFileData, p, OtherState, ErrStat, ErrMsg)
    ! Physical damping flag and 6 damping coefficients
    !...............................................
    p%damp_flag  = InputFileData%InpBl%damp_flag
-   p%beta       = InputFileData%InpBl%beta
+   select case (p%damp_flag)
+   case (0) ! No damping
+   case (1) ! Stiffness-proportional damping
+      p%beta = InputFileData%InpBl%beta
+   case (2) ! Modal damping
+      p%zeta = InputFileData%InpBl%zeta
+   case default
+      call SetErrStat(ErrID_Fatal, "Invalid value for physical damping flag in input file.", ErrStat, ErrMsg, RoutineName )
+      return
+   end select
 
    !...............................................
    ! set parameters for File I/O data:
@@ -1796,7 +1805,7 @@ END SUBROUTINE Init_ContinuousStates
 
 !-----------------------------------------------------------------------------------------------------------------------------------
 !> This routine initializes modal damping.
-SUBROUTINE Init_ModalDamping(x, OtherState, p, m)
+SUBROUTINE Init_ModalDamping(x, OtherState, p, m, ErrStat, ErrMsg)
 
    ! TODO : Error messages are probably wrong in some way.
 
@@ -1804,26 +1813,23 @@ SUBROUTINE Init_ModalDamping(x, OtherState, p, m)
    type(BD_OtherStateType),         INTENT(IN   )  :: OtherState        !< Global rotations are stored in otherstate
    TYPE(BD_ParameterType),          INTENT(INOUT)  :: p           !< Parameters, output modal damping matrix in original frame here
    TYPE(BD_MiscVarType),            INTENT(INOUT)  :: m           !< misc/optimization variables
+   INTEGER(IntKi),                  INTENT(  OUT)  :: ErrStat
+   CHARACTER(ErrMsgLen),            INTENT(  OUT)  :: ErrMsg
 
-   ! Local variables
+   INTEGER(IntKi)                            :: ErrStat2   ! Temporary Error status
+   CHARACTER(ErrMsgLen)                      :: ErrMsg2    ! Temporary Error message
    INTEGER(IntKi)                            :: nDOF
    INTEGER(IntKi)                            :: j ! looping indexing variable
    INTEGER(IntKi)                            :: numZeta ! number of damping values
-   REAL                            :: Zj ! diagonal element of the modal damping matrix
-   INTEGER(IntKi)           :: ErrStat
-   CHARACTER(ErrMsgLen)     :: ErrMsg
+   REAL(R8Ki)                                :: Zj ! diagonal element of the modal damping matrix
    REAL(R8Ki), ALLOCATABLE                   :: eigenvectors (:, :) ! mode shapes
    REAL(R8Ki), ALLOCATABLE                   :: omega (:) ! modal frequencies (rad/s)
-   REAL(LaKi), ALLOCATABLE                   :: phiT_M (:, :) ! mode shapes transpose times mass matrix
-   REAL(LaKi), ALLOCATABLE                   :: phi0T_M_phi0 (:, :) ! normalization calculation of mass matrix
-   REAL, DIMENSION(40) :: zeta ! Modal damping values, should be changed to be user input.
+   REAL(R8Ki), ALLOCATABLE                   :: phiT_M (:, :) ! mode shapes transpose times mass matrix
+   REAL(R8Ki), ALLOCATABLE                   :: phi0T_M_phi0 (:, :) ! normalization calculation of mass matrix
 
-   REAL(LaKi), ALLOCATABLE                   :: modal_participation (:, :) ! Modal participation factor
+   REAL(R8Ki), ALLOCATABLE                   :: modal_participation (:, :) ! Modal participation factor
    INTEGER(IntKi)                            :: bdModesFile ! Unit numbers for file with BD modes
    real(R8Ki)                                :: NodeRot(3, 3)
-
-   INTEGER(IntKi)                                 :: ErrStat2   ! Temporary Error status
-   CHARACTER(ErrMsgLen)                           :: ErrMsg2    ! Temporary Error message
 
    ErrStat = ErrID_None
    ErrMsg  = ''
@@ -1839,15 +1845,15 @@ SUBROUTINE Init_ModalDamping(x, OtherState, p, m)
    ! zeta = (/ 0.001d0, 0.003d0, 0.0015d0, 0.0045d0, 0.002d0, 0.006d0, 0.007d0, 0.008d0, 0.009d0, 0.010d0 /)
 
    ! Zeta for IEA 22 test
-   zeta = (/  0.00481431, 0.00501452, 0.01319441, 0.01365751, 0.02704056, 0.02928076, &
-               0.03943607, 0.0133448, 0.05628846, 0.05935411, 0.01490789, 0.08727722, &
-               0.08508602, 0.01754962, 0.12212305, 0.12607313, 0.02324255, 0.03571866, &
-               0.13962916, 0.00848232, 0.16332203, 0.0405824, 0.28314572, 0.05114984, &
-               0.40216838, 0.3507376, 0.022072, 0.0540725, 0.06678422, 0.03625773, &
-               0.0484979, 0.8516855, 0.98869347, 0.05778878, 0.06610646, 0.0764022, &
-               0.08499995, 0.09210838, 0.13037341, 0.13997288 /)
+   ! zeta = (/  0.00481431, 0.00501452, 0.01319441, 0.01365751, 0.02704056, 0.02928076, &
+   !             0.03943607, 0.0133448, 0.05628846, 0.05935411, 0.01490789, 0.08727722, &
+   !             0.08508602, 0.01754962, 0.12212305, 0.12607313, 0.02324255, 0.03571866, &
+   !             0.13962916, 0.00848232, 0.16332203, 0.0405824, 0.28314572, 0.05114984, &
+   !             0.40216838, 0.3507376, 0.022072, 0.0540725, 0.06678422, 0.03625773, &
+   !             0.0484979, 0.8516855, 0.98869347, 0.05778878, 0.06610646, 0.0764022, &
+   !             0.08499995, 0.09210838, 0.13037341, 0.13997288 /)
 
-   numZeta = size(zeta, 1)
+   numZeta = size(p%zeta)
 
    ! 0. Setup quadrature points
    CALL BD_QuadraturePointData(p, x, m)
@@ -1882,7 +1888,7 @@ SUBROUTINE Init_ModalDamping(x, OtherState, p, m)
    CALL EigenSolveWrap(m%LP_StifK_LU, m%LP_MassM_LU, nDOF, nDOF, .TRUE., eigenvectors, omega, ErrStat, ErrMsg )
 
    ! Mass-normalize the mode shapes
-   CALL AllocAry(phi0T_M_phi0, nDOF, nDof, 'phi0T_M_phi0', ErrStat2, ErrMsg2)
+   CALL AllocAry(phi0T_M_phi0, nDOF, nDOF, 'phi0T_M_phi0', ErrStat2, ErrMsg2)
    CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'Init_ModalDamping')
 
    phi0T_M_phi0 = matmul(transpose(eigenvectors), matmul(m%LP_MassM_LU, eigenvectors))
@@ -1892,7 +1898,7 @@ SUBROUTINE Init_ModalDamping(x, OtherState, p, m)
    end do
 
    ! 4. Generate damping matrix in original frame
-   CALL AllocAry(phiT_M, nDOF, nDof, 'phiT_M', ErrStat2, ErrMsg2)
+   CALL AllocAry(phiT_M, nDOF, nDOF, 'phiT_M', ErrStat2, ErrMsg2)
    CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'Init_ModalDamping')
 
    phiT_M = matmul(transpose(eigenvectors), m%LP_MassM_LU) ! after normalization
@@ -1903,11 +1909,11 @@ SUBROUTINE Init_ModalDamping(x, OtherState, p, m)
    do j = 1, nDOF
 
       if( j <= numZeta) then
-         Zj = 2.0d0 * omega(j) * zeta(j)
+         Zj = 2.0_R8Ki * omega(j) * p%zeta(j)
       else
          ! Stiffness proportional damping is used past the last prescribed value
          ! at a rate equal to the last prescribed value.
-         Zj = 2.0d0 * omega(j) * (zeta(numZeta) * omega(j) / omega(numZeta))
+         Zj = 2.0_R8Ki * omega(j) * (p%zeta(numZeta) * omega(j) / omega(numZeta))
       endif
 
       p%ModalDampingMat(j, :) = Zj * phiT_M(j, :)
@@ -1947,7 +1953,7 @@ SUBROUTINE Init_ModalDamping(x, OtherState, p, m)
    ! print *, 'Verifying mass orthonormal here.'
    ! phi0T_M_phi0 = matmul(transpose(eigenvectors), matmul(p%ModalDampingMat, eigenvectors))
    ! do j = 1,nDOF
-   !    phi0T_M_phi0(j,j) = phi0T_M_phi0(j,j) / omega(j) / 2.0d0
+   !    phi0T_M_phi0(j,j) = phi0T_M_phi0(j,j) / omega(j) / 2.0_R8Ki
    ! end do
 
    CALL CalcModalParticipation()
@@ -1996,8 +2002,8 @@ CONTAINS
 
       ! Write to a file
       do j = 1, numZeta
-         write(bdModesFile, ' (1F12.4,1F12.8,6E14.5) ') omega(j)/6.28318530d0, &
-            zeta(j), modal_participation(j, :) / sum(modal_participation(j, :))
+         write(bdModesFile, ' (1F12.4,1F12.8,6E14.5) ') omega(j)/TwoPi_D, &
+            p%zeta(j), modal_participation(j, :) / sum(modal_participation(j, :))
       end do
 
       close(bdModesFile)
@@ -2023,8 +2029,8 @@ SUBROUTINE EigenSolveWrap(K, M, nDOF, NOmega,  bCheckSingularity, EigVect, Omega
    CHARACTER(*),           INTENT(  OUT)    :: ErrMsg                             ! Error message if ErrStat /= ErrID_None
 
    ! LOCALS
-   REAL(LaKi), ALLOCATABLE                   :: K_LaKi(:,:), M_LaKi(:,:)
-   REAL(LaKi), ALLOCATABLE                   :: EigVect_LaKi(:,:), Omega_LaKi(:)
+   REAL(R8Ki), ALLOCATABLE                   :: K_R8Ki(:,:), M_R8Ki(:,:)
+   REAL(R8Ki), ALLOCATABLE                   :: EigVect_R8Ki(:,:), Omega_R8Ki(:)
    INTEGER(IntKi)                            :: N
    INTEGER(IntKi)                            :: ErrStat2
    CHARACTER(ErrMsgLen)                      :: ErrMsg2
@@ -2035,11 +2041,11 @@ SUBROUTINE EigenSolveWrap(K, M, nDOF, NOmega,  bCheckSingularity, EigVect, Omega
 
    ! --- Unfortunate conversion to FEKi... TODO TODO consider storing M and K in FEKi
    N=size(K,1)
-   CALL AllocAry(K_LaKi      , N, N, 'K_FEKi',    ErrStat2, ErrMsg2); if(Failed()) return
-   CALL AllocAry(M_LaKi      , N, N, 'M_FEKi',    ErrStat2, ErrMsg2); if(Failed()) return
-   K_LaKi = real( K, LaKi )
-   M_LaKi = real( M, LaKi )
-   N=size(K_LaKi,1)
+   CALL AllocAry(K_R8Ki      , N, N, 'K_FEKi',    ErrStat2, ErrMsg2); if(Failed()) return
+   CALL AllocAry(M_R8Ki      , N, N, 'M_FEKi',    ErrStat2, ErrMsg2); if(Failed()) return
+   K_R8Ki = real( K, R8Ki )
+   M_R8Ki = real( M, R8Ki )
+   N=size(K_R8Ki,1)
 
    ! Note:  NOmega must be <= N, which is the length of Omega2, Phi!
    if ( NOmega > nDOF ) then
@@ -2049,15 +2055,15 @@ SUBROUTINE EigenSolveWrap(K, M, nDOF, NOmega,  bCheckSingularity, EigVect, Omega
    end if
 
    ! --- Eigenvalue analysis
-   CALL AllocAry(EigVect_LAKi, N, N, 'EigVect', ErrStat2, ErrMsg2); if(Failed()) return;
-   CALL AllocAry(Omega_LaKi,     N , 'Omega', ErrStat2, ErrMsg2); if(Failed()) return; ! <<< NOTE: Needed due to dimension of Omega
-   CALL EigenSolve(K_LaKi, M_LaKi, N, bCheckSingularity, EigVect_LaKi, Omega_LaKi, ErrStat2, ErrMsg2 ); if (Failed()) return;
+   CALL AllocAry(EigVect_R8Ki, N, N, 'EigVect', ErrStat2, ErrMsg2); if(Failed()) return;
+   CALL AllocAry(Omega_R8Ki,     N , 'Omega', ErrStat2, ErrMsg2); if(Failed()) return; ! <<< NOTE: Needed due to dimension of Omega
+   CALL EigenSolve(K_R8Ki, M_R8Ki, N, bCheckSingularity, EigVect_R8Ki, Omega_R8Ki, ErrStat2, ErrMsg2 ); if (Failed()) return;
 
    Omega(:)        = huge(1.0_ReKi)
-   Omega(1:nOmega) = real(Omega_LaKi(1:nOmega), FEKi) !<<< nOmega<N
+   Omega(1:nOmega) = real(Omega_R8Ki(1:nOmega), FEKi) !<<< nOmega<N
 
    ! --- Setting up Phi, and type conversion
-   EigVect=REAL( EigVect_LaKi(:,1:NOmega), LaKi )   ! eigenvectors
+   EigVect=REAL( EigVect_R8Ki(:,1:NOmega), R8Ki )   ! eigenvectors
 
    CALL CleanupEigen()
    return
@@ -2071,10 +2077,10 @@ CONTAINS
    END FUNCTION Failed
 
    SUBROUTINE CleanupEigen()
-      IF (ALLOCATED(Omega_LaKi)  ) DEALLOCATE(Omega_LaKi)
-      IF (ALLOCATED(EigVect_LaKi)) DEALLOCATE(EigVect_LaKi)
-      IF (ALLOCATED(K_LaKi)      ) DEALLOCATE(K_LaKi)
-      IF (ALLOCATED(M_LaKi)      ) DEALLOCATE(M_LaKi)
+      IF (ALLOCATED(Omega_R8Ki)  ) DEALLOCATE(Omega_R8Ki)
+      IF (ALLOCATED(EigVect_R8Ki)) DEALLOCATE(EigVect_R8Ki)
+      IF (ALLOCATED(K_R8Ki)      ) DEALLOCATE(K_R8Ki)
+      IF (ALLOCATED(M_R8Ki)      ) DEALLOCATE(M_R8Ki)
    END SUBROUTINE CleanupEigen
 
 END SUBROUTINE EigenSolveWrap

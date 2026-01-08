@@ -160,6 +160,7 @@ IMPLICIT NONE
     REAL(R8Ki) , DIMENSION(1:3)  :: blade_CG = 0.0_R8Ki      !< Blade center of gravity [-]
     REAL(R8Ki) , DIMENSION(1:3,1:3)  :: blade_IN = 0.0_R8Ki      !< Blade Length [-]
     REAL(R8Ki) , DIMENSION(1:6)  :: beta = 0.0_R8Ki      !< Damping Coefficient [-]
+    REAL(R8Ki) , DIMENSION(:), ALLOCATABLE  :: zeta      !< Modal Damping Coefficients [-]
     REAL(R8Ki)  :: tol = 0.0_R8Ki      !< Tolerance used in stopping criterion [-]
     REAL(R8Ki) , DIMENSION(:), ALLOCATABLE  :: QPtN      !< Quadrature (QuadPt) point locations in natural frame [-1, 1] [-]
     REAL(R8Ki) , DIMENSION(:), ALLOCATABLE  :: QPtWeight      !< Weights at each quadrature point (QuadPt) [-]
@@ -1222,6 +1223,18 @@ subroutine BD_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg)
    DstParamData%blade_CG = SrcParamData%blade_CG
    DstParamData%blade_IN = SrcParamData%blade_IN
    DstParamData%beta = SrcParamData%beta
+   if (allocated(SrcParamData%zeta)) then
+      LB(1:1) = lbound(SrcParamData%zeta)
+      UB(1:1) = ubound(SrcParamData%zeta)
+      if (.not. allocated(DstParamData%zeta)) then
+         allocate(DstParamData%zeta(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstParamData%zeta.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstParamData%zeta = SrcParamData%zeta
+   end if
    DstParamData%tol = SrcParamData%tol
    if (allocated(SrcParamData%QPtN)) then
       LB(1:1) = lbound(SrcParamData%QPtN)
@@ -1557,6 +1570,9 @@ subroutine BD_DestroyParam(ParamData, ErrStat, ErrMsg)
    if (allocated(ParamData%member_eta)) then
       deallocate(ParamData%member_eta)
    end if
+   if (allocated(ParamData%zeta)) then
+      deallocate(ParamData%zeta)
+   end if
    if (allocated(ParamData%QPtN)) then
       deallocate(ParamData%QPtN)
    end if
@@ -1660,6 +1676,7 @@ subroutine BD_PackParam(RF, Indata)
    call RegPack(RF, InData%blade_CG)
    call RegPack(RF, InData%blade_IN)
    call RegPack(RF, InData%beta)
+   call RegPackAlloc(RF, InData%zeta)
    call RegPack(RF, InData%tol)
    call RegPackAlloc(RF, InData%QPtN)
    call RegPackAlloc(RF, InData%QPtWeight)
@@ -1757,6 +1774,7 @@ subroutine BD_UnPackParam(RF, OutData)
    call RegUnpack(RF, OutData%blade_CG); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%blade_IN); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%beta); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%zeta); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%tol); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%QPtN); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%QPtWeight); if (RegCheckErr(RF, RoutineName)) return
