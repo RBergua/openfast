@@ -70,6 +70,8 @@ IMPLICIT NONE
     REAL(R8Ki) , DIMENSION(:,:,:), ALLOCATABLE  :: stiff0      !< C/S stiffness matrix arrays [-]
     REAL(R8Ki) , DIMENSION(:,:,:), ALLOCATABLE  :: mass0      !< C/S mass matrix arrays [-]
     REAL(R8Ki) , DIMENSION(1:6)  :: beta = 0.0_R8Ki      !< Damping Coefficient [-]
+    INTEGER(IntKi)  :: n_modes = 0_IntKi      !< Number of modal damping coefficients [-]
+    REAL(R8Ki) , DIMENSION(:), ALLOCATABLE  :: zeta      !< Modal damping coefficient array [-]
     INTEGER(IntKi)  :: damp_flag = 0_IntKi      !< Damping Flag: 0-No Damping, 1-Stiffness Prop. Damped, 2-Modal Damping [-]
   END TYPE BladeInputData
 ! =======================
@@ -539,6 +541,19 @@ subroutine BD_CopyBladeInputData(SrcBladeInputDataData, DstBladeInputDataData, C
       DstBladeInputDataData%mass0 = SrcBladeInputDataData%mass0
    end if
    DstBladeInputDataData%beta = SrcBladeInputDataData%beta
+   DstBladeInputDataData%n_modes = SrcBladeInputDataData%n_modes
+   if (allocated(SrcBladeInputDataData%zeta)) then
+      LB(1:1) = lbound(SrcBladeInputDataData%zeta)
+      UB(1:1) = ubound(SrcBladeInputDataData%zeta)
+      if (.not. allocated(DstBladeInputDataData%zeta)) then
+         allocate(DstBladeInputDataData%zeta(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstBladeInputDataData%zeta.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstBladeInputDataData%zeta = SrcBladeInputDataData%zeta
+   end if
    DstBladeInputDataData%damp_flag = SrcBladeInputDataData%damp_flag
 end subroutine
 
@@ -558,6 +573,9 @@ subroutine BD_DestroyBladeInputData(BladeInputDataData, ErrStat, ErrMsg)
    if (allocated(BladeInputDataData%mass0)) then
       deallocate(BladeInputDataData%mass0)
    end if
+   if (allocated(BladeInputDataData%zeta)) then
+      deallocate(BladeInputDataData%zeta)
+   end if
 end subroutine
 
 subroutine BD_PackBladeInputData(RF, Indata)
@@ -571,6 +589,8 @@ subroutine BD_PackBladeInputData(RF, Indata)
    call RegPackAlloc(RF, InData%stiff0)
    call RegPackAlloc(RF, InData%mass0)
    call RegPack(RF, InData%beta)
+   call RegPack(RF, InData%n_modes)
+   call RegPackAlloc(RF, InData%zeta)
    call RegPack(RF, InData%damp_flag)
    if (RegCheckErr(RF, RoutineName)) return
 end subroutine
@@ -589,6 +609,8 @@ subroutine BD_UnPackBladeInputData(RF, OutData)
    call RegUnpackAlloc(RF, OutData%stiff0); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%mass0); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%beta); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%n_modes); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%zeta); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%damp_flag); if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 

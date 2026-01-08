@@ -48,9 +48,11 @@ typedef   ^        BladeInputData    IntKi    format_index     -     -     -    
 #vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 #the following are BDKi = R8Ki
 typedef   ^        BladeInputData    R8Ki     station_eta     {:}    -     -    "Station location in eta [0,1]"
-typedef   ^        BladeInputData     ^       stiff0       {:}{:}{:} -     -    "C/S stiffness matrix arrays"
-typedef   ^        BladeInputData     ^       mass0        {:}{:}{:} -     -    "C/S mass matrix arrays"
-typedef   ^        BladeInputData     ^       beta             {6} - - "Damping Coefficient" -
+typedef   ^        BladeInputData    R8Ki     stiff0       {:}{:}{:} -     -    "C/S stiffness matrix arrays"
+typedef   ^        BladeInputData    R8Ki     mass0        {:}{:}{:} -     -    "C/S mass matrix arrays"
+typedef   ^        BladeInputData    R8Ki     beta             {6} - - "Damping Coefficient" -
+typedef   ^        BladeInputData    IntKi    n_modes           -  - - "Number of modal damping coefficients" -
+typedef   ^        BladeInputData    R8Ki     zeta              :  - - "Modal damping coefficient array" -
 #end of BDKi-type variables
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 typedef   ^        BladeInputData    IntKi    damp_flag    - - - "Damping Flag: 0-No Damping, 1-Stiffness Prop. Damped, 2-Modal Damping"
