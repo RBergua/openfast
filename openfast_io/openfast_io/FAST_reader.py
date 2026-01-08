@@ -1,3 +1,4 @@
+from numbers import Number
 import os, re, copy
 import numpy as np
 from functools import reduce
@@ -915,7 +916,7 @@ class InputReader_OpenFAST(object):
         f.readline()
         f.readline()
         f.readline()
-        #---------------------- DAMPING COEFFICIENT------------------------------------
+        #---------------------- Stiffness-Proportional Damping -----------------
         ln = f.readline().split()
         self.fst_vt['BeamDynBlade'][BladeNumber]['mu1']           = float(ln[0])
         self.fst_vt['BeamDynBlade'][BladeNumber]['mu2']           = float(ln[1])
@@ -923,6 +924,11 @@ class InputReader_OpenFAST(object):
         self.fst_vt['BeamDynBlade'][BladeNumber]['mu4']           = float(ln[3])
         self.fst_vt['BeamDynBlade'][BladeNumber]['mu5']           = float(ln[4])
         self.fst_vt['BeamDynBlade'][BladeNumber]['mu6']           = float(ln[5])
+        f.readline()
+        # ------ Modal Damping [used only if damp_type=2] --------------------------------
+        
+        self.fst_vt['BeamDynBlade'][BladeNumber]['n_modes']       = int_read(f.readline().split()[0])
+        self.fst_vt['BeamDynBlade'][BladeNumber]['zeta']          = np.array([f.readline().strip().split()[:self.fst_vt['BeamDynBlade'][BladeNumber]['n_modes']]], dtype=float)
         f.readline()
         #---------------------- DISTRIBUTED PROPERTIES---------------------------------
         

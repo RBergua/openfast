@@ -820,7 +820,7 @@ class InputWriter_OpenFAST(object):
         f.write('Generated with OpenFAST_IO\n')
         f.write('---------------------- BLADE PARAMETERS --------------------------------------\n')
         f.write('{:<22} {:<11} {:}'.format(bd_blade_dict['station_total'], 'station_total', '- Number of blade input stations (-)\n'))
-        f.write('{:<22} {:<11} {:}'.format(bd_blade_dict['damp_type'], 'damp_type', '- Damping type: 0: no damping; 1: damped\n'))
+        f.write('{:<22} {:<11} {:}'.format(bd_blade_dict['damp_type'], 'damp_type', '- Damping type (switch) {0: none, 1: stiffness-proportional, 2: modal}\n'))
         f.write('---------------------- DAMPING COEFFICIENT------------------------------------\n')
         f.write(" ".join(['{:^11s}'.format(i) for i in ['mu1','mu2','mu3','mu4','mu5','mu6']])+'\n')
         f.write(" ".join(['{:^11s}'.format(i) for i in ['(-)','(-)','(-)','(-)','(-)','(-)']])+'\n')
