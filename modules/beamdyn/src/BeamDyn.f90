@@ -1807,28 +1807,26 @@ END SUBROUTINE Init_ContinuousStates
 !> This routine initializes modal damping.
 SUBROUTINE Init_ModalDamping(x, OtherState, p, m, ErrStat, ErrMsg)
 
-   ! TODO : Error messages are probably wrong in some way.
-
    TYPE(BD_ContinuousStateType),    INTENT(IN   )  :: x           !< Continuous states at t on input at t + dt on output
    type(BD_OtherStateType),         INTENT(IN   )  :: OtherState        !< Global rotations are stored in otherstate
    TYPE(BD_ParameterType),          INTENT(INOUT)  :: p           !< Parameters, output modal damping matrix in original frame here
    TYPE(BD_MiscVarType),            INTENT(INOUT)  :: m           !< misc/optimization variables
    INTEGER(IntKi),                  INTENT(  OUT)  :: ErrStat
-   CHARACTER(ErrMsgLen),            INTENT(  OUT)  :: ErrMsg
+   CHARACTER(*),                    INTENT(  OUT)  :: ErrMsg
 
-   INTEGER(IntKi)                            :: ErrStat2   ! Temporary Error status
-   CHARACTER(ErrMsgLen)                      :: ErrMsg2    ! Temporary Error message
+   CHARACTER(*), PARAMETER                   :: RoutineName = 'Init_ModalDamping'
+   INTEGER(IntKi)                            :: ErrStat2
+   CHARACTER(ErrMsgLen)                      :: ErrMsg2
    INTEGER(IntKi)                            :: nDOF
-   INTEGER(IntKi)                            :: j ! looping indexing variable
-   INTEGER(IntKi)                            :: numZeta ! number of damping values
-   REAL(R8Ki)                                :: Zj ! diagonal element of the modal damping matrix
-   REAL(R8Ki), ALLOCATABLE                   :: eigenvectors (:, :) ! mode shapes
-   REAL(R8Ki), ALLOCATABLE                   :: omega (:) ! modal frequencies (rad/s)
-   REAL(R8Ki), ALLOCATABLE                   :: phiT_M (:, :) ! mode shapes transpose times mass matrix
-   REAL(R8Ki), ALLOCATABLE                   :: phi0T_M_phi0 (:, :) ! normalization calculation of mass matrix
-
-   REAL(R8Ki), ALLOCATABLE                   :: modal_participation (:, :) ! Modal participation factor
-   INTEGER(IntKi)                            :: bdModesFile ! Unit numbers for file with BD modes
+   INTEGER(IntKi)                            :: j, k                 ! looping indexing variable
+   INTEGER(IntKi)                            :: numZeta              ! number of damping values
+   REAL(R8Ki)                                :: Zj                   ! diagonal element of the modal damping matrix
+   REAL(R8Ki), ALLOCATABLE                   :: eigenvectors(:, :)   ! mode shapes
+   REAL(R8Ki), ALLOCATABLE                   :: omega(:)             ! modal frequencies (rad/s)
+   REAL(R8Ki), ALLOCATABLE                   :: phiT_M(:, :)         ! mode shapes transpose times mass matrix
+   REAL(R8Ki), ALLOCATABLE                   :: phi0T_M_phi0(:, :)   ! normalization calculation of mass matrix
+   REAL(R8Ki), ALLOCATABLE                   :: StifK(:,:)           ! Copy of stiffness matrix for eigenanalysis (modified during solve)
+   REAL(R8Ki), ALLOCATABLE                   :: MassM(:,:)           ! Copy of mass matrix for eigenanalysis (modified during solve)
    real(R8Ki)                                :: NodeRot(3, 3)
 
    ErrStat = ErrID_None
@@ -1879,17 +1877,19 @@ SUBROUTINE Init_ModalDamping(x, OtherState, p, m, ErrStat, ErrMsg)
    ! For now, calculate all eigenpairs
    nDOF = p%dof_total - 6
 
-   CALL AllocAry(eigenvectors, nDOF, nDOF, 'eigenvectors', ErrStat2, ErrMsg2)
-   CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'Init_ModalDamping')
+   ! Allocate eigenvector matrix and eigenvalue arrays
+   call AllocAry(eigenvectors, nDOF, nDOF, 'eigenvectors', ErrStat2, ErrMsg2); if (Failed()) return
+   call AllocAry(omega, nDOF, 'omega', ErrStat2, ErrMsg2); if (Failed()) return
+   call AllocAry(StifK, nDOF, nDOF, 'StifK', ErrStat2, ErrMsg2); if (Failed()) return
+   call AllocAry(MassM, nDOF, nDOF, 'MassM', ErrStat2, ErrMsg2); if (Failed()) return
 
-   CALL AllocAry(omega, nDOF, 'omega', ErrStat2, ErrMsg2)
-   CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'Init_ModalDamping')
-
-   CALL EigenSolveWrap(m%LP_StifK_LU, m%LP_MassM_LU, nDOF, nDOF, .TRUE., eigenvectors, omega, ErrStat, ErrMsg )
+   ! EigenSolve modifies the input matrices, so make copies before calling
+   StifK = m%LP_StifK_LU
+   MassM = m%LP_MassM_LU
+   call EigenSolve(StifK, MassM, nDOF, .TRUE., eigenvectors, omega, ErrStat2, ErrMsg2); if (Failed()) return
 
    ! Mass-normalize the mode shapes
-   CALL AllocAry(phi0T_M_phi0, nDOF, nDOF, 'phi0T_M_phi0', ErrStat2, ErrMsg2)
-   CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'Init_ModalDamping')
+   call AllocAry(phi0T_M_phi0, nDOF, nDOF, 'phi0T_M_phi0', ErrStat2, ErrMsg2); if (Failed()) return
 
    phi0T_M_phi0 = matmul(transpose(eigenvectors), matmul(m%LP_MassM_LU, eigenvectors))
 
@@ -1898,13 +1898,11 @@ SUBROUTINE Init_ModalDamping(x, OtherState, p, m, ErrStat, ErrMsg)
    end do
 
    ! 4. Generate damping matrix in original frame
-   CALL AllocAry(phiT_M, nDOF, nDOF, 'phiT_M', ErrStat2, ErrMsg2)
-   CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'Init_ModalDamping')
+   call AllocAry(phiT_M, nDOF, nDOF, 'phiT_M', ErrStat2, ErrMsg2); if (Failed()) return
 
    phiT_M = matmul(transpose(eigenvectors), m%LP_MassM_LU) ! after normalization
 
-   CALL AllocAry(p%ModalDampingMat, nDOF, nDOF, 'p%ModalDampingMat', ErrStat2, ErrMsg2)
-   CALL SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'Init_ModalDamping')
+   call AllocAry(p%ModalDampingMat, nDOF, nDOF, 'p%ModalDampingMat', ErrStat2, ErrMsg2); if (Failed()) return
 
    do j = 1, nDOF
 
@@ -1923,29 +1921,23 @@ SUBROUTINE Init_ModalDamping(x, OtherState, p, m, ErrStat, ErrMsg)
 
    ! Apply the rotation of q here. When the actual dynamics are at the same position
    ! as this, then this cancels with a rotation applied at the modal damping force.
-   do j = 1, size(x%dqdt, 2)-1
+   do j = 2, p%node_total
 
       ! Loop over the nodes that apply to the damping matrix, so don't include the root node.
-      call BD_CrvMatrixR(x%q(4:6, j+1), NodeRot)
-
-      p%ModalDampingMat(:, (j-1)*6+1:(j-1)*6+3) = matmul(p%ModalDampingMat(:, (j-1)*6+1:(j-1)*6+3), &
-                                                         NodeRot)
-
-      p%ModalDampingMat(:, (j-1)*6+4:(j-1)*6+6) = matmul(p%ModalDampingMat(:, (j-1)*6+4:(j-1)*6+6), &
-                                                         NodeRot)
-
+      call BD_CrvMatrixR(x%q(4:6, j), NodeRot)
+      
+      k = (j-2)*6
+      p%ModalDampingMat(:, k+1:k+3) = matmul(p%ModalDampingMat(:, k+1:k+3), NodeRot)
+      p%ModalDampingMat(:, k+4:k+6) = matmul(p%ModalDampingMat(:, k+4:k+6), NodeRot)
    end do
-   do j = 1, size(x%dqdt, 2)-1
+   do j = 2, p%node_total
 
       ! Loop over the nodes that apply to the damping matrix, so don't include the root node.
-      call BD_CrvMatrixR(x%q(4:6, j+1), NodeRot)
-
-      p%ModalDampingMat((j-1)*6+1:(j-1)*6+3, :) = matmul(transpose(NodeRot), &
-                  p%ModalDampingMat((j-1)*6+1:(j-1)*6+3, :))
-
-      p%ModalDampingMat((j-1)*6+4:(j-1)*6+6, :) = matmul(transpose(NodeRot), &
-                  p%ModalDampingMat((j-1)*6+4:(j-1)*6+6, :))
-
+      call BD_CrvMatrixR(x%q(4:6, j), NodeRot)
+      
+      k = (j-2)*6
+      p%ModalDampingMat(k+1:k+3, :) = matmul(transpose(NodeRot), p%ModalDampingMat(k+1:k+3, :))
+      p%ModalDampingMat(k+4:k+6, :) = matmul(transpose(NodeRot), p%ModalDampingMat(k+4:k+6, :))
    end do
 
    ! Debugging / verifying -  recover the zeta values
@@ -1956,30 +1948,25 @@ SUBROUTINE Init_ModalDamping(x, OtherState, p, m, ErrStat, ErrMsg)
    !    phi0T_M_phi0(j,j) = phi0T_M_phi0(j,j) / omega(j) / 2.0_R8Ki
    ! end do
 
-   CALL CalcModalParticipation()
+   call CalcModalParticipation()
 
    ! Allocate memory for the velocity vector that will be multiplied by the modal damping matrix
-   CALL AllocAry(m%DampedVelocities, p%dof_total-6, 'DampedVelocities', ErrStat2, ErrMsg2)
-   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'Init_ModalDamping')
+   call AllocAry(m%DampedVelocities, nDOF, 'DampedVelocities', ErrStat2, ErrMsg2); if (Failed()) return
 
    ! Allocate memory for the velocity vector that will be multiplied by the modal damping matrix
-   CALL AllocAry(m%ModalDampingF, p%dof_total-6, 'ModalDampingF', ErrStat2, ErrMsg2)
-   CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'Init_ModalDamping')
+   call AllocAry(m%ModalDampingF, nDOF, 'ModalDampingF', ErrStat2, ErrMsg2); if (Failed()) return
 
-   print *, 'End of Modal damping init.'
+contains
 
-   CALL CleanupModalInit()
+   logical function Failed()
+      call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+      Failed =  ErrStat >= AbortErrLev
+   end function Failed
 
-CONTAINS
+   subroutine CalcModalParticipation()
 
-   SUBROUTINE CleanupModalInit()
-      IF (ALLOCATED(eigenvectors) ) DEALLOCATE(eigenvectors)
-      IF (ALLOCATED(omega) ) DEALLOCATE(omega)
-      IF (ALLOCATED(phi0T_M_phi0) ) DEALLOCATE(phi0T_M_phi0)
-      IF (ALLOCATED(phiT_M) ) DEALLOCATE(phiT_M)
-   END SUBROUTINE CleanupModalInit
-
-   SUBROUTINE CalcModalParticipation()
+      REAL(R8Ki), ALLOCATABLE                   :: modal_participation (:, :) ! Modal participation factor
+      INTEGER(IntKi)                            :: bdModesFile ! Unit numbers for file with BD modes
 
       ! Theory based on Abaqus documentation
       ! Only using rotational DOFs for rotations and not including
@@ -1993,12 +1980,12 @@ CONTAINS
       end do
 
       ! Write to a file instead
-      CALL GetNewUnit( bdModesFile )
+      CALL GetNewUnit(bdModesFile)
       open(unit=bdModesFile, file='beamdyn_modes.csv')
 
-      write(bdModesFile,*) '#Frequency [Hz], Zeta [Frac. Critical], &
-         &Participation X, Participation Y, Participation Z, &
-         &Participation RX, Participation RY, Participation RZ'
+      write(bdModesFile,*) '#Frequency [Hz], Zeta [Frac. Critical],'// &
+                           'Participation X, Participation Y, Participation Z,'// &
+                           'Participation RX, Participation RY, Participation RZ'
 
       ! Write to a file
       do j = 1, numZeta
@@ -2008,82 +1995,9 @@ CONTAINS
 
       close(bdModesFile)
 
-      IF (ALLOCATED(modal_participation) ) DEALLOCATE(modal_participation)
-
    END SUBROUTINE
 
 END SUBROUTINE
-
-!> Wrapper function for eigen value analyses
-SUBROUTINE EigenSolveWrap(K, M, nDOF, NOmega,  bCheckSingularity, EigVect, Omega, ErrStat, ErrMsg )
-   USE NWTC_Num, only: EigenSolve
-
-   INTEGER,                INTENT(IN   )    :: nDOF                               ! Total degrees of freedom of the incoming system
-   REAL(FEKi),             INTENT(IN   )    :: K(nDOF, nDOF)                      ! stiffness matrix
-   REAL(FEKi),             INTENT(IN   )    :: M(nDOF, nDOF)                      ! mass matrix
-   INTEGER,                INTENT(IN   )    :: NOmega                             ! No. of requested eigenvalues
-   LOGICAL,                INTENT(IN   )    :: bCheckSingularity                  ! If True, the solver will fail if rigid modes are present
-   REAL(FEKi),             INTENT(  OUT)    :: EigVect(nDOF, NOmega)                  ! Returned Eigenvectors
-   REAL(FEKi),             INTENT(  OUT)    :: Omega(NOmega)                      ! Returned Eigenvalues
-   INTEGER(IntKi),         INTENT(  OUT)    :: ErrStat                            ! Error status of the operation
-   CHARACTER(*),           INTENT(  OUT)    :: ErrMsg                             ! Error message if ErrStat /= ErrID_None
-
-   ! LOCALS
-   REAL(R8Ki), ALLOCATABLE                   :: K_R8Ki(:,:), M_R8Ki(:,:)
-   REAL(R8Ki), ALLOCATABLE                   :: EigVect_R8Ki(:,:), Omega_R8Ki(:)
-   INTEGER(IntKi)                            :: N
-   INTEGER(IntKi)                            :: ErrStat2
-   CHARACTER(ErrMsgLen)                      :: ErrMsg2
-   ErrStat = ErrID_None
-   ErrMsg  = ''
-   EigVect=0.0_FeKi
-   Omega=0.0_FeKi
-
-   ! --- Unfortunate conversion to FEKi... TODO TODO consider storing M and K in FEKi
-   N=size(K,1)
-   CALL AllocAry(K_R8Ki      , N, N, 'K_FEKi',    ErrStat2, ErrMsg2); if(Failed()) return
-   CALL AllocAry(M_R8Ki      , N, N, 'M_FEKi',    ErrStat2, ErrMsg2); if(Failed()) return
-   K_R8Ki = real( K, R8Ki )
-   M_R8Ki = real( M, R8Ki )
-   N=size(K_R8Ki,1)
-
-   ! Note:  NOmega must be <= N, which is the length of Omega2, Phi!
-   if ( NOmega > nDOF ) then
-      CALL SetErrStat(ErrID_Fatal,"NOmega must be less than or equal to N",ErrStat,ErrMsg,'EigenSolveWrap')
-      CALL CleanupEigen()
-      return
-   end if
-
-   ! --- Eigenvalue analysis
-   CALL AllocAry(EigVect_R8Ki, N, N, 'EigVect', ErrStat2, ErrMsg2); if(Failed()) return;
-   CALL AllocAry(Omega_R8Ki,     N , 'Omega', ErrStat2, ErrMsg2); if(Failed()) return; ! <<< NOTE: Needed due to dimension of Omega
-   CALL EigenSolve(K_R8Ki, M_R8Ki, N, bCheckSingularity, EigVect_R8Ki, Omega_R8Ki, ErrStat2, ErrMsg2 ); if (Failed()) return;
-
-   Omega(:)        = huge(1.0_ReKi)
-   Omega(1:nOmega) = real(Omega_R8Ki(1:nOmega), FEKi) !<<< nOmega<N
-
-   ! --- Setting up Phi, and type conversion
-   EigVect=REAL( EigVect_R8Ki(:,1:NOmega), R8Ki )   ! eigenvectors
-
-   CALL CleanupEigen()
-   return
-
-CONTAINS
-
-   LOGICAL FUNCTION Failed()
-      call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'EigenSolveWrap')
-      Failed =  ErrStat >= AbortErrLev
-      if (Failed) call CleanUpEigen()
-   END FUNCTION Failed
-
-   SUBROUTINE CleanupEigen()
-      IF (ALLOCATED(Omega_R8Ki)  ) DEALLOCATE(Omega_R8Ki)
-      IF (ALLOCATED(EigVect_R8Ki)) DEALLOCATE(EigVect_R8Ki)
-      IF (ALLOCATED(K_R8Ki)      ) DEALLOCATE(K_R8Ki)
-      IF (ALLOCATED(M_R8Ki)      ) DEALLOCATE(M_R8Ki)
-   END SUBROUTINE CleanupEigen
-
-END SUBROUTINE EigenSolveWrap
 
 !-----------------------------------------------------------------------------------------------------------------------------------
 !> This routine is called at the end of the simulation.
@@ -6056,7 +5970,7 @@ SUBROUTINE BD_AddModalDampingRHS(u, p, x, OtherState, m)
 
    ModalDampingRot = matmul(transpose(u%RootMotion%Orientation(:, :, 1)), OtherState%GlbRot)
 
-   do j = 1, size(x%dqdt, 2)-1
+   do j = 1, p%node_total-1
 
       ! Loop over the nodes that apply to the damping matrix, so don't include the root node.
       call BD_CrvMatrixR(x%q(4:6, j+1), NodeRot)
@@ -6071,7 +5985,7 @@ SUBROUTINE BD_AddModalDampingRHS(u, p, x, OtherState, m)
    m%ModalDampingF = matmul(p%ModalDampingMat, m%DampedVelocities)
 
    ! 4. Rotate to correct coordinates and subtract from m%LP_RHS_LU
-   do j = 1, size(x%dqdt, 2)-1
+   do j = 1, p%node_total-1
 
       call BD_CrvMatrixR(x%q(4:6, j+1), NodeRot)
 

@@ -80,8 +80,6 @@ MODULE NWTC_Num
    INTEGER, PARAMETER :: kernelType_TRIWEIGHT     = 4
    INTEGER, PARAMETER :: kernelType_TRICUBE       = 5
    INTEGER, PARAMETER :: kernelType_GAUSSIAN      = 6
-
-   INTEGER, PARAMETER  :: LaKi = R8Ki  ! Define the kind to be used for LaPack, Eigensolve
    
       ! constants for output formats
    INTEGER, PARAMETER                        :: Output_in_Native_Units = 0
@@ -7302,23 +7300,23 @@ end function Rad2M180to180Deg
       USE NWTC_LAPACK, only: LAPACK_ggev
 
       INTEGER       ,          INTENT(IN   )    :: N             !< Number of degrees of freedom, size of M and K
-      REAL(LaKi),              INTENT(INOUT)    :: K(N, N)       !< Stiffness matrix
-      REAL(LaKi),              INTENT(INOUT)    :: M(N, N)       !< Mass matrix
+      REAL(R8Ki),              INTENT(INOUT)    :: K(N, N)       !< Stiffness matrix
+      REAL(R8Ki),              INTENT(INOUT)    :: M(N, N)       !< Mass matrix
       LOGICAL,                 INTENT(IN   )    :: bCheckSingularity                  ! If True, the solver will fail if rigid modes are present
-      REAL(LaKi),              INTENT(INOUT)    :: EigVect(N, N) !< Returned Eigenvectors
-      REAL(LaKi),              INTENT(INOUT)    :: Omega(N)      !< Returned Eigenvalues
+      REAL(R8Ki),              INTENT(INOUT)    :: EigVect(N, N) !< Returned Eigenvectors
+      REAL(R8Ki),              INTENT(INOUT)    :: Omega(N)      !< Returned Eigenvalues
       INTEGER(IntKi),          INTENT(  OUT)    :: ErrStat       !< Error status of the operation
       CHARACTER(*),            INTENT(  OUT)    :: ErrMsg        !< Error message if ErrStat /= ErrID_None
       ! LOCALS
-      REAL(LaKi), ALLOCATABLE                   :: WORK (:),  VL(:,:), AlphaR(:), AlphaI(:), BETA(:) ! eigensolver variables
+      REAL(R8Ki), ALLOCATABLE                   :: WORK (:),  VL(:,:), AlphaR(:), AlphaI(:), BETA(:) ! eigensolver variables
       INTEGER                                   :: i
       INTEGER                                   :: LWORK                          !variables for the eigensolver
       INTEGER,    ALLOCATABLE                   :: KEY(:)
       INTEGER(IntKi)                            :: ErrStat2
       CHARACTER(ErrMsgLen)                      :: ErrMsg2
-      REAL(LaKi) :: normA
-      REAL(LaKi) :: Omega2(N)  !< Squared eigenvalues
-      REAL(LaKi), parameter :: MAX_EIGENVALUE = HUGE(1.0_ReKi) ! To avoid overflow when switching to ReKi
+      REAL(R8Ki) :: normA
+      REAL(R8Ki) :: Omega2(N)  !< Squared eigenvalues
+      REAL(R8Ki), parameter :: MAX_EIGENVALUE = HUGE(1.0_ReKi) ! To avoid overflow when switching to ReKi
 
       ErrStat = ErrID_None
       ErrMsg  = ''
@@ -7335,7 +7333,7 @@ end function Rad2M180to180Deg
 
       ! --- Eigenvalue  analysis
       ! note: SGGEV seems to have memory issues in certain cases. The eigenvalues seem to be okay, but the eigenvectors vary wildly with different compiling options.
-      !       DGGEV seems to work better, so I'm making these variables LaKi (which is set to R8Ki for now)   - bjj 4/25/2014
+      !       DGGEV seems to work better, so I'm making these variables R8Ki (which is set to R8Ki for now)   - bjj 4/25/2014
       ! bjj: This comes from the LAPACK documentation:
       !   Note: the quotients AlphaR(j)/BETA(j) and AlphaI(j)/BETA(j) may easily over- or underflow, and BETA(j) may even be zero.
       !   Thus, the user should avoid naively computing the ratio Alpha/beta.  However, AlphaR and AlphaI will be always less
@@ -7345,7 +7343,7 @@ end function Rad2M180to180Deg
       if(Failed()) return
 
       ! --- Determining and sorting eigen frequencies
-      Omega2(:) =0.0_LaKi
+      Omega2(:) =0.0_R8Ki
       DO I=1,N !Initialize the key and calculate Omega
          KEY(I)=I
          !Omega2(I) = AlphaR(I)/Beta(I)
@@ -7355,11 +7353,11 @@ end function Rad2M180to180Deg
             Omega2(I) = MAX_EIGENVALUE
          elseif ( EqualRealNos(real(AlphaI(I),ReKi),0.0_ReKi) ) THEN
             ! --- Real Eigenvalues
-            IF ( AlphaR(I)<0.0_LaKi ) THEN
-               if ( (AlphaR(I)/Beta(I))<1e-6_LaKi ) then
+            IF ( AlphaR(I)<0.0_R8Ki ) THEN
+               if ( (AlphaR(I)/Beta(I))<1e-6_R8Ki ) then
                   ! Tolerating very small negative eigenvalues
                   if (bCheckSingularity) call WrScr('[INFO] Negative eigenvalue found with small norm (system may contain rigid body mode)')
-                  Omega2(I)=0.0_LaKi
+                  Omega2(I)=0.0_R8Ki
                else
                   if (bCheckSingularity) call WrScr('[WARN] Negative eigenvalue found, system may be ill-conditioned.')
                   Omega2(I)=AlphaR(I)/Beta(I)
@@ -7370,11 +7368,11 @@ end function Rad2M180to180Deg
          else
             ! --- Complex Eigenvalues
             normA = sqrt(AlphaR(I)**2 + AlphaI(I)**2)
-            if ( (normA/Beta(I))<1e-6_LaKi ) then
+            if ( (normA/Beta(I))<1e-6_R8Ki ) then
                ! Tolerating very small eigenvalues with imaginary part
                if (bCheckSingularity) call WrScr('[WARN] Complex eigenvalue found with small norm, approximating as 0')
-               Omega2(I) = 0.0_LaKi
-            elseif ( abs(AlphaR(I))>1e3_LaKi*abs(AlphaI(I)) ) then
+               Omega2(I) = 0.0_R8Ki
+            elseif ( abs(AlphaR(I))>1e3_R8Ki*abs(AlphaI(I)) ) then
                ! Tolerating very small imaginary part compared to real part... (not pretty)
                if (bCheckSingularity) call WrScr('[WARN] Complex eigenvalue found with small Im compare to Re')
                Omega2(I) = AlphaR(I)/Beta(I)
@@ -7409,10 +7407,10 @@ end function Rad2M180to180Deg
       !+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++!
 
       ! --- Return Omega (capped by huge(ReKi)) and check for singularity
-      Omega(:) = 0.0_LaKi
+      Omega(:) = 0.0_R8Ki
       do I=1,N
          if (EqualRealNos(real(Omega2(I),ReKi), 0.0_ReKi)) then  ! NOTE: may be necessary for some corner numerics
-            Omega(i)=0.0_LaKi
+            Omega(i)=0.0_R8Ki
             if (bCheckSingularity) then
                call Fatal('Zero eigenvalue found, system may contain rigid body mode'); return
             endif
@@ -7421,7 +7419,7 @@ end function Rad2M180to180Deg
          else
             ! Negative eigenfrequency
             print*,'>>> Wrong eigenfrequency, Omega^2=',Omega2(I) ! <<< This should never happen
-            Omega(i)= 0.0_LaKi
+            Omega(i)= 0.0_R8Ki
             call Fatal('Negative eigenvalue found, system may be ill-conditioned'); return
          endif
       enddo
@@ -7452,10 +7450,10 @@ end function Rad2M180to180Deg
       END SUBROUTINE CleanupEigen
 
       pure subroutine sort_in_place(a,key)
-         real(LaKi), intent(inout), dimension(:) :: a
+         real(R8Ki), intent(inout), dimension(:) :: a
          integer(IntKi), intent(inout), dimension(:) :: key
          integer(IntKi) :: tempI
-         real(LaKi) :: temp
+         real(R8Ki) :: temp
          integer(IntKi) :: i, j
          do i = 2, size(a)
             j = i - 1
