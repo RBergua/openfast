@@ -1832,8 +1832,6 @@ SUBROUTINE Init_ModalDamping(x, OtherState, p, m, ErrStat, ErrMsg)
    ErrStat = ErrID_None
    ErrMsg  = ''
 
-   PRINT *, 'In modal damping branch. Damping values are currently hard-coded.'
-
    ! TODO : Take actual user input for zeta
    ! zeta is fraction of critical damping.
    ! zeta = (/ 0.1d0, 0.3d0, 0.15d0, 0.45d0, 0.2d0, 0.6d0, 0.7d0, 0.8d0, 0.9d0, 1.0d0 /)
@@ -5947,10 +5945,11 @@ SUBROUTINE BD_AddModalDampingRHS(u, p, x, OtherState, m)
          ! 1.b. Subtract out the rigid body rotational velocity based on the blade root rotation
 
          ! Vector from root to node
-         r = OtherState%GlbPos + p%uuN0(1:3, elem_node, elem) + x%q(1:3, j) - &
-             (u%RootMotion%Position(:, 1) + u%RootMotion%TranslationDisp(:, 1))
+         ! r = OtherState%GlbPos + p%uuN0(1:3, elem_node, elem) + x%q(1:3, j) - &
+         !     (u%RootMotion%Position(:, 1) + u%RootMotion%TranslationDisp(:, 1))
+         r = p%uuN0(1:3, elem_node, elem) + x%q(1:3, j)
 
-         m%DampedVelocities(k+1:k+3) = m%DampedVelocities(k+1:k+3) - Cross_Product(x%dqdt(4:6, 1), r)
+         m%DampedVelocities(k+1:k+3) = m%DampedVelocities(k+1:k+3) - Cross_Product(u%RootMotion%RotationVel(:, 1), r)
       end do
 
    end do
