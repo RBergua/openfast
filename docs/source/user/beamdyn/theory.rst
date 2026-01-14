@@ -605,7 +605,32 @@ where :math:`{\underline{\underline{O}}}_{12}` and
 matrices of :math:`\mathcal{{\underline{\underline{O}}}}` and
 :math:`\mathcal{{\underline{\underline{G}}}}` as
 :math:`{\underline{\underline{C}}}_{12}` in Eq. :eq:`E1-PartC`.
+Modal Damping
+-------------
 
+In addition to the stiffness-proportional viscous damping described above, BeamDyn
+also supports modal damping. When modal damping is selected (``damp_flag = 2``), 
+BeamDyn computes the natural frequencies and mode shapes of the blade and applies 
+damping in the modal coordinates.
+
+The modal damping approach constructs a damping matrix :math:`{\underline{\underline{C}}}_{modal}` 
+based on user-specified modal damping ratios :math:`\zeta_i` for modes :math:`i = 1, 2, \ldots, n_{modes}`.
+The modal damping matrix is defined in terms of the modal properties:
+
+.. math::
+       :label: ModalDamping
+
+       {\underline{\underline{C}}}_{modal} = \sum_{i=1}^{n_{modes}} 2 \zeta_i \omega_i \underline{\phi}_i \underline{\phi}_i^T
+
+where :math:`\omega_i` is the natural frequency of mode :math:`i`, :math:`\underline{\phi}_i`
+is the corresponding mode shape (mass-normalized eigenvector), and :math:`\zeta_i` is the
+modal damping ratio for mode :math:`i`. This damping matrix is then transformed to the 
+physical coordinates and applied during the time integration in the same manner as the 
+stiffness-proportional damping.
+
+The advantage of modal damping is that it allows for mode-specific damping levels, which
+can be more physically representative of composite blade structures where different modes
+may experience different levels of damping due to various energy dissipation mechanisms.
 .. _convergence-criterion:
 
 Convergence Criterion and Generalized-\ :math:`\alpha` Time Integrator
@@ -637,7 +662,8 @@ Time integration is performed using the generalized-\ :math:`\alpha`
 scheme in BeamDyn, which is an unconditionally stable (for linear
 systems), second-order accurate algorithm. The scheme allows for users
 to choose integration parameters that introduce high-frequency numerical
-dissipation. More details regarding the generalized-\ :math:`\alpha`
+dissipation. The amount of numerical dissipation is controlled by the user-specified
+spectral radius at infinity, :math:`\rho_{\infty}`. More details regarding the generalized-\ :math:`\alpha`
 method can be found in :cite:`Chung-Hulbert:1993,Bauchau:2010`.
 
 Calculation of Reaction Loads
@@ -651,14 +677,14 @@ mode), the reaction loads at the root are needed to satisfy equality of
 the governing equations. The reaction loads at the root are also the
 loads passing from blade to hub in a full turbine analysis.
 
-The governing equations in Eq. :eq:`GovernGEBT-1-2` can be recast in a compact form
+The governing equations in Eq. :eq:`GovernGEBT-1-2` can be recast in a compact form
 
 .. math::
    :label: CompactGovern
 
    {\underline{\mathcal{F}}}^I - {\underline{\mathcal{F}}}^{C\prime} + {\underline{\mathcal{F}}}^D = {\underline{\mathcal{F}}}^{ext}
 
-with all the vectors defined in Section [sec:LinearProcess]. At the
+with all the vectors defined in Section [sec:LinearProcess]. At the
 blade root, the governing equation is revised as
 
 .. math::
@@ -668,14 +694,14 @@ blade root, the governing equation is revised as
 
 where :math:`{\underline{\mathcal{F}}}^R = \left[ {\underline{F}}^R~~~{\underline{M}}^R\right]^T`
 is the reaction force vector and it can be solved from
-Eq. :eq:`CompactGovernRoot` given that the motion fields are known at this
+Eq. :eq:`CompactGovernRoot` given that the motion fields are known at this
 point.
 
 Calculation of Blade Loads
 --------------------------
 
 BeamDyn can also calculate the blade loads at each finite element node
-along the blade axis. The governing equation in Eq. :eq:`CompactGovern` are
+along the blade axis. The governing equation in Eq. :eq:`CompactGovern` are
 recast as
 
 .. math::

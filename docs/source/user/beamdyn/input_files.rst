@@ -215,15 +215,22 @@ contents of the BeamDyn input file (useful for debugging errors in the
 input file).
 
 The ``QuasiStaticInit`` flag indicates if BeamDyn should perform a quasi-static
-solution at initialization to better initialize its states. In general, this should 
-be set to true for better numerical performance (it reduces startup transients).
+solution at initialization to better initialize its states. This option is only 
+available when coupled to OpenFAST with dynamic analysis enabled. When set to ``TRUE``,
+BeamDyn will perform a steady-state startup (SSS) solve that includes centripetal
+accelerations to reduce startup transients and improve numerical performance. This
+is particularly useful for rotating blade simulations where the initial conditions
+would otherwise cause spurious transients. The keyword "DEFAULT" sets this to ``FALSE``.
 
 ``rhoinf`` specifies the numerical damping parameter (spectral radius
 of the amplification matrix) in the range of :math:`[0.0,1.0]` used in
 the generalized-\ :math:`\alpha` time integrator implemented in BeamDyn
-for dynamic analysis. For ``rhoinf = 1.0``, no
-numerical damping is introduced and the generalized-\ :math:`\alpha`
-scheme is identical to the Newmark scheme; for
+for dynamic analysis. **Note: This parameter is only used when BeamDyn is run
+in loose coupling mode (e.g., stand-alone with the driver or when loose coupling 
+is explicitly selected in OpenFAST). When tight coupling is used in OpenFAST, 
+time integration is handled by the glue code and this parameter is ignored.**
+For ``rhoinf = 1.0``, no numerical damping is introduced and the 
+generalized-\ :math:`\alpha` scheme is identical to the Newmark scheme; for
 ``rhoinf = 0.0``, maximum numerical damping is
 introduced. Numerical damping may help produce numerically stable
 solutions.
@@ -245,9 +252,11 @@ between two input stations into “Refine factor” of segments. The keyword
 This entry is not used in Gauss quadrature.
 
 ``N_Fact`` specifies a parameter used in the modified Newton-Raphson
-scheme. If ``N_Fact = 1`` a full Newton
-iteration scheme is used, i.e., the global tangent stiffness matrix is
-computed and factorized at each iteration; if
+scheme. **Note: This parameter is only used when BeamDyn is run in loose coupling 
+mode (stand-alone with the driver or when loose coupling is explicitly selected in 
+OpenFAST). When tight coupling is used in OpenFAST, this parameter is ignored.**
+If ``N_Fact = 1`` a full Newton iteration scheme is used, i.e., the global tangent 
+stiffness matrix is computed and factorized at each iteration; if
 ``N_Fact > 1`` a modified Newton iteration
 scheme is used, i.e., the global stiffness matrix is computed and
 factorized every ``N_Fact`` iterations within each time step. The
@@ -265,15 +274,19 @@ load steps as opposed to one single large load step which may cause divergence o
 Newton-Raphson scheme. The keyword “DEFAULT” sets ``load_retries = 20``.
 
 ``NRMax`` specifies the maximum number of iterations per time step in
-the Newton-Raphson scheme. If convergence is not reached within this
-number of iterations, BeamDyn returns an error message and terminates
-the simulation. The keyword “DEFAULT” sets
+the Newton-Raphson scheme. **Note: This parameter is only used when BeamDyn is run 
+in loose coupling mode (stand-alone with the driver or when loose coupling is explicitly 
+selected in OpenFAST). When tight coupling is used in OpenFAST, this parameter is ignored.**
+If convergence is not reached within this number of iterations, BeamDyn returns an error 
+message and terminates the simulation. The keyword "DEFAULT" sets
 ``NRMax = 10``.
 
 ``Stop_Tol`` specifies a tolerance parameter used in convergence
 criteria of a nonlinear solution that is used for the termination of the
-iteration. The keyword “DEFAULT” sets
-``Stop_Tol = 1.0E-05``. Please refer to
+iteration. **Note: This parameter is only used when BeamDyn is run in loose coupling 
+mode (stand-alone with the driver or when loose coupling is explicitly selected in 
+OpenFAST). When tight coupling is used in OpenFAST, this parameter is ignored.**
+The keyword "DEFAULT" sets ``Stop_Tol = 1.0E-05``. Please refer to
 :numref:`convergence-criterion` for more details.
 
 ``tngt_stf_fd`` is a boolean that sets the flag to compute the tangent stiffness
@@ -468,18 +481,26 @@ Blade Parameters
 ``Station_Total`` specifies the number cross-sectional stations along
 the blade axis used in the analysis.
 
-``Damp_Type`` specifies if structural damping is considered in the
-analysis. If ``Damp_Type = 0``, then no damping is
-considered in the analysis and the six damping coefficient in the next
-section will be ignored. If ``Damp_Type = 1``, structural
-damping will be included in the analysis.
+``damp_type`` specifies the type of structural damping to be used in the
+analysis. There are three options:
 
-Damping Coefficient
-~~~~~~~~~~~~~~~~~~~
+- ``damp_type = 0``: No damping is considered in the analysis. The damping 
+  coefficients in the following sections will be ignored.
+- ``damp_type = 1``: Stiffness-proportional damping is applied. 
+  The six damping coefficients (``beta``) in the Stiffness-Proportional Damping 
+  section are used to scale the 6x6 stiffness matrix at each cross section.
+- ``damp_type = 2``: Modal damping is applied. The modal damping coefficients 
+  (``zeta``) for the first ``n_modes`` modes are used. BeamDyn internally computes 
+  the modal properties and applies damping in the modal coordinates.
 
-This section specifies six damping coefficients, :math:`\mu_{ii}` with
+Stiffness-Proportional Damping Coefficients
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This section specifies six damping coefficients, :math:`\mu_{ii}` (also called ``beta``) with
 :math:`i \in [1,6]`, for six DOFs (three translations and three
-rotations). Viscous damping is implemented in BeamDyn where the damping
+rotations). These coefficients are only used when ``damp_flag = 1``.
+
+Viscous damping is implemented in BeamDyn where the damping
 forces are proportional to the strain rate. These are
 stiffness-proportional damping coefficients, whereby the
 :math:`6\times6` damping matrix at each cross section is scaled from the
@@ -509,6 +530,25 @@ coefficient matrix defined as
        0 & 0 & 0 & 0 & \mu_{55} & 0 \\
        0 & 0 & 0 & 0 & 0 & \mu_{66} \\
    \end{bmatrix}
+
+Modal Damping Coefficients
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This section specifies modal damping parameters and is only used when ``damp_flag = 2``.
+
+``n_modes`` specifies the number of modes for which modal damping coefficients
+are provided. BeamDyn will compute the natural frequencies and mode shapes of the 
+blade and apply damping in the modal coordinates.
+
+``zeta`` is an array of ``n_modes`` modal damping ratios, one for each mode. 
+Each value should typically be between 0.0 (no damping) and 1.0 (critical damping),
+though higher values are permitted. Common values for composite blade structures 
+are in the range of 0.01 to 0.05 (1% to 5% of critical damping). The damping 
+ratios are applied to modes 1 through ``n_modes`` in order of increasing frequency.
+
+If modal damping is selected, BeamDyn calculates nodal damping forces based on the node velocities, 
+rotated to the initial node orientation, and the mode shape after quasi-static initialization has been performed,
+if it was requested. These nodal damping forces are then transformed back to the current node orientation.
 
 Distributed Properties
 ~~~~~~~~~~~~~~~~~~~~~~
