@@ -550,6 +550,13 @@ If modal damping is selected, BeamDyn calculates nodal damping forces based on t
 rotated to the initial node orientation, and the mode shape after quasi-static initialization has been performed,
 if it was requested. These nodal damping forces are then transformed back to the current node orientation.
 
+Recommendations:
+
+- It is recommended to stop inputting zeta values before reaching the first axial mode (typically around 18 modes). Users may experiment with including more or fewer modes to observe the effect on results.
+- Avoid prescribing a final zeta value of 1.0 (e.g., do not specify 18 modes with realistic zeta values followed by a 19th mode with zeta=1.0), as this can significantly degrade result quality.
+- When attempting to match stiffness-proportional damping (:math:`\mu`), the OpenFAST toolbox may fail to provide reliable damping values matched with mode numbers once some modes become critically damped. Reducing the number of modes (e.g., from 40 to 30) can help if higher modes are indexed incorrectly.
+- In some cases, axial loads appear to be driven by the axial motion of non-axial modes.
+
 Distributed Properties
 ~~~~~~~~~~~~~~~~~~~~~~
 
