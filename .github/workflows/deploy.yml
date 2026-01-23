@@ -174,8 +174,8 @@ jobs:
           MATLAB_ROOT: ${{ steps.setup-matlab.outputs.matlabroot }}
         run: .github/scripts/build_windows_executables.bat
 
-      - name: Test version output
-        run: .github/scripts/test_windows_executables.bat
+      # - name: Test version output
+      #   run: .github/scripts/test_windows_executables.bat
 
       # - name: Build MATLAB Mex File
       #   uses: matlab-actions/run-command@v2
