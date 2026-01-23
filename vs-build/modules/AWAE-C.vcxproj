@@ -73,6 +73,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>..\..\build\lib\</OutDir>
     <IntDir>..\..\build\$(Configuration)_$(Platform)\$(ProjectName)\</IntDir>
+    <IncludePath>..\..\modules\nwtc-library\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
