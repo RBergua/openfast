@@ -41,15 +41,15 @@ echo on
 
 
 @REM Build MATLAB solution last
-echo on
-devenv vs-build/OpenFAST.sln /Build "Release_Matlab|x64"
-echo off
-if %ERRORLEVEL% NEQ 0 (
-    set "FailedSolutions=!FailedSolutions!Release_Matlab  "
-    set "OverallErrorLevel=1"
-    echo Build of OpenFAST.sln Release_Matlab failed!
-)
-echo on
+@REM echo on
+@REM devenv vs-build/OpenFAST.sln /Build "Release_Matlab|x64"
+@REM echo off
+@REM if %ERRORLEVEL% NEQ 0 (
+@REM     set "FailedSolutions=!FailedSolutions!Release_Matlab  "
+@REM     set "OverallErrorLevel=1"
+@REM     echo Build of OpenFAST.sln Release_Matlab failed!
+@REM )
+@REM echo on
 
 
 
