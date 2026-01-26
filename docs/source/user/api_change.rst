@@ -35,8 +35,10 @@ Added in OpenFAST `dev`
 Module                                        Line     Flag Name            Example Value
 ============================================= ======== ==================== ========================================================================================================================================================================================================
 OpenFAST                                      8        ModCoupling          3   ModCoupling  - Module coupling method (switch) {1=loose; 2=tight with fixed Jacobian updates (DT_UJac); 3=tight with automatic Jacobian updates}
+OpenFAST                                      20       CompSoil             0   CompSoil     - Compute soil-structural dynamics (switch) {0=None; 1=SoilDyn}
 OpenFAST                                      17       NRotors              2   NRotors      - Number of rotors in turbine (-)
 OpenFAST                                      28       MirrorRotor          F   MirrorRotor  - Flag to reverse rotor rotation direction [1 to NRotors] {F=Normal, T=Mirror}
+OpenFAST                                      45       SoilFile             "SoilDyn.dat"     SoilFile        - Name of the file containing the SoilDyn input parameters (quoted string)
 OpenFAST                                      52                            ---------------------- INPUT FILES Rotor 2 -------------------------------------
 OpenFAST                                      53       EDFile               "ElastoDyn.dat"   EDFile          - Name of file containing ElastoDyn input parameters (quoted string)
 OpenFAST                                      54       BDBldFile(1)         "BeamDyn.dat"     BDBldFile(1)    - Name of file containing BeamDyn input parameters for blade 1 (quoted string)

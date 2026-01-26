@@ -1337,8 +1337,8 @@ subroutine filter_angles2(psi_filt, chi_filt, psi, chi, alpha, alpha_bar)
    DCM1 = EulerConstruct( (/ psi_filt, 0.0_ReKi, chi_filt /) )
    DCM2 = EulerConstruct( (/ psi, 0.0_ReKi, chi /) )
    ! Compute the logarithmic map of the DCMs:
-   CALL DCM_logMap( DCM1, lambda(:,1), errStat, errMsg)
-   CALL DCM_logMap( DCM2, lambda(:,2), errStat, errMsg)
+   CALL DCM_logMap(DCM1, lambda(:,1))
+   CALL DCM_logMap(DCM2, lambda(:,2))
    !Make sure we don't cross a 2pi boundary:
    CALL DCM_SetLogMapForInterp( lambda )
    !Interpolate the logarithmic map:

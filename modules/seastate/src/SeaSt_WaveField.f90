@@ -40,7 +40,6 @@ FUNCTION WaveField_GetNodeTotalWaveElev( WaveField, WaveField_m, Time, pos, ErrS
    character(ErrMsgLen)                              :: errMsg2
 
    ErrStat   = ErrID_None
-   ErrMsg    = ""
 
    IF (ALLOCATED(WaveField%WaveElev1) .or. ALLOCATED(WaveField%WaveElev2)) then
       CALL WaveField_Interp_Setup3D(Time, pos, WaveField%SrfGridParams, WaveField_m, ErrStat2, ErrMsg2)
@@ -114,7 +113,6 @@ SUBROUTINE WaveField_GetNodeWaveNormal( WaveField, WaveField_m, Time, pos, n, Er
    character(ErrMsgLen)                              :: errMsg2
 
    ErrStat   = ErrID_None
-   ErrMsg    = ""
 
    call GridInterpSetupN( (/Real(Time+WaveField%WaveTimeShift,ReKi),pos(1),pos(2)/), WaveField%SrfGridParams, WaveField_m, ErrStat2, ErrMsg2 )
    slope = GridInterpS( WaveField%WaveElev1, WaveField%SrfGridParams, WaveField_m )
@@ -160,7 +158,6 @@ SUBROUTINE WaveField_GetNodeWaveKin( WaveField, WaveField_m, Time, pos, forceNod
    character(ErrMsgLen)                              :: errMsg2
 
    ErrStat   = ErrID_None
-   ErrMsg    = ""
 
    posXY    = pos(1:2)
    posXY0   = (/pos(1),pos(2),0.0_ReKi/)
@@ -309,7 +306,6 @@ SUBROUTINE WaveField_GetNodeWaveVel( WaveField, WaveField_m, Time, pos, forceNod
    character(ErrMsgLen)                              :: errMsg2
 
    ErrStat   = ErrID_None
-   ErrMsg    = ""
 
    posXY    = pos(1:2)
    posXY0   = (/pos(1),pos(2),0.0_ReKi/)
@@ -424,7 +420,6 @@ SUBROUTINE WaveField_GetNodeWaveVelAcc( WaveField, WaveField_m, Time, pos, force
    character(ErrMsgLen)                              :: errMsg2
 
    ErrStat   = ErrID_None
-   ErrMsg    = ""
 
    posXY    = pos(1:2)
    posXY0   = (/pos(1),pos(2),0.0_ReKi/)
@@ -552,7 +547,6 @@ SUBROUTINE WaveField_GetWaveKin( WaveField, WaveField_m, Time, pos, forceNodeInW
    real(ReKi),                         allocatable   :: FV_DC(:,:), FA_DC(:,:)
 
    ErrStat   = ErrID_None
-   ErrMsg    = ""
 
    NumPoints = size(pos, dim=2)
    DO i = 1, NumPoints
@@ -587,9 +581,9 @@ contains
       call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       Failed = ErrStat >= AbortErrLev
    end function
-   logical function FailedMsg(ErrMsg2)
-      character(*), intent(in   ) :: ErrMsg2
-      call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+   logical function FailedMsg(ErrMsgTmp)
+      character(*), intent(in   ) :: ErrMsgTmp
+      call SetErrStat( ErrStat2, ErrMsgTmp, ErrStat, ErrMsg, RoutineName )
       FailedMsg = ErrStat >= AbortErrLev
    end function
 end subroutine WaveField_GetWaveKin
@@ -617,7 +611,6 @@ SUBROUTINE WaveField_GetWaveVelAcc_AD( WaveField, WaveField_m, StartNode, Time, 
    character(ErrMsgLen)                              :: errMsg2
 
    ErrStat   = ErrID_None
-   ErrMsg    = ""
 
    MSL2SWL   = WaveField%MSL2SWL
    WtrDpth   = WaveField%EffWtrDpth - MSL2SWL
@@ -694,7 +687,6 @@ SUBROUTINE WaveField_GetMeanDynSurfCurr( WaveField, WaveTMax, WaveDT, CurrVxi0, 
    character(ErrMsgLen)                              :: errMsg2
 
    ErrStat   = ErrID_None
-   ErrMsg    = ""
 
    CurrVxi0 = 0.0_SiKi
    CurrVyi0 = 0.0_SiKi
@@ -753,7 +745,6 @@ subroutine WaveField_Interp_Setup3D( Time, Position, p, m, ErrStat, ErrMsg )
    character(ErrMsgLen)                 :: ErrMsg2
 
    ErrStat = ErrID_None
-   ErrMsg  = ""
 
    CALL GridInterpSetup3D((/Real(Time,ReKi),Position(1),Position(2)/), p, m, ErrStat2, ErrMsg2 )
      if (Failed()) return;
