@@ -120,6 +120,12 @@ subroutine FAST_AeroMapDriver(AM, m, p_FAST, m_FAST, y_FAST, T, ErrStat, ErrMsg)
                            CompAeroMaps, ErrStat2, ErrMsg2)
    if (Failed()) return
 
+   ! If BeamDyn blades are being used, return error
+   if (T%p_FAST%CompElast == Module_BD) then
+      call SetErrStat(ErrID_Fatal, "AeroMap does not currently work with BeamDyn blades, support will be added in a future version of OpenFAST", ErrStat, ErrMsg, RoutineName)
+      return
+   end if
+
    ! Initialize module data transfer mappings
    call FAST_InitMappings(m%Mappings, m%ModData, T, ErrStat2, ErrMsg2)
    if (Failed()) return
