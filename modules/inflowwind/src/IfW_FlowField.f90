@@ -72,7 +72,6 @@ subroutine IfW_FlowField_GetVelAcc(FF, IStart, Time, PositionXYZ, VelocityUVW, A
    logical                                   :: GridExceedAllow   ! is this point allowed to exceed bounds of wind grid
 
    ErrStat = ErrID_None
-   ErrMsg = ""
 
    ! Get number of points to evaluate
    NumPoints = size(PositionXYZ, dim=2)
@@ -737,7 +736,6 @@ subroutine Grid3DField_GetCell(G3D, Time, Position, CalcAccel, AllowExtrap, &
    logical                             :: InGrid
 
    ErrStat = ErrID_None
-   ErrMsg = ""
 
    ! Initialize to no extrapolation (modified in bounds routines)
    AllExtrap = ExtrapNone
