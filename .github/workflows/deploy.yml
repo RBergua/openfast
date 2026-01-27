@@ -165,11 +165,10 @@ jobs:
         with:
           products: Simulink
 
-      - name: Build Executables
-        shell: pwsh
+      - name: Build Executabless
         env:
           MATLAB_ROOT: ${{ steps.setup-matlab.outputs.matlabroot }}
-        run: .github/scripts/build_windows_executables.ps1
+        run: .github/scripts/build_windows_executables.bat
 
       # - name: Test version output
       #   run: .github/scripts/test_windows_executables.bat

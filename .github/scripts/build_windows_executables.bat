@@ -54,6 +54,27 @@ echo "Remove '_Release' and '_Matlab' from file names"
 powershell -command "Push-Location -Path .\build\bin; Get-ChildItem -File -Filter '*_Release*' | Rename-Item -NewName { `$_.Name -replace '_Release', '' }"
 powershell -command "Push-Location -Path .\build\bin; Get-ChildItem -File -Filter '*_Matlab*' | Rename-Item -NewName { `$_.Name -replace '_Matlab', '' }"
 
+@echo off
+setlocal enabledelayedexpansion
+
+cd /d build\bin || exit /b 1
+
+for %%F in (*_Release*) do (
+    set "name=%%~nxF"
+    set "newname=!name:_Release=!"
+    if not "!name!"=="!newname!" (
+        ren "%%F" "!newname!"
+    )
+)
+for %%F in (*_Matlab*) do (
+    set "name=%%~nxF"
+    set "newname=!name:_Matlab=!"
+    if not "!name!"=="!newname!" (
+        ren "%%F" "!newname!"
+    )
+)
+
+endlocal
 
 echo "List executables in build\bin"
 dir build\bin
