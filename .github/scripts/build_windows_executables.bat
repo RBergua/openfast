@@ -7,8 +7,6 @@ for /f "tokens=* usebackq" %%f in (`dir /b "C:\Program Files (x86)\Intel\oneAPI\
 @REM since building the Visual Studio projects modifies files
 powershell -command "(Get-Content -Path '.\vs-build\CreateGitVersion.bat') -replace '--dirty', '' | Set-Content -Path '.\vs-build\CreateGitVersion.bat'"
 
-
-
 setlocal enabledelayedexpansion
 
 :: Initialize a variable to store failed solutions
@@ -16,55 +14,44 @@ set "FailedSolutions="
 set "OverallErrorLevel=0"
 
 
-echo on
-@REM Build all solutions (release 64)
+echo "Build all solutions (release 64)"
 devenv vs-build/OpenFAST.sln /Build "Release|x64"
-echo off
 if %ERRORLEVEL% NEQ 0 (
     set "FailedSolutions=!FailedSolutions!Release  "
     set "OverallErrorLevel=1"
     echo Build of OpenFAST.sln Release failed!
 )
-echo on
 
 
-@REM Build all OpenMP solutions (release 64 OpenMP)
-echo on
+echo "Build all OpenMP solutions (release 64 OpenMP)"
 devenv vs-build/OpenFAST.sln /Build "OpenMP_Release|x64"
-echo off
 if %ERRORLEVEL% NEQ 0 (
     set "FailedSolutions=!FailedSolutions!OpenMP_Release  "
     set "OverallErrorLevel=1"
     echo Build of OpenFAST.sln OpenMP_Release failed!
 )
-echo on
 
 
-@REM Build MATLAB solution last
-echo on
+echo "Build MATLAB solution"
 devenv vs-build/OpenFAST.sln /Build "Matlab_Release|x64"
-echo off
 if %ERRORLEVEL% NEQ 0 (
     set "FailedSolutions=!FailedSolutions!Matlab_Release  "
     set "OverallErrorLevel=1"
     echo Build of OpenFAST.sln Matlab_Release failed!
 )
-echo on
 
 
-@REM Copy controllers to bin directory
-@REM xcopy .\reg_tests\r-test\glue-codes\openfast\5MW_Baseline\ServoData\*.dll .\build\bin\ /y
-
-echo.
-echo Build Summary:
-echo off
+echo "Build Summary:"
 if defined FailedSolutions (
     echo The following solutions failed to build:
     echo %FailedSolutions%
 ) else (
     echo All solutions built successfully.
 )
-echo on
+
+
+echo "Remove '_Release' from file names"
+powershell -command "Get-ChildItem -File -Filter '*_Release*' | Rename-Item -NewName { $_.Name -replace '_Release', '' }"
 
 :: Set the final error level based on the overall build status
 exit /b %OverallErrorLevel%
