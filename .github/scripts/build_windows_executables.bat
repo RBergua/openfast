@@ -30,27 +30,26 @@ echo on
 
 @REM Build all OpenMP solutions (release 64 OpenMP)
 echo on
-devenv vs-build/OpenFAST.sln /Build "Release_OpenMP|x64"
+devenv vs-build/OpenFAST.sln /Build "OpenMP_Release|x64"
 echo off
 if %ERRORLEVEL% NEQ 0 (
-    set "FailedSolutions=!FailedSolutions!Release_OpenMP  "
+    set "FailedSolutions=!FailedSolutions!OpenMP_Release  "
     set "OverallErrorLevel=1"
-    echo Build of OpenFAST.sln Release_OpenMP failed!
+    echo Build of OpenFAST.sln OpenMP_Release failed!
 )
 echo on
 
 
 @REM Build MATLAB solution last
-@REM echo on
-@REM devenv vs-build/OpenFAST.sln /Build "Release_Matlab|x64"
-@REM echo off
-@REM if %ERRORLEVEL% NEQ 0 (
-@REM     set "FailedSolutions=!FailedSolutions!Release_Matlab  "
-@REM     set "OverallErrorLevel=1"
-@REM     echo Build of OpenFAST.sln Release_Matlab failed!
-@REM )
-@REM echo on
-
+echo on
+devenv vs-build/OpenFAST.sln /Build "Matlab_Release|x64"
+echo off
+if %ERRORLEVEL% NEQ 0 (
+    set "FailedSolutions=!FailedSolutions!Matlab_Release  "
+    set "OverallErrorLevel=1"
+    echo Build of OpenFAST.sln Matlab_Release failed!
+)
+echo on
 
 
 @REM Copy controllers to bin directory
