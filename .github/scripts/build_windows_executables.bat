@@ -14,7 +14,7 @@ set "FailedSolutions="
 set "OverallErrorLevel=0"
 
 
-echo "Build all solutions (release 64)"
+echo "Build all projects (Release|64)"
 devenv vs-build/OpenFAST.sln /Build "Release|x64"
 if %ERRORLEVEL% NEQ 0 (
     set "FailedSolutions=!FailedSolutions!Release  "
@@ -23,7 +23,7 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 
-echo "Build all OpenMP solutions (release 64 OpenMP)"
+echo "Build all OpenMP projects (OpenMP_Release|64)"
 devenv vs-build/OpenFAST.sln /Build "OpenMP_Release|x64"
 if %ERRORLEVEL% NEQ 0 (
     set "FailedSolutions=!FailedSolutions!OpenMP_Release  "
@@ -32,7 +32,7 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 
-echo "Build MATLAB solution"
+echo "Build OpenFAST-Simulink shared library (Matlab_Release|x64)"
 devenv vs-build/OpenFAST.sln /Build "Matlab_Release|x64"
 if %ERRORLEVEL% NEQ 0 (
     set "FailedSolutions=!FailedSolutions!Matlab_Release  "

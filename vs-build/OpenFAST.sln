@@ -2233,8 +2233,8 @@ Global
 		{C3C93CC0-EDD7-438F-988C-1F917FAEFA67}.Matlab_Debug|x64.Build.0 = Matlab_Debug|x64
 		{C3C93CC0-EDD7-438F-988C-1F917FAEFA67}.Matlab_Debug|x86.ActiveCfg = Matlab_Debug|Win32
 		{C3C93CC0-EDD7-438F-988C-1F917FAEFA67}.Matlab_Debug|x86.Build.0 = Matlab_Debug|Win32
-		{C3C93CC0-EDD7-438F-988C-1F917FAEFA67}.Matlab_Release|x64.ActiveCfg = Matlab_Debug|x64
-		{C3C93CC0-EDD7-438F-988C-1F917FAEFA67}.Matlab_Release|x64.Build.0 = Matlab_Debug|x64
+		{C3C93CC0-EDD7-438F-988C-1F917FAEFA67}.Matlab_Release|x64.ActiveCfg = Matlab_Release|x64
+		{C3C93CC0-EDD7-438F-988C-1F917FAEFA67}.Matlab_Release|x64.Build.0 = Matlab_Release|x64
 		{C3C93CC0-EDD7-438F-988C-1F917FAEFA67}.Matlab_Release|x86.ActiveCfg = Matlab_Debug|Win32
 		{C3C93CC0-EDD7-438F-988C-1F917FAEFA67}.Matlab_Release|x86.Build.0 = Matlab_Debug|Win32
 		{C3C93CC0-EDD7-438F-988C-1F917FAEFA67}.OpenMP_Release|x64.ActiveCfg = Matlab_Release|x64
