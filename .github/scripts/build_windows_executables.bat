@@ -50,8 +50,9 @@ if defined FailedSolutions (
 )
 
 
-echo "Remove '_Release' from file names"
-powershell -command "Get-ChildItem -File -Filter '*_Release*' | Rename-Item -NewName { $_.Name -replace '_Release', '' }"
+echo "Remove '_Release' and '_Matlab' from file names"
+powershell -command "Push-Location -Path .\build\bin; Get-ChildItem -File -Filter '*_Release*' | Rename-Item -NewName { `$_.Name -replace '_Release', '' }"
+powershell -command "Push-Location -Path .\build\bin; Get-ChildItem -File -Filter '*_Matlab*' | Rename-Item -NewName { `$_.Name -replace '_Matlab', '' }"
 
 
 echo "List executables in build\bin"
