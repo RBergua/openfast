@@ -53,5 +53,9 @@ if defined FailedSolutions (
 echo "Remove '_Release' from file names"
 powershell -command "Get-ChildItem -File -Filter '*_Release*' | Rename-Item -NewName { $_.Name -replace '_Release', '' }"
 
+
+echo "List executables in build\bin"
+dir build\bin
+
 :: Set the final error level based on the overall build status
 exit /b %OverallErrorLevel%
