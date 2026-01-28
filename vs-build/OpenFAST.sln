@@ -2402,11 +2402,9 @@ Global
 		{9779535B-8DE4-4484-8B59-6E78344D658A}.Double_Release|x86.ActiveCfg = Double_Release|x64
 		{9779535B-8DE4-4484-8B59-6E78344D658A}.Double_Release|x86.Build.0 = Double_Release|x64
 		{9779535B-8DE4-4484-8B59-6E78344D658A}.Matlab_Debug|x64.ActiveCfg = Double_Debug|x64
-		{9779535B-8DE4-4484-8B59-6E78344D658A}.Matlab_Debug|x64.Build.0 = Double_Debug|x64
 		{9779535B-8DE4-4484-8B59-6E78344D658A}.Matlab_Debug|x86.ActiveCfg = Double_Debug|x64
 		{9779535B-8DE4-4484-8B59-6E78344D658A}.Matlab_Debug|x86.Build.0 = Double_Debug|x64
 		{9779535B-8DE4-4484-8B59-6E78344D658A}.Matlab_Release|x64.ActiveCfg = Release|x64
-		{9779535B-8DE4-4484-8B59-6E78344D658A}.Matlab_Release|x64.Build.0 = Release|x64
 		{9779535B-8DE4-4484-8B59-6E78344D658A}.Matlab_Release|x86.ActiveCfg = Release|x64
 		{9779535B-8DE4-4484-8B59-6E78344D658A}.Matlab_Release|x86.Build.0 = Release|x64
 		{9779535B-8DE4-4484-8B59-6E78344D658A}.OpenMP_Release|x64.ActiveCfg = OpenMP_Release|x64
