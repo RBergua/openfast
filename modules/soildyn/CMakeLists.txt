@@ -15,35 +15,34 @@
 #
 
 if (GENERATE_TYPES)
-  generate_f90_types(src/OrcaFlexInterface.txt ${CMAKE_CURRENT_LIST_DIR}/src/OrcaFlexInterface_Types.f90)
+  generate_f90_types(src/SoilDyn_Registry.txt ${CMAKE_CURRENT_LIST_DIR}/src/SoilDyn_Types.f90)
 endif()
 
+# SoilDyn Library
+add_library(soildynlib STATIC
+  src/REDWINinterface.f90
+  src/SoilDyn.f90
+  src/SoilDyn_IO.f90
+  src/SoilDyn_Types.f90)
+target_link_libraries(soildynlib nwtclibs)
 if (WIN_DLL_LOAD)
-  add_definitions(-DLibLoad)
+  target_compile_definitions(soildynlib PRIVATE LibLoad)
 else (WIN_DLL_LOAD)
-  add_definitions(-DNO_LibLoad)
+  target_compile_definitions(soildynlib PRIVATE NO_LibLoad)
 endif (WIN_DLL_LOAD)
 
-add_library(orcaflexlib STATIC
-  src/OrcaFlexInterface.f90
-  src/OrcaFlexInterface_Types.f90
+# SoilDyn Driver
+add_executable(soildyn_driver  
+  src/driver/SoilDyn_Driver_Types.f90
+  src/driver/SoilDyn_Driver_Subs.f90
+  src/driver/SoilDyn_Driver.f90
 )
-target_link_libraries(orcaflexlib nwtclibs)
-if (ORCA_DLL_LOAD)
-  target_compile_definitions(orcaflexlib PUBLIC LibLoad)
-else ()
-  target_compile_definitions(orcaflexlib PUBLIC NO_LibLoad)
-endif ()
+target_link_libraries(soildyn_driver soildynlib nwtclibs versioninfolib)
 
-add_executable(orca_driver
-  src/OrcaDriver_Subs.f90
-  src/OrcaDriver_Types.f90
-  src/OrcaDriver.f90
-)
-target_link_libraries(orca_driver orcaflexlib versioninfolib)
 
-install(TARGETS orcaflexlib orca_driver
+install(TARGETS soildynlib soildyn_driver
   EXPORT "${CMAKE_PROJECT_NAME}Libraries"
   RUNTIME DESTINATION bin
   LIBRARY DESTINATION lib
-  ARCHIVE DESTINATION lib)
+  ARCHIVE DESTINATION lib
+)
