@@ -67,30 +67,32 @@
 	</Configurations>
 	<Files>
 		<Filter Name="Registry Files" Filter="txt">
-			<File RelativePath="..\..\modules\lindyn\src\LinDyn_Registry.txt">
+			<File RelativePath="..\..\modules\soildyn\src\SoilDyn_Registry.txt">
 				<FileConfiguration Name="Double_Debug|x64">
-					<Tool Name="VFCustomBuildTool" CommandLine="CALL ..\RunRegistry.bat LinDyn" Description="Running Registry for LinDyn" Outputs="..\..\modules\lindyn\src\LinDyn_Types.f90"/>
+					<Tool Name="VFCustomBuildTool" CommandLine="CALL ..\RunRegistry.bat SoilDyn" Description="Running Registry for SoilDyn" Outputs="..\..\modules\soildyn\src\SoilDyn_Types.f90"/>
 				</FileConfiguration>
 				<FileConfiguration Name="Double_Release|x64">
-					<Tool Name="VFCustomBuildTool" CommandLine="CALL ..\RunRegistry.bat LinDyn" Description="Running Registry for LinDyn" Outputs="..\..\modules\lindyn\src\LinDyn_Types.f90"/>
+					<Tool Name="VFCustomBuildTool" CommandLine="CALL ..\RunRegistry.bat SoilDyn" Description="Running Registry for SoilDyn" Outputs="..\..\modules\soildyn\src\SoilDyn_Types.f90"/>
 				</FileConfiguration>
 				<FileConfiguration Name="Double_OpenMP_Release|x64">
-					<Tool Name="VFCustomBuildTool" CommandLine="CALL ..\RunRegistry.bat LinDyn" Description="Running Registry for LinDyn" Outputs="..\..\modules\lindyn\src\LinDyn_Types.f90"/>
+					<Tool Name="VFCustomBuildTool" CommandLine="CALL ..\RunRegistry.bat SoilDyn" Description="Running Registry for SoilDyn" Outputs="..\..\modules\soildyn\src\SoilDyn_Types.f90"/>
 				</FileConfiguration>
 				<FileConfiguration Name="Release|x64">
-					<Tool Name="VFCustomBuildTool" CommandLine="CALL ..\RunRegistry.bat LinDyn" Description="Running Registry for LinDyn" Outputs="..\..\modules\lindyn\src\LinDyn_Types.f90"/>
+					<Tool Name="VFCustomBuildTool" CommandLine="CALL ..\RunRegistry.bat SoilDyn" Description="Running Registry for SoilDyn" Outputs="..\..\modules\soildyn\src\SoilDyn_Types.f90"/>
 				</FileConfiguration>
 				<FileConfiguration Name="Debug|x64">
-					<Tool Name="VFCustomBuildTool" CommandLine="CALL ..\RunRegistry.bat LinDyn" Description="Running Registry for LinDyn" Outputs="..\..\modules\lindyn\src\LinDyn_Types.f90"/>
+					<Tool Name="VFCustomBuildTool" CommandLine="CALL ..\RunRegistry.bat SoilDyn" Description="Running Registry for SoilDyn" Outputs="..\..\modules\soildyn\src\SoilDyn_Types.f90"/>
 				</FileConfiguration>
 				<FileConfiguration Name="OpenMP_Release|x64">
-					<Tool Name="VFCustomBuildTool" CommandLine="CALL ..\RunRegistry.bat LinDyn" Description="Running Registry for LinDyn" Outputs="..\..\modules\lindyn\src\LinDyn_Types.f90"/>
+					<Tool Name="VFCustomBuildTool" CommandLine="CALL ..\RunRegistry.bat SoilDyn" Description="Running Registry for SoilDyn" Outputs="..\..\modules\soildyn\src\SoilDyn_Types.f90"/>
 				</FileConfiguration>
 			</File>
 		</Filter>
 		<Filter Name="Source Files" Filter="f90;for;f;fpp;ftn;def;odl;idl">
-			<File RelativePath="..\..\modules\lindyn\src\LinDyn.f90"/>
-			<File RelativePath="..\..\modules\lindyn\src\LinDyn_Types.f90"/>
+			<File RelativePath="..\..\modules\soildyn\src\SoilDyn.f90"/>
+			<File RelativePath="..\..\modules\soildyn\src\SoilDyn_IO.f90"/>
+			<File RelativePath="..\..\modules\soildyn\src\SoilDyn_Types.f90"/>
+			<File RelativePath="..\..\modules\soildyn\src\REDWINinterface.f90"/>
 		</Filter>
 	</Files>
 	<Globals/>
