@@ -616,20 +616,22 @@ damping in the modal coordinates.
 
 The modal damping approach constructs a damping matrix :math:`{\underline{\underline{C}}}_{modal}` 
 based on user-specified modal damping ratios :math:`\zeta_i` for modes :math:`i = 1, 2, \ldots, n_{modes}`.
-Past the user-specified :math:`n_{modes}`, BeamDyn assigns :math:`zeta_i` to grow proportional to the
-modal natural frequency and match the last prescribed :math:`zeta_i` value.
+Past the user-specified :math:`n_{modes}`, BeamDyn assigns :math:`\zeta_i` to grow proportional to the
+modal natural frequency and match the last prescribed :math:`\zeta_i` value.
 The modal damping matrix is defined in terms of the modal properties:
 
 .. math::
        :label: ModalDamping
 
-       {\underline{\underline{C}}}_{modal} = \underline{\underline{\Phi}}^{-T} {\underline{\underline{Z}}} \underline{\underline{\Phi}}^{-1} = \underline{\underline{M}} \underline{\underline{\Phi}} {\underline{\underline{Z}}} \underline{\underline{\Phi}}^T \underline{\underline{M}}
+       {\underline{\underline{C}}}_{modal} = {\underline{\underline{\Phi}}}^{-T} {\underline{\underline{Z}}} {\underline{\underline{\Phi}}}^{-1} 
+       = {\underline{\underline{M}}} {\underline{\underline{\Phi}}} {\underline{\underline{Z}}} {\underline{\underline{\Phi}}}^T {\underline{\underline{M}}}
 
 
 where :math:`\underline{\underline{Z}}` is a diagonal matrix with diagonal entry :math:`i` equal to
-:math:`2 \omega_i \zeta_i` for natural frequency in rad/s of :math:`omega_i`.
+:math:`2 \omega_i \zeta_i` for natural frequency in rad/s of :math:`\omega_i`.
 Additionally, :math:`\underline{\underline{\Phi}}` is the matrix of mass-normalized mode shapes
 (each as a column).
+:math:`\underline{\underline{M}}` is the mass matrix after the quasi-static initialization.
 
 At each time step, a vector of nodal velocities is calculated subtracting off the rigid body motion of the root.
 This vector of velocities is rotated at each node to be aligned with the beam as initialized.
