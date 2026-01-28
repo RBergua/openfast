@@ -489,7 +489,7 @@ analysis. There are three options:
 - ``damp_type = 1``: Stiffness-proportional damping is applied. 
   The six damping coefficients (``beta``) in the Stiffness-Proportional Damping 
   section are used to scale the 6x6 stiffness matrix at each cross section.
-- ``damp_type = 2``: Modal damping is applied. The modal damping coefficients 
+- ``damp_type = 2``: Modal damping is applied. The modal fractions of critical damping
   (``zeta``) for the first ``n_modes`` modes are used. BeamDyn internally computes 
   the modal properties and applies damping in the modal coordinates.
 
@@ -542,20 +542,40 @@ blade and apply damping in the modal coordinates.
 
 ``zeta`` is an array of ``n_modes`` modal damping ratios, one for each mode. 
 Each value should typically be between 0.0 (no damping) and 1.0 (critical damping),
-though higher values are permitted. Common values for composite blade structures 
-are in the range of 0.01 to 0.05 (1% to 5% of critical damping). The damping 
+though higher values are permitted. Common values for composite blade structures
+are less than 0.05 (less than 5% of critical damping). The damping
 ratios are applied to modes 1 through ``n_modes`` in order of increasing frequency.
+
+After ``n_modes`` damping values are assigned that grow proportional to the modal
+natural frequency. This proportionality is assigned to match the ``zeta`` value
+of last mode with prescribed damping.
 
 If modal damping is selected, BeamDyn calculates nodal damping forces based on the node velocities, 
 rotated to the initial node orientation, and the mode shape after quasi-static initialization has been performed,
 if it was requested. These nodal damping forces are then transformed back to the current node orientation.
 
+When using modal damping, ``PitchDOF`` needs to be set to ``TRUE`` in ElastoDyn to give BeamDyn
+a correct root pitch velocity. Otherwise, blade pitching will give spurious damping behavior.
+
 Recommendations:
 
-- It is recommended to stop inputting zeta values before reaching the first axial mode (typically around 18 modes). Users may experiment with including more or fewer modes to observe the effect on results.
+- It is recommended to stop inputting zeta values before reaching the first axial mode (typically around 18 modes).
+  Users may experiment with including more or fewer modes to observe the effect on results.
 - Avoid prescribing a final zeta value of 1.0 (e.g., do not specify 18 modes with realistic zeta values followed by a 19th mode with zeta=1.0), as this can significantly degrade result quality.
-- When attempting to match stiffness-proportional damping (:math:`\mu`), the OpenFAST toolbox may fail to provide reliable damping values matched with mode numbers once some modes become critically damped. Reducing the number of modes (e.g., from 40 to 30) can help if higher modes are indexed incorrectly.
+- When attempting to match stiffness-proportional damping (:math:`\mu`), the OpenFAST toolbox may fail to
+  provide reliable damping values matched with mode numbers once some modes become critically damped.
+  Reducing the number of modes (e.g., from 40 to 30) can help if higher modes are indexed incorrectly.
 - In some cases, axial loads appear to be driven by the axial motion of non-axial modes.
+- Verify that the modal frequencies and modal participation factors output in ``InputFile.BD.R*.B*.modes.csv`` file are consistent with the expected modes.
+  This file is only output when modal damping is used.
+  The number of output modes in this file is equal to the degrees of freedom of the blade.
+  However, modes tend to become numerical artifacts past the first few modes of a given type.
+
+Notes:
+
+- Modal damping is experimental in OpenFAST 5.0, so should be used with care.
+- Modal damping is only supported for tight coupling with OpenFAST. The solver implementation for loose coupling and stand-alone BeamDyn are not yet supported.
+- Output forces internal forces from BeamDyn at quadrature points do not capture contributions from the modal damping forces.
 
 Distributed Properties
 ~~~~~~~~~~~~~~~~~~~~~~

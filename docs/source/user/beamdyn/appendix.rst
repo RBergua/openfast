@@ -20,7 +20,8 @@ OpenFAST+BeamDyn and stand-alone BeamDyn (static and dynamic) simulations all re
    The file includes stiffness and mass matrices at each station, as well as damping parameters.
    Note that the example file uses stiffness-proportional damping (damp_flag = 1). For modal
    damping (damp_flag = 2), the n_modes parameter should be set to a non-zero value and 
-   followed by the corresponding modal damping ratios (zeta values).
+   followed by the corresponding modal damping ratios (zeta values) represented as the
+   fraction of critical damping.
 
 Stand-alone BeamDyn simulation also require a driver input file; we list here examples for static and dynamic simulations:
 

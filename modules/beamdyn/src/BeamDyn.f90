@@ -194,7 +194,7 @@ SUBROUTINE BD_Init( InitInp, u, p, x, xd, z, OtherState, y, MiscVar, Interval, I
    ! Calculation of modal damping here
 
    IF(p%damp_flag .EQ. 2) THEN
-      call Init_ModalDamping(x, OtherState, p, MiscVar, ErrStat2, ErrMsg2); if (Failed()) return
+      call Init_ModalDamping(InitInp, x, OtherState, p, MiscVar, ErrStat2, ErrMsg2); if (Failed()) return
    ENDIF
 
       !.................................
@@ -1805,8 +1805,9 @@ END SUBROUTINE Init_ContinuousStates
 
 !-----------------------------------------------------------------------------------------------------------------------------------
 !> This routine initializes modal damping.
-SUBROUTINE Init_ModalDamping(x, OtherState, p, m, ErrStat, ErrMsg)
+SUBROUTINE Init_ModalDamping(InitInp, x, OtherState, p, m, ErrStat, ErrMsg)
 
+   TYPE(BD_InitInputType),          INTENT(IN   )  :: InitInp     !< Input data for initialization routine
    TYPE(BD_ContinuousStateType),    INTENT(IN   )  :: x           !< Continuous states at t on input at t + dt on output
    type(BD_OtherStateType),         INTENT(IN   )  :: OtherState        !< Global rotations are stored in otherstate
    TYPE(BD_ParameterType),          INTENT(INOUT)  :: p           !< Parameters, output modal damping matrix in original frame here
@@ -1831,23 +1832,6 @@ SUBROUTINE Init_ModalDamping(x, OtherState, p, m, ErrStat, ErrMsg)
 
    ErrStat = ErrID_None
    ErrMsg  = ''
-
-   ! TODO : Take actual user input for zeta
-   ! zeta is fraction of critical damping.
-   ! zeta = (/ 0.1d0, 0.3d0, 0.15d0, 0.45d0, 0.2d0, 0.6d0, 0.7d0, 0.8d0, 0.9d0, 1.0d0 /)
-   ! zeta = (/ 0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0, 0.0d0 /)
-
-   ! ! Zeta for Damped_Beam tests
-   ! zeta = (/ 0.001d0, 0.003d0, 0.0015d0, 0.0045d0, 0.002d0, 0.006d0, 0.007d0, 0.008d0, 0.009d0, 0.010d0 /)
-
-   ! Zeta for IEA 22 test
-   ! zeta = (/  0.00481431, 0.00501452, 0.01319441, 0.01365751, 0.02704056, 0.02928076, &
-   !             0.03943607, 0.0133448, 0.05628846, 0.05935411, 0.01490789, 0.08727722, &
-   !             0.08508602, 0.01754962, 0.12212305, 0.12607313, 0.02324255, 0.03571866, &
-   !             0.13962916, 0.00848232, 0.16332203, 0.0405824, 0.28314572, 0.05114984, &
-   !             0.40216838, 0.3507376, 0.022072, 0.0540725, 0.06678422, 0.03625773, &
-   !             0.0484979, 0.8516855, 0.98869347, 0.05778878, 0.06610646, 0.0764022, &
-   !             0.08499995, 0.09210838, 0.13037341, 0.13997288 /)
 
    numZeta = size(p%zeta)
 
@@ -1919,6 +1903,7 @@ SUBROUTINE Init_ModalDamping(x, OtherState, p, m, ErrStat, ErrMsg)
 
    ! Apply the rotation of q here. When the actual dynamics are at the same position
    ! as this, then this cancels with a rotation applied at the modal damping force.
+   ! Transforms as a tensor, so pre and post multiply by nodal rotations.
    do j = 2, p%node_total
 
       ! Loop over the nodes that apply to the damping matrix, so don't include the root node.
@@ -1937,14 +1922,6 @@ SUBROUTINE Init_ModalDamping(x, OtherState, p, m, ErrStat, ErrMsg)
       p%ModalDampingMat(k+1:k+3, :) = matmul(transpose(NodeRot), p%ModalDampingMat(k+1:k+3, :))
       p%ModalDampingMat(k+4:k+6, :) = matmul(transpose(NodeRot), p%ModalDampingMat(k+4:k+6, :))
    end do
-
-   ! Debugging / verifying -  recover the zeta values
-   ! phi0T_M_phi0 = matmul(transpose(eigenvectors), matmul(m%LP_MassM_LU, eigenvectors))
-   ! print *, 'Verifying mass orthonormal here.'
-   ! phi0T_M_phi0 = matmul(transpose(eigenvectors), matmul(p%ModalDampingMat, eigenvectors))
-   ! do j = 1,nDOF
-   !    phi0T_M_phi0(j,j) = phi0T_M_phi0(j,j) / omega(j) / 2.0_R8Ki
-   ! end do
 
    call CalcModalParticipation()
 
@@ -1977,18 +1954,27 @@ contains
          modal_participation(:, j) = sum(phiT_M(:, j::6)*phiT_M(:, j::6), dim=2)
       end do
 
-      ! Write to a file instead
+      ! Write to a file
       CALL GetNewUnit(bdModesFile)
-      open(unit=bdModesFile, file='beamdyn_modes.csv')
+      open(unit=bdModesFile, file=TRIM( InitInp%RootName )//'.modes.csv')
 
       write(bdModesFile,*) '#Frequency [Hz], Zeta [Frac. Critical],'// &
                            'Participation X, Participation Y, Participation Z,'// &
                            'Participation RX, Participation RY, Participation RZ'
 
-      ! Write to a file
-      do j = 1, numZeta
+      ! Loop over modes to output
+      do j = 1, nDOF
+
+         if( j <= numZeta) then
+            Zj = p%zeta(j)
+         else
+            ! Stiffness proportional damping is used past the last prescribed value
+            ! at a rate equal to the last prescribed value.
+            Zj = (p%zeta(numZeta) * omega(j) / omega(numZeta))
+         endif
+
          write(bdModesFile, ' (1F12.4,1F12.8,6E14.5) ') omega(j)/TwoPi_D, &
-            p%zeta(j), modal_participation(j, :) / sum(modal_participation(j, :))
+            Zj, modal_participation(j, :) / sum(modal_participation(j, :))
       end do
 
       close(bdModesFile)
