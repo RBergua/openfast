@@ -609,28 +609,41 @@ Modal Damping
 -------------
 
 In addition to the stiffness-proportional viscous damping described above, BeamDyn
-also supports modal damping. When modal damping is selected (``damp_flag = 2``), 
+also supports modal damping. This is currently only supported when run in tight coupling
+with OpenFAST. When modal damping is selected (``damp_flag = 2``), 
 BeamDyn computes the natural frequencies and mode shapes of the blade and applies 
 damping in the modal coordinates.
 
 The modal damping approach constructs a damping matrix :math:`{\underline{\underline{C}}}_{modal}` 
 based on user-specified modal damping ratios :math:`\zeta_i` for modes :math:`i = 1, 2, \ldots, n_{modes}`.
+Past the user-specified :math:`n_{modes}`, BeamDyn assigns :math:`zeta_i` to grow proportional to the
+modal natural frequency and match the last prescribed :math:`zeta_i` value.
 The modal damping matrix is defined in terms of the modal properties:
 
 .. math::
        :label: ModalDamping
 
-       {\underline{\underline{C}}}_{modal} = \sum_{i=1}^{n_{modes}} 2 \zeta_i \omega_i \underline{\phi}_i \underline{\phi}_i^T
+       {\underline{\underline{C}}}_{modal} = \underline{\underline{\Phi}}^{-T} {\underline{\underline{Z}}} \underline{\underline{\Phi}}^{-1} = \underline{\underline{M}} \underline{\underline{\Phi}} {\underline{\underline{Z}}} \underline{\underline{\Phi}}^T \underline{\underline{M}}
 
-where :math:`\omega_i` is the natural frequency of mode :math:`i`, :math:`\underline{\phi}_i`
-is the corresponding mode shape (mass-normalized eigenvector), and :math:`\zeta_i` is the
-modal damping ratio for mode :math:`i`. This damping matrix is then transformed to the 
-physical coordinates and applied during the time integration in the same manner as the 
-stiffness-proportional damping.
 
-The advantage of modal damping is that it allows for mode-specific damping levels, which
-can be more physically representative of composite blade structures where different modes
-may experience different levels of damping due to various energy dissipation mechanisms.
+where :math:`\underline{\underline{Z}}` is a diagonal matrix with diagonal entry :math:`i` equal to
+:math:`2 \omega_i \zeta_i` for natural frequency in rad/s of :math:`omega_i`.
+Additionally, :math:`\underline{\underline{\Phi}}` is the matrix of mass-normalized mode shapes
+(each as a column).
+
+At each time step, a vector of nodal velocities is calculated subtracting off the rigid body motion of the root.
+This vector of velocities is rotated at each node to be aligned with the beam as initialized.
+Damping forces at nodes are then simply the product of the damping matrix and the vector of velocities.
+These forces are then rotated back to the global coordinates with the inverse of the velocity rotation.
+The extra rotations appear to give better modal damping results than fixing the damping matrix in the
+root frame.
+
+Modal damping gives the user mode-specific control of damping levels to better match
+experiments or theoretical damping predictions.
+Furthermore, modal damping need not grow proportional to frequency (as prescribed by
+stiffness proportional damping). Rather, more constant damping factors across frequency
+can be used as have been observed in some experiments and model predictions.
+
 .. _convergence-criterion:
 
 Convergence Criterion and Generalized-\ :math:`\alpha` Time Integrator
