@@ -5258,7 +5258,6 @@ END SUBROUTINE Morison_CalcOutput
       type (Stack) :: SE                 ! Stack element
 
       ErrStat = ErrID_None
-      ErrMsg = ""
 
       ! Convert unit vectors to ReKi for compatibility with GetSectionFreeSurfaceIntersects_Cyl
       k_hat_Re = real(k_hat, ReKi)
