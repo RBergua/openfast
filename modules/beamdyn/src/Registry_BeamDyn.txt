@@ -352,6 +352,7 @@ typedef   ^        MiscVarType    ^            LP_RHS_LU    {:}           - - "R
 # Velocity array for modal damping calculation
 typedef   ^        MiscVarType    ^            DampedVelocities    {:}           - - "Velocity vector for applying modal damping" -
 typedef   ^        MiscVarType    ^            ModalDampingF    {:}           - - "Modal damping force in the modal damping matrix coordinates" -
+typedef   ^        MiscVarType    ^            RotatedDamping  {:}{:}        - - "Rotated damping matrix for linearization at time step in GA2" -
 #end of BDKi-type variables
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 typedef   ^        MiscVarType    IntKi        LP_indx      {:}           - - "Index vector for LU" -

@@ -311,6 +311,7 @@ IMPLICIT NONE
     REAL(R8Ki) , DIMENSION(:), ALLOCATABLE  :: LP_RHS_LU      !< Right-hand-side vector for LU [-]
     REAL(R8Ki) , DIMENSION(:), ALLOCATABLE  :: DampedVelocities      !< Velocity vector for applying modal damping [-]
     REAL(R8Ki) , DIMENSION(:), ALLOCATABLE  :: ModalDampingF      !< Modal damping force in the modal damping matrix coordinates [-]
+    REAL(R8Ki) , DIMENSION(:,:), ALLOCATABLE  :: RotatedDamping      !< Rotated damping matrix for linearization at time step in GA2 [-]
     INTEGER(IntKi) , DIMENSION(:), ALLOCATABLE  :: LP_indx      !< Index vector for LU [-]
     TYPE(BD_InputType)  :: u      !< Inputs converted to the internal BD coordinate system [-]
     TYPE(ModJacType)  :: Jac      !< Jacobian matrices and arrays corresponding to module variables [-]
@@ -2986,6 +2987,18 @@ subroutine BD_CopyMisc(SrcMiscData, DstMiscData, CtrlCode, ErrStat, ErrMsg)
       end if
       DstMiscData%ModalDampingF = SrcMiscData%ModalDampingF
    end if
+   if (allocated(SrcMiscData%RotatedDamping)) then
+      LB(1:2) = lbound(SrcMiscData%RotatedDamping)
+      UB(1:2) = ubound(SrcMiscData%RotatedDamping)
+      if (.not. allocated(DstMiscData%RotatedDamping)) then
+         allocate(DstMiscData%RotatedDamping(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstMiscData%RotatedDamping.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstMiscData%RotatedDamping = SrcMiscData%RotatedDamping
+   end if
    if (allocated(SrcMiscData%LP_indx)) then
       LB(1:1) = lbound(SrcMiscData%LP_indx)
       UB(1:1) = ubound(SrcMiscData%LP_indx)
@@ -3134,6 +3147,9 @@ subroutine BD_DestroyMisc(MiscData, ErrStat, ErrMsg)
    if (allocated(MiscData%ModalDampingF)) then
       deallocate(MiscData%ModalDampingF)
    end if
+   if (allocated(MiscData%RotatedDamping)) then
+      deallocate(MiscData%RotatedDamping)
+   end if
    if (allocated(MiscData%LP_indx)) then
       deallocate(MiscData%LP_indx)
    end if
@@ -3195,6 +3211,7 @@ subroutine BD_PackMisc(RF, Indata)
    call RegPackAlloc(RF, InData%LP_RHS_LU)
    call RegPackAlloc(RF, InData%DampedVelocities)
    call RegPackAlloc(RF, InData%ModalDampingF)
+   call RegPackAlloc(RF, InData%RotatedDamping)
    call RegPackAlloc(RF, InData%LP_indx)
    call BD_PackInput(RF, InData%u) 
    call NWTC_Library_PackModJacType(RF, InData%Jac) 
@@ -3252,6 +3269,7 @@ subroutine BD_UnPackMisc(RF, OutData)
    call RegUnpackAlloc(RF, OutData%LP_RHS_LU); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%DampedVelocities); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%ModalDampingF); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%RotatedDamping); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%LP_indx); if (RegCheckErr(RF, RoutineName)) return
    call BD_UnpackInput(RF, OutData%u) ! u 
    call NWTC_Library_UnpackModJacType(RF, OutData%Jac) ! Jac 

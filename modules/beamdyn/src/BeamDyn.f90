@@ -1931,6 +1931,8 @@ SUBROUTINE Init_ModalDamping(InitInp, x, OtherState, p, m, ErrStat, ErrMsg)
    ! Allocate memory for the velocity vector that will be multiplied by the modal damping matrix
    call AllocAry(m%ModalDampingF, nDOF, 'ModalDampingF', ErrStat2, ErrMsg2); if (Failed()) return
 
+   call AllocAry(m%RotatedDamping, nDOF, nDOF, 'RotatedDamping', ErrStat2, ErrMsg2); if (Failed()) return
+
 contains
 
    logical function Failed()
@@ -4877,6 +4879,11 @@ SUBROUTINE BD_DynamicSolutionGA2( x, OtherState, p, m, ErrStat, ErrMsg)
       m%LP_RHS       =  RESHAPE(m%RHS(:,:), (/p%dof_total/))
       m%LP_RHS_LU    =  m%LP_RHS(7:p%dof_total)
 
+      ! Modal damping
+      IF(p%damp_flag .EQ. 2) THEN
+         CALL BD_AddModalDampingRHS(p, x, OtherState, m, fact)
+      ENDIF
+
          ! Solve for X in A*X=B to get the accelerations of blade
       CALL LAPACK_getrs( 'N',p%dof_total-6, m%LP_StifK_LU, m%LP_indx, m%LP_RHS_LU, ErrStat2, ErrMsg2)
          CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
@@ -5761,7 +5768,7 @@ SUBROUTINE BD_CalcForceAcc( u, p, x, OtherState, m, ErrStat, ErrMsg )
 
    IF(p%damp_flag .EQ. 2) THEN
       ! Because modal damping is already global, it wouldn't make sense in BD_AssembleRHS.
-      CALL BD_AddModalDampingRHS(u, p, x, OtherState, m)
+      CALL BD_AddModalDampingRHS(p, x, OtherState, m, .False.)
    ENDIF
 
    ! Solve linear equations A * X = B for acceleration (F=ma) for nodes 2:p%node_total
@@ -5898,15 +5905,16 @@ END SUBROUTINE BD_ComputeElementMass
 !-----------------------------------------------------------------------------------------------------------------------------------
 !> This subroutine calculates the modal damping force
 ! Adds modal damping contributions to m%LP_RHS_LU
-SUBROUTINE BD_AddModalDampingRHS(u, p, x, OtherState, m)
+SUBROUTINE BD_AddModalDampingRHS(p, x, OtherState, m, fact)
 
-   TYPE(BD_InputType),           INTENT(IN   )  :: u           !< Inputs at t
    TYPE(BD_ParameterType),       INTENT(IN   )  :: p           !< Parameters
    TYPE(BD_ContinuousStateType), INTENT(IN   )  :: x           !< Continuous states
    TYPE(BD_OtherStateType),      INTENT(IN   )  :: OtherState  !< other states (contains ref orientation)
    TYPE(BD_MiscVarType),         INTENT(INOUT)  :: m           !< Misc/optimization variables
+   LOGICAL,                      INTENT(IN   )  :: fact        !< Boolean to calculate the Jacobian
 
    integer(IntKi)    :: j, k        ! looping indexing variable
+   integer(IntKi)    :: nDOF        ! number of DOFs
    integer(IntKi)    :: elem        ! looping indexing for element number
    integer(IntKi)    :: elem_node   ! looping indexing for node in the element number
    real(R8Ki)        :: r(3)        ! nodal position relative to root
@@ -5935,7 +5943,7 @@ SUBROUTINE BD_AddModalDampingRHS(u, p, x, OtherState, m)
          !     (u%RootMotion%Position(:, 1) + u%RootMotion%TranslationDisp(:, 1))
          r = p%uuN0(1:3, elem_node, elem) + x%q(1:3, j)
 
-         m%DampedVelocities(k+1:k+3) = m%DampedVelocities(k+1:k+3) - Cross_Product(u%RootMotion%RotationVel(:, 1), r)
+         m%DampedVelocities(k+1:k+3) = m%DampedVelocities(k+1:k+3) - Cross_Product(x%dqdt(4:6, 1), r)
       end do
 
    end do
@@ -5970,6 +5978,33 @@ SUBROUTINE BD_AddModalDampingRHS(u, p, x, OtherState, m)
       m%LP_RHS_LU(k+1:k+3) = m%LP_RHS_LU(k+1:k+3) - matmul(NodeRot, m%ModalDampingF(k+1:k+3))
       m%LP_RHS_LU(k+4:k+6) = m%LP_RHS_LU(k+4:k+6) - matmul(NodeRot, m%ModalDampingF(k+4:k+6))
    end do
+
+   IF (fact) THEN
+      ! Calculate Jacobian and add to 'm%LP_StifK_LU'
+      ! Do not consider any derivative effects of displacements on portions of this calculation
+      nDOF = p%dof_total - 6
+
+      m%RotatedDamping = p%ModalDampingMat
+
+      do j = 2, p%node_total
+
+         ! Loop over the nodes that apply to the damping matrix, so don't include the root node.
+         call BD_CrvMatrixR(x%q(4:6, j), NodeRot)
+
+         k = (j - 2) * 6
+
+         ! Rotations of the velocity side
+         m%RotatedDamping(k+1:k+3, :) = matmul(m%RotatedDamping(k+1:k+3, :), transpose(NodeRot))
+         m%RotatedDamping(k+4:k+6, :) = matmul(m%RotatedDamping(k+4:k+6, :), transpose(NodeRot))
+
+         ! rotations on the force side
+         m%RotatedDamping(:, k+1:k+3) = matmul(NodeRot, m%RotatedDamping(:, k+1:k+3))
+         m%RotatedDamping(:, k+4:k+6) = matmul(NodeRot, m%RotatedDamping(:, k+4:k+6))
+
+      end do
+
+      m%LP_StifK_LU(1:nDOF, 1:nDOF) = m%LP_StifK_LU(1:nDOF, 1:nDOF) + p%coef(7) * m%RotatedDamping
+   ENDIF
 
 END SUBROUTINE BD_AddModalDampingRHS
 
