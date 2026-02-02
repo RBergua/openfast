@@ -5994,12 +5994,12 @@ SUBROUTINE BD_AddModalDampingRHS(p, x, OtherState, m, fact)
          k = (j - 2) * 6
 
          ! Rotations of the velocity side
-         m%RotatedDamping(k+1:k+3, :) = matmul(m%RotatedDamping(k+1:k+3, :), transpose(NodeRot))
-         m%RotatedDamping(k+4:k+6, :) = matmul(m%RotatedDamping(k+4:k+6, :), transpose(NodeRot))
+         m%RotatedDamping(:, k+1:k+3) = matmul(m%RotatedDamping(:, k+1:k+3), transpose(NodeRot))
+         m%RotatedDamping(:, k+4:k+6) = matmul(m%RotatedDamping(:, k+4:k+6), transpose(NodeRot))
 
          ! rotations on the force side
-         m%RotatedDamping(:, k+1:k+3) = matmul(NodeRot, m%RotatedDamping(:, k+1:k+3))
-         m%RotatedDamping(:, k+4:k+6) = matmul(NodeRot, m%RotatedDamping(:, k+4:k+6))
+         m%RotatedDamping(k+1:k+3, :) = matmul(NodeRot, m%RotatedDamping(k+1:k+3, :))
+         m%RotatedDamping(k+4:k+6, :) = matmul(NodeRot, m%RotatedDamping(k+4:k+6, :))
 
       end do
 
