@@ -74,7 +74,9 @@
 	<Files>
 		<Filter Name="Registry Files" Filter="txt"/>
 		<Filter Name="Source Files" Filter="f90;for;f;fpp;ftn;def;odl;idl">
-			<File RelativePath="..\..\modules\subdyn\src\SubDyn_Driver.f90"/>
+			<File RelativePath="..\..\modules\soildyn\src\driver\SoilDyn_Driver.f90"/>
+			<File RelativePath="..\..\modules\soildyn\src\driver\SoilDyn_Driver_Subs.f90"/>
+			<File RelativePath="..\..\modules\soildyn\src\driver\SoilDyn_Driver_Types.f90"/>
 		</Filter>
 	</Files>
 	<Globals/>

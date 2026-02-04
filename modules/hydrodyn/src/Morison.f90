@@ -5445,6 +5445,7 @@ END SUBROUTINE Morison_CalcOutput
       type (Stack) :: SE                 ! Stack element
 
       ErrStat = ErrID_None
+      ErrMsg = ""
 
       ! Initialize first stack element
       SA(1)%level      = 1
