@@ -815,6 +815,14 @@ subroutine LowResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
             end if
 
 
+            ! -  no messages if inside bounds, so put error handling inside if
+            call PlaneOutOfDomain(u%D_wake(np,nt),u%p_plane(:,np,nt),y%V_plane(:,np,nt),m%planeDomainExit(np,nt),ErrStat2,ErrMsg2)
+            if (m%planeDomainExit(np,nt) /= 0_IntKi) then
+               call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
+               cycle
+            endif
+
+
             ! Calculate y%V_plane
             y%V_plane(:,np,nt) = 0.0_ReKi
             wsum_tmp = 0.0_ReKi
@@ -849,81 +857,11 @@ subroutine LowResGridCalcOutput(n, u, p, xd, y, m, errStat, errMsg)
 
             end do !nr
 
-            if (.true.) then
-                if ( iwsum == 0 ) then
-
-                   call SetErrStat( ErrID_Fatal, 'The rotor plane for turbine '//trim(num2lstr(nt))//' has left the low-resolution domain (i.e., there are no points in the polar grid that lie within the low-resolution domain).', errStat, errMsg, RoutineName )
-                   return
-
-                else
-
-                   m%V_amb_low_disk(1:3,nt) = m%V_amb_low_disk(1:3,nt)/REAL(iwsum/8,ReKi)   ! iwsum is always a multiple of 8
-                   Vave_amb_low_norm  = TwoNorm(m%V_amb_low_disk(1:3,nt))
-                   if ( EqualRealNos(Vave_amb_low_norm, 0.0_ReKi ) )  then
-                      call SetErrStat( ErrID_Fatal, 'The magnitude of the spatial-averaged ambient wind speed in the low-resolution domain associated with the wake plane at the rotor disk for turbine #'//trim(num2lstr(nt))//' is zero.', errStat, errMsg, RoutineName )
-                      return
-                   else
-                      y%Vx_wind_disk(nt) = dot_product( u%xhat_plane(:,np,nt),m%V_amb_low_disk(1:3,nt) )
-                      y%TI_amb(nt) = 0.0_ReKi
-                      do wamb = 1, iwsum
-                         y%TI_amb(nt) = y%TI_amb(nt)+TwoNorm(m%Vamb_lowpol(:,wamb)-m%V_amb_low_disk(1:3,nt))**2.0_ReKi
-                      end do  !wamb
-                      y%TI_amb(nt) = sqrt(y%TI_amb(nt)/(3.0_ReKi*REAL(iwsum,ReKi)))/Vave_amb_low_norm
-                   end if !Vave_amb_low_norm
-
-                 end if
-
-             end if
-
-
-             ! Calculate y%V_plane
-
-             y%V_plane(:,np,nt) = 0.0_ReKi
-             wsum_tmp = 0.0_ReKi
-             n_r_polar = FLOOR((p%C_ScaleDiam*u%D_wake(np,nt))/p%dpol)
-
-             ! if a wake plane exits domain, velocity is set differently, so skip remaining velocity logic after this
-             ! -  no messages if inside bounds, so put error handling inside if
-             call PlaneOutOfDomain(u%D_wake(np,nt),u%p_plane(:,np,nt),y%V_plane(:,np,nt),m%planeDomainExit(np,nt),ErrStat2,ErrMsg2)
-             if (m%planeDomainExit(np,nt) /= 0_IntKi) then
-                call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
-                cycle
-             endif
-
-             do nr = 0, n_r_polar
-
-                r_polar = REAL(nr,ReKi)*p%dpol
-
-                select case ( p%Mod_Meander )
-                case (MeanderMod_Uniform)
-                   w = 1.0_ReKi
-                case (MeanderMod_TruncJinc)
-                   w = jinc( r_polar/(p%C_Meander*u%D_wake(np,nt) ) )
-                case (MeanderMod_WndwdJinc)
-                   w = jinc( r_polar/(p%C_Meander*u%D_wake(np,nt) ) )*jinc( r_polar/(2.0_ReKi*p%C_Meander*u%D_wake(np,nt) ) )
-                end select
-
-                n_psi_polar = MAX(CEILING(TwoPi*REAL(nr,ReKi))-1,0)
-
-                do npsi = 0,n_psi_polar
-
-                   psi_polar = (TwoPi*REAL(npsi,ReKi))/(REAL(n_psi_polar+1,ReKi))
-                   p_polar = u%p_plane(:,np,nt) + r_polar*COS(psi_polar)*yHat_plane + r_polar*SIN(psi_polar)*zHat_plane
-                   Vdist_lowpol_tmp = INTERP3D(p_polar, p%LowRes%oXYZ, p%LowRes%dXYZ, m%Vdist_low, within)
-                   if ( within ) then
-                      y%V_plane(:,np,nt) = y%V_plane(:,np,nt) + w*Vdist_lowpol_tmp
-                      wsum_tmp = wsum_tmp + w
-                   end if
-
-                end do !npsi
-
-             end do!nr
-
-             if ( EqualRealNos( wsum_tmp, 0.0_ReKi ) ) then
-                y%V_plane(:,np,nt) = 0.0_ReKi
-             else
-                y%V_plane(:,np,nt) = y%V_plane(:,np,nt)/wsum_tmp
-             end if
+            if ( EqualRealNos( wsum_tmp, 0.0_ReKi ) ) then
+               y%V_plane(:,np,nt) = 0.0_ReKi
+            else
+               y%V_plane(:,np,nt) = y%V_plane(:,np,nt)/wsum_tmp
+            end if
 
          end if
       end do ! np, tmpPln
