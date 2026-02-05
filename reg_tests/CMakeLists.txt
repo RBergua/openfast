@@ -111,7 +111,7 @@ foreach(srcDir 5MW_Baseline)
 endforeach()
 
 ## fastfarm seed
-foreach(srcDir 5MW_Baseline)
+foreach(srcDir 5MW_Baseline WAT_MannBoxDB)
   file(COPY "${CMAKE_CURRENT_LIST_DIR}/r-test/glue-codes/fast-farm/${srcDir}"
        DESTINATION "${CTEST_BINARY_DIR}/glue-codes/fast-farm/")
 endforeach()
