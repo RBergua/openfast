@@ -91,7 +91,28 @@
 		</Configuration>
 	</Configurations>
 	<Files>
-		<Filter Name="Registry Files" Filter="txt"/>
+		<Filter Name="Registry Files" Filter="txt">
+			<File RelativePath="..\..\modules\nwtc-library\src\GridInterp.txt">
+				<FileConfiguration Name="OpenMP_Release|x64">
+					<Tool Name="VFCustomBuildTool" CommandLine="CALL ..\RunRegistry.bat GridInterp" Description="Running Registry for GridInterp" Outputs="..\..\modules\nwtc-library\src\GridInterp_Types.f90"/>
+				</FileConfiguration>
+				<FileConfiguration Name="Double_OpenMP_Release|x64">
+					<Tool Name="VFCustomBuildTool" CommandLine="CALL ..\RunRegistry.bat GridInterp" Description="Running Registry for GridInterp" Outputs="..\..\modules\nwtc-library\src\GridInterp_Types.f90"/>
+				</FileConfiguration>
+				<FileConfiguration Name="Release|x64">
+					<Tool Name="VFCustomBuildTool" CommandLine="CALL ..\RunRegistry.bat GridInterp" Description="Running Registry for GridInterp" Outputs="..\..\modules\nwtc-library\src\GridInterp_Types.f90"/>
+				</FileConfiguration>
+				<FileConfiguration Name="Debug|x64">
+					<Tool Name="VFCustomBuildTool" CommandLine="CALL ..\RunRegistry.bat GridInterp" Description="Running Registry for GridInterp" Outputs="..\..\modules\nwtc-library\src\GridInterp_Types.f90"/>
+				</FileConfiguration>
+				<FileConfiguration Name="Double_Debug|x64">
+					<Tool Name="VFCustomBuildTool" CommandLine="CALL ..\RunRegistry.bat GridInterp" Description="Running Registry for GridInterp" Outputs="..\..\modules\nwtc-library\src\GridInterp_Types.f90"/>
+				</FileConfiguration>
+				<FileConfiguration Name="Double_Release|x64">
+					<Tool Name="VFCustomBuildTool" CommandLine="CALL ..\RunRegistry.bat GridInterp" Description="Running Registry for GridInterp" Outputs="..\..\modules\nwtc-library\src\GridInterp_Types.f90"/>
+				</FileConfiguration>
+			</File>
+		</Filter>
 		<Filter Name="Source Files" Filter="f90;for;f;fpp;ftn;def;odl;idl">
 			<Filter Name="NetLib">
 				<File RelativePath="..\..\modules\nwtc-library\src\NetLib\slatec\aaaaaa.f"/>
@@ -211,6 +232,8 @@
 			</File>
 			<File RelativePath="..\..\modules\nwtc-library\src\VTK.f90"/>
 			<File RelativePath="..\..\modules\nwtc-library\src\YAML.f90"/>
+			<File RelativePath="..\..\modules\nwtc-library\src\GridInterp.f90"/>
+			<File RelativePath="..\..\modules\nwtc-library\src\GridInterp_Types.f90"/>
 		</Filter>
 	</Files>
 	<Globals/>
