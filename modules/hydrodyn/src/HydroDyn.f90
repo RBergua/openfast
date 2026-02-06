@@ -1371,8 +1371,7 @@ SUBROUTINE HydroDyn_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, ErrStat,
       LOGICAL,         SAVE                :: FrstWarn_LrgY = .TRUE.
       logical                              :: calcMorisonHstLdsLocal
 
-         ! Initialize ErrStat
-         
+      ! Initialize ErrStat
       ErrStat = ErrID_None         
       ErrMsg  = ""
 
@@ -1389,7 +1388,7 @@ SUBROUTINE HydroDyn_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, ErrStat,
          
       IF ( (p%OutSwtch == 1 .OR. p%OutSwtch == 3) .AND. ( Time > m%LastOutTime ) ) THEN               
          CALL HDOut_WriteOutputs( m%LastOutTime, y, p, m%Decimate, ErrStat2, ErrMsg2 )         
-            CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+         if (Failed()) return
       END IF
       m%LastOutTime   = Time ! time associated with the next values of y%WriteOutput
       
@@ -1409,8 +1408,8 @@ SUBROUTINE HydroDyn_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, ErrStat,
       IF ( (ABS( WrapToPi(PRPRotation(3)-PtfmRefY) ) > LrgAngle) .AND. FrstWarn_LrgY ) THEN
          ErrStat2 = ErrID_Severe
          ErrMsg2  = 'Yaw angle at PRP relative to the reference yaw position (PtfmRefY) violated the small angle assumption. The solution might be inaccurate. Consider using PtfmYMod=1 and adjust PtfmYCutoff. Simulation continuing, but future warnings will be suppressed.'
-         call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
          FrstWarn_LrgY = .FALSE.
+         if (Failed()) return
       END IF
 
          !-------------------------------------------------------------------
@@ -1419,16 +1418,15 @@ SUBROUTINE HydroDyn_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, ErrStat,
          !-------------------------------------------------------------------
 
 
-
       if ( p%PotMod == 1 ) then
          ! Transformation matrices between global and PRP frame
-         ALLOCATE(RRb2g(6*p%NBody,6*p%NBody),STAT=ErrStat2)
-         ALLOCATE(RRg2b(6*p%NBody,6*p%NBody),STAT=ErrStat2)
+         ALLOCATE(RRb2g(6*p%NBody,6*p%NBody),STAT=ErrStat2);   if (Failed0("RRb2g")) return;
+         ALLOCATE(RRg2b(6*p%NBody,6*p%NBody),STAT=ErrStat2);   if (Failed0("RRg2b")) return;
          RRg2b(:,:) = 0.0_ReKi
          do iBody = 1, p%NBody
                ! Determine the rotational angles from the direction-cosine matrix
             ! rotdisp = GetRotAngs ( u%PtfmRefY, u%WAMITMesh%Orientation(:,:,iBody), ErrStat2, ErrMsg2 )
-            !    CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+            ! if (Failed()) return
             rotdisp = EulerExtractZYX(u%WAMITMesh%Orientation(:,:,iBody))
             indxStart = (iBody-1)*6+1
             indxEnd   = indxStart+5
@@ -1443,9 +1441,7 @@ SUBROUTINE HydroDyn_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, ErrStat,
          end do
          RRb2g = transpose(RRg2b)
 
-   !FIXME: Error handling appears to be broken here.
          if ( p%NBodyMod == 1 ) then
-              
                   ! Compute the load contirbution from user-supplied added stiffness and damping        
                m%F_PtfmAdd = p%AddF0(:,1) - matmul(p%AddCLin(:,:,1), q) &
                            - matmul( matmul(RRb2g,p%AddBLin(:,:,1) ), matmul(RRg2b,qdot) ) &
@@ -1483,14 +1479,13 @@ SUBROUTINE HydroDyn_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, ErrStat,
                if ( p%NBodyMod == 1 .or. p%NBody == 1 ) then
                      ! Copy the inputs from the HD mesh into the WAMIT mesh
                   call MeshCopy( u%WAMITMesh, m%u_WAMIT(1)%Mesh, MESH_UPDATECOPY, ErrStat2, ErrMsg2 )
-                     call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-                        if ( ErrStat >= AbortErrLev ) return
+                  if (Failed()) return
                   
                   ! m%u_WAMIT(1)%PtfmRefY = u%PtfmRefY
                   m%u_WAMIT(1)%PtfmRefY = PtfmRefY
                   call WAMIT_CalcOutput( Time, m%u_WAMIT(1), p%WAMIT(1), x%WAMIT(1), xd%WAMIT(1),  &
                                           z%WAMIT, OtherState%WAMIT(1), y%WAMIT(1), m%WAMIT(1), ErrStat2, ErrMsg2 )
-                     call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+                  if (Failed()) return
                   do iBody=1,p%NBody
                      y%WAMITMesh%Force (:,iBody) = y%WAMITMesh%Force (:,iBody) + y%WAMIT(1)%Mesh%Force (:,iBody)
                      y%WAMITMesh%Moment(:,iBody) = y%WAMITMesh%Moment(:,iBody) + y%WAMIT(1)%Mesh%Moment(:,iBody)
@@ -1512,7 +1507,7 @@ SUBROUTINE HydroDyn_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, ErrStat,
                      m%u_WAMIT(iBody)%PtfmRefY = PtfmRefY
                      call WAMIT_CalcOutput( Time, m%u_WAMIT(iBody), p%WAMIT(iBody), x%WAMIT(iBody), xd%WAMIT(iBody),  &
                                           z%WAMIT, OtherState%WAMIT(iBody), y%WAMIT(iBody), m%WAMIT(iBody), ErrStat2, ErrMsg2 )
-                        call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+                     if (Failed()) return
                      y%WAMITMesh%Force (:,iBody) = y%WAMITMesh%Force (:,iBody) + y%WAMIT(iBody)%Mesh%Force (:,1)
                      y%WAMITMesh%Moment(:,iBody) = y%WAMITMesh%Moment(:,iBody) + y%WAMIT(iBody)%Mesh%Moment(:,1)
 
@@ -1532,7 +1527,7 @@ SUBROUTINE HydroDyn_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, ErrStat,
 
             if ( p%NBodyMod == 1 .or. p%NBody == 1 ) then
                call WAMIT2_CalcOutput( Time, PtfmRefY, p%WaveField, p%WAMIT2(1), y%WAMIT2(1), m%WAMIT2(1), ErrStat2, ErrMsg2 )
-                  call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+               if (Failed()) return
                do iBody=1,p%NBody
                   y%WAMITMesh%Force (:,iBody) = y%WAMITMesh%Force (:,iBody) + y%WAMIT2(1)%Mesh%Force (:,iBody)
                   y%WAMITMesh%Moment(:,iBody) = y%WAMITMesh%Moment(:,iBody) + y%WAMIT2(1)%Mesh%Moment(:,iBody)
@@ -1543,7 +1538,7 @@ SUBROUTINE HydroDyn_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, ErrStat,
                do iBody=1,p%NBody
 
                   call WAMIT2_CalcOutput( Time, PtfmRefY, p%WaveField, p%WAMIT2(iBody), y%WAMIT2(iBody), m%WAMIT2(iBody), ErrStat2, ErrMsg2 )
-                     call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+                  if (Failed()) return
                   y%WAMITMesh%Force (:,iBody) = y%WAMITMesh%Force (:,iBody) + y%WAMIT2(iBody)%Mesh%Force (:,1)
                   y%WAMITMesh%Moment(:,iBody) = y%WAMITMesh%Moment(:,iBody) + y%WAMIT2(iBody)%Mesh%Moment(:,1)
 
@@ -1563,6 +1558,7 @@ SUBROUTINE HydroDyn_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, ErrStat,
          Inputs_FIT%si_t(:)  = u%WAMITMesh%TranslationDisp(:,1)             
          Inputs_FIT%vel_t(:) = u%WAMITMesh%TranslationVel (:,1)  
          CALL FIT_CalcOutput( Time, Inputs_FIT, p%FIT, FIT_x, xd%FIT, FIT_z, OtherState%FIT, y%FIT, ErrStat2, ErrMsg2 ) 
+         if (Failed()) return
          
             ! Add FIT forces to the HydroDyn output mesh
          y%WAMITMesh%Force (:,1) = y%WAMITMesh%Force (:,1) + y%FIT%F(:)
@@ -1583,11 +1579,11 @@ SUBROUTINE HydroDyn_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, ErrStat,
 
          ! Integrate all the mesh loads onto the platfrom reference Point (PRP) at (0,0,0)
       m%F_Hydro = CalcLoadsAtWRP( y, u, m%AllHdroOrigin, m%HD_MeshMap, ErrStat2, ErrMsg2 )
-         CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+      if (Failed()) return
 
          ! Map calculated results into the first p%NumOuts values of the y%WriteOutput Array
       CALL HDOut_MapOutputs( p, y, m%WAMIT, m%WAMIT2, m%F_PtfmAdd, m%F_Waves, m%F_Hydro, u%PRPMesh, PtfmRefY, q, qdot, qdotdot, ErrStat2, ErrMsg2 )
-         CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+      if (Failed()) return
 
          ! Aggregate the sub-module outputs 
       IF (p%Morison%NumOuts > 0) THEN
@@ -1603,6 +1599,21 @@ SUBROUTINE HydroDyn_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, ErrStat,
       IF (ALLOCATED(RRb2g)) DEALLOCATE(RRb2g)
       IF (ALLOCATED(RRg2b)) DEALLOCATE(RRg2b)
 
+contains
+   logical function Failed()
+      call SetErrStat(errStat2, errMsg2, errStat, errMsg, RoutineName)
+      Failed = errStat >= AbortErrLev
+   end function Failed
+   ! check for failed where /= 0 is fatal
+   logical function Failed0(txt)
+      character(*), intent(in) :: txt
+      if (ErrStat2 /= 0) then
+         ErrStat2 = ErrID_Fatal
+         ErrMsg2  = "Could not allocate "//trim(txt)
+         call SetErrStat(ErrStat2, ErrMsg2, errStat, errMsg, RoutineName)
+      endif
+      Failed0 = ErrStat >= AbortErrLev
+   end function Failed0
 END SUBROUTINE HydroDyn_CalcOutput
 
 
@@ -1717,6 +1728,9 @@ function CalcLoadsAtWRP( y, u, AllHdroOrigin, MeshMapData, ErrStat, ErrMsg )
    integer(IntKi)                                 :: ErrStat2             ! temporary Error status of the operation
    character(ErrMsgLen)                           :: ErrMsg2              ! temporary Error message if ErrStat /= ErrID_None
    
+   ErrStat = ErrID_None
+   ErrMsg  = ""
+
    CalcLoadsAtWRP = 0.0_ReKi
    
    if ( y%WAMITMesh%Committed  ) then

@@ -72,6 +72,12 @@ SET Output_Loc=%CURR_LOC%
 %REGISTRY% "%CURR_LOC%\Registry_NWTC_Library_base.txt" %ALL_FAST_Includes% -O "%Output_Loc%" -noextrap
 GOTO checkError
 
+:GridInterp
+SET CURR_LOC=%NWTC_Lib_Loc%
+SET Output_Loc=%CURR_LOC%
+%REGISTRY% "%CURR_LOC%\GridInterp.txt "  -I "%NWTC_Lib_Loc%"  -I "%CURR_LOC%" -O "%Output_Loc%" -noextrap
+GOTO checkError
+
 :MAP
 SET CURR_LOC=%MAP_Loc%
 SET Output_Loc=%CURR_LOC%
