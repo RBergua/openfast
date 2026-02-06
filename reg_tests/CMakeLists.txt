@@ -97,6 +97,10 @@ foreach(srcDir BAR_Baseline)
   file(COPY "${CMAKE_CURRENT_LIST_DIR}/r-test/modules/aerodyn/${srcDir}"
        DESTINATION "${CTEST_BINARY_DIR}/modules/aerodyn/")
 endforeach()
+foreach(srcDir seastate_wr_kin1)
+  file(COPY "${CMAKE_CURRENT_LIST_DIR}/r-test/modules/seastate/${srcDir}"
+       DESTINATION "${CTEST_BINARY_DIR}/modules/seastate/")
+endforeach()
 
 ## openfast test directories
 foreach(srcDir 5MW_Baseline AOC AWT27 SWRT UAE_VI WP_Baseline)
