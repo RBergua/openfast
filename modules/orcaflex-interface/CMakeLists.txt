@@ -29,7 +29,7 @@ add_library(orcaflexlib STATIC
   src/OrcaFlexInterface_Types.f90
 )
 target_link_libraries(orcaflexlib nwtclibs)
-if (ORCA_DLL_LOAD)
+if (WIN_DLL_LOAD)
   target_compile_definitions(orcaflexlib PUBLIC LibLoad)
 else ()
   target_compile_definitions(orcaflexlib PUBLIC NO_LibLoad)
