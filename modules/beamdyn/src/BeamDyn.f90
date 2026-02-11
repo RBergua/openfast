@@ -4869,10 +4869,7 @@ SUBROUTINE BD_DynamicSolutionGA2( x, OtherState, p, m, ErrStat, ErrMsg)
          ! extract the unconstrained stifness matrix
          m%LP_StifK_LU  =  m%LP_StifK(7:p%dof_total,7:p%dof_total)
 
-         ! note m%LP_indx is allocated larger than necessary (to allow us to use it in multiple places)
-         CALL LAPACK_getrf( p%dof_total-6, p%dof_total-6, m%LP_StifK_LU, m%LP_indx, ErrStat2, ErrMsg2)
-         CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-         if (ErrStat >= AbortErrLev) return
+         ! Factoring of the matrix is done below after modal damping is added (if applicable).
       ENDIF
 
          ! Reshape 2d array into 1d for the use with the LAPACK solver
@@ -4883,9 +4880,21 @@ SUBROUTINE BD_DynamicSolutionGA2( x, OtherState, p, m, ErrStat, ErrMsg)
       IF(p%damp_flag .EQ. 2) THEN
          CALL BD_AddModalDampingRHS(p, x, OtherState, m, fact)
 
-         ! TODO : This call should just be for debugging.
-         CALL BD_FD_GA2_DAMPING(p, x, OtherState, m)
+         IF ( (p%tngt_stf_fd .OR. p%tngt_stf_comp) .AND. fact ) then
+            ! FD does not get incorporated to everything else,
+            ! but this function prints the error comparison.
+            CALL BD_FD_GA2_DAMPING(p, x, OtherState, m)
+         end if
       ENDIF
+
+      if (fact) then
+         ! Factor iteration matrix after the damping matrix from modal damping is added.
+         CALL LAPACK_getrf( p%dof_total-6, p%dof_total-6, m%LP_StifK_LU, m%LP_indx, ErrStat2, ErrMsg2)
+         CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
+
+         ! note m%LP_indx is allocated larger than necessary (to allow us to use it in multiple places)
+         if (ErrStat >= AbortErrLev) return
+      end if
 
          ! Solve for X in A*X=B to get the accelerations of blade
       CALL LAPACK_getrs( 'N',p%dof_total-6, m%LP_StifK_LU, m%LP_indx, m%LP_RHS_LU, ErrStat2, ErrMsg2)
@@ -5075,7 +5084,8 @@ SUBROUTINE BD_FD_GA2_DAMPING(p_in, x_in, OtherState_in, m_in)
    ErrStat = ErrID_None
    ErrMsg  = ""
 
-   delta = 1.0d-6
+   ! Debugging work suggests at 1e-6 works well here.
+   delta = 1.0d-6 ! p_in%tngt_stf_pert
 
    nDOF = p_in%dof_total - 6
 
@@ -5167,11 +5177,9 @@ SUBROUTINE BD_FD_GA2_DAMPING(p_in, x_in, OtherState_in, m_in)
    ! print *, 'Finite Diff matrix: \n', Damping_FD
    ! print *, 'Difference in damping matrices: \n', Damping_Diff
 
-   print *, 'Finite Matrix norm: \n', sum(Damping_FD*Damping_FD)
-   print *, 'Error Diff norm: \n', sum(Damping_Diff*Damping_Diff)
-   print *, 'rel error norm: \n', sum(Damping_Diff*Damping_Diff) / sum(Damping_FD*Damping_FD)
-
-   print *, 'Pause'
+   print *, 'Finite Difference Matrix Norm: \n', sum(Damping_FD*Damping_FD)
+   print *, 'Error Diff Norm: \n', sum(Damping_Diff*Damping_Diff)
+   print *, 'Relative Error Norm: \n', sum(Damping_Diff*Damping_Diff) / sum(Damping_FD*Damping_FD)
 
 END SUBROUTINE
 
