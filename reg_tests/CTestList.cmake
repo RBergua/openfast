@@ -445,9 +445,10 @@ py_ad_regression("py_ad_B1n2_OLAF"                   "aerodyn;OLAF;python")
 ua_regression("ua_redfreq"                  "unsteadyaero")
 
 # BeamDyn regression tests
-bd_regression("bd_5MW_dynamic"              "beamdyn;dynamic")
-bd_regression("bd_5MW_dynamic_gravity_Az00" "beamdyn;dynamic")
-bd_regression("bd_5MW_dynamic_gravity_Az90" "beamdyn;dynamic")
+bd_regression("bd_5MW_dynamic"               "beamdyn;dynamic")
+bd_regression("bd_5MW_dynamic_gravity_Az00"  "beamdyn;dynamic")
+bd_regression("bd_5MW_dynamic_gravity_Az90"  "beamdyn;dynamic")
+bd_regression("bd_5MW_dynamic_modal_damping" "beamdyn;dynamic")
 bd_regression("bd_curved_beam"              "beamdyn;static")
 bd_regression("bd_isotropic_rollup"         "beamdyn;static")
 bd_regression("bd_static_cantilever_beam"   "beamdyn;static")
