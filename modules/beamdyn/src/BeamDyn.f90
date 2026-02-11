@@ -4882,6 +4882,9 @@ SUBROUTINE BD_DynamicSolutionGA2( x, OtherState, p, m, ErrStat, ErrMsg)
       ! Modal damping
       IF(p%damp_flag .EQ. 2) THEN
          CALL BD_AddModalDampingRHS(p, x, OtherState, m, fact)
+
+         ! TODO : This call should just be for debugging.
+         CALL BD_FD_GA2_DAMPING(p, x, OtherState, m)
       ENDIF
 
          ! Solve for X in A*X=B to get the accelerations of blade
@@ -5045,6 +5048,132 @@ SUBROUTINE BD_FD_GA2( x, OtherState, p, m )
     ENDDO
 
 END SUBROUTINE BD_FD_GA2
+
+! This subroutine does finite differencing for only the modal damping
+! of the GA2 algorithm. This is applied in a consistent way as the Newton update.
+SUBROUTINE BD_FD_GA2_DAMPING(p_in, x_in, OtherState_in, m_in)
+
+   TYPE(BD_ParameterType),       INTENT(IN   )  :: p_in           !< Parameters
+   TYPE(BD_ContinuousStateType), INTENT(IN   )  :: x_in           !< Continuous states
+   TYPE(BD_OtherStateType),      INTENT(IN   )  :: OtherState_in  !< other states (contains ref orientation)
+   TYPE(BD_MiscVarType),         INTENT(INOUT)  :: m_in           !< Misc/optimization variables
+
+   TYPE(BD_ParameterType)          :: p           !< Parameters
+   TYPE(BD_ContinuousStateType)    :: x           !< Continuous states
+   TYPE(BD_OtherStateType)         :: OtherState  !< other states (contains ref orientation)
+   TYPE(BD_MiscVarType)            :: m           !< Misc/optimization variables
+
+   integer(IntKi)    :: i, j, k        ! looping indexing variable
+   integer(IntKi)    :: nDOF        ! number of DOFs
+   real(BDKi)     :: delta        ! number of DOFs
+
+   INTEGER(IntKi)                  :: ErrStat   ! Temporary Error status
+   CHARACTER(ErrMsgLen)            :: ErrMsg    ! Temporary Error message
+   REAL(BDKi), allocatable  :: Damping_FD(:,:)
+   REAL(BDKi), allocatable  :: Damping_Diff(:,:)
+
+   ErrStat = ErrID_None
+   ErrMsg  = ""
+
+   delta = 1.0d-6
+
+   nDOF = p_in%dof_total - 6
+
+   ! allocate local array and initialize to all zeros
+   CALL AllocAry(Damping_FD, nDOF, nDOF,'Damping_FD', ErrStat, ErrMsg)
+   CALL AllocAry(Damping_Diff, nDOF, nDOF,'Damping_Diff', ErrStat, ErrMsg)
+
+   Damping_FD(:, :) = 0.0_BDKi
+   Damping_Diff(:, :) = 0.0_BDKi
+
+   CALL BD_CopyMisc(m_in, m, MESH_NEWCOPY, ErrStat, ErrMsg)
+
+   ! Loop over doing Finite Differencing
+   DO i = 2,p_in%nodes_per_elem ! skip first node
+      DO j = 1,p_in%dof_node
+
+         ! Global DOF
+         k = 6 * (i - 2) + j
+
+         !!!!!!!!!!!!!!!!!!!!!!!!!
+         ! Positive Perturbation
+         ! Copy Everything about the problem
+         CALL BD_CopyParam(p_in, p, MESH_UPDATECOPY, ErrStat, ErrMsg)
+         CALL BD_CopyContState(x_in, x, MESH_UPDATECOPY, ErrStat, ErrMsg)
+         CALL BD_CopyOtherState(OtherState_in, OtherState, MESH_UPDATECOPY, ErrStat, ErrMsg)
+         CALL BD_CopyMisc(m_in, m, MESH_UPDATECOPY, ErrStat, ErrMsg)
+
+         ! Apply perturbation as a solution is applied
+         m%Solution = 0.0_BDKi
+         m%Solution(j,i) = delta
+
+         ! Recalculate Everything
+         CALL BD_UpdateDynamicGA2(p,m,x,OtherState)
+         CALL BD_QuadraturePointData( p,x,m )
+         CALL BD_GenerateDynamicElementGA2( x, OtherState, p, m, .FALSE.)
+
+         m%LP_RHS_LU = 0.0_BDKi
+
+         CALL BD_AddModalDampingRHS(p, x, OtherState, m, .FALSE.)
+
+         Damping_FD(:, k) = Damping_FD(:, k) + m%LP_RHS_LU
+
+         !!!!!!!!!!!!!!!!!!!!!!!!!
+         ! Negative Perturbation
+         ! Copy Everything about the problem
+         CALL BD_CopyParam(p_in, p, MESH_UPDATECOPY, ErrStat, ErrMsg)
+         CALL BD_CopyContState(x_in, x, MESH_UPDATECOPY, ErrStat, ErrMsg)
+         CALL BD_CopyOtherState(OtherState_in, OtherState, MESH_UPDATECOPY, ErrStat, ErrMsg)
+         CALL BD_CopyMisc(m_in, m, MESH_UPDATECOPY, ErrStat, ErrMsg)
+
+         ! Apply perturbation as a solution is applied
+         m%Solution = 0.0_BDKi
+         m%Solution(j,i) = -1.0_BDKi * delta
+
+         ! Recalculate Everything
+         CALL BD_UpdateDynamicGA2(p,m,x,OtherState)
+         CALL BD_QuadraturePointData( p,x,m )
+         CALL BD_GenerateDynamicElementGA2( x, OtherState, p, m, .FALSE.)
+
+         m%LP_RHS_LU = 0.0_BDKi
+
+         CALL BD_AddModalDampingRHS(p, x, OtherState, m, .FALSE.)
+
+         Damping_FD(:, k) = Damping_FD(:, k) - m%LP_RHS_LU
+
+         ! Include Negative Sign because solver actually uses -dRHS/dX
+         Damping_FD(:, k) = Damping_FD(:, k) / (-2.0_BDKi * delta)
+
+      END DO
+   END DO
+
+   ! Reference Analytical Damping Matrix
+
+   ! Copy Everything about the problem
+   CALL BD_CopyParam(p_in, p, MESH_UPDATECOPY, ErrStat, ErrMsg)
+   CALL BD_CopyContState(x_in, x, MESH_UPDATECOPY, ErrStat, ErrMsg)
+   CALL BD_CopyOtherState(OtherState_in, OtherState, MESH_UPDATECOPY, ErrStat, ErrMsg)
+   CALL BD_CopyMisc(m_in, m, MESH_UPDATECOPY, ErrStat, ErrMsg)
+
+   ! Recalculate Everything
+   CALL BD_QuadraturePointData( p,x,m )
+   CALL BD_GenerateDynamicElementGA2( x, OtherState, p, m, .FALSE.)
+
+   m%LP_StifK_LU = 0.0_BDKi
+   CALL BD_AddModalDampingRHS(p, x, OtherState, m, .TRUE.)
+
+   Damping_Diff = m%LP_StifK_LU - Damping_FD
+
+   ! print *, 'Finite Diff matrix: \n', Damping_FD
+   ! print *, 'Difference in damping matrices: \n', Damping_Diff
+
+   print *, 'Finite Matrix norm: \n', sum(Damping_FD*Damping_FD)
+   print *, 'Error Diff norm: \n', sum(Damping_Diff*Damping_Diff)
+   print *, 'rel error norm: \n', sum(Damping_Diff*Damping_Diff) / sum(Damping_FD*Damping_FD)
+
+   print *, 'Pause'
+
+END SUBROUTINE
 
 !-----------------------------------------------------------------------------------------------------------------------------------
 !> This subroutine updates the 1) displacements/rotations(uf)
@@ -6003,7 +6132,7 @@ SUBROUTINE BD_AddModalDampingRHS(p, x, OtherState, m, fact)
 
       end do
 
-      m%LP_StifK_LU(1:nDOF, 1:nDOF) = m%LP_StifK_LU(1:nDOF, 1:nDOF) + p%coef(7) * m%RotatedDamping
+      m%LP_StifK_LU = m%LP_StifK_LU + p%coef(7) * m%RotatedDamping
    ENDIF
 
 END SUBROUTINE BD_AddModalDampingRHS
