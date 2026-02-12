@@ -1258,26 +1258,18 @@ CONTAINS
 !!   
 !! This routine is the inverse of DCM_exp (nwtc_num::dcm_exp). \n
 !! Use DCM_logMap (nwtc_num::dcm_logmap) instead of directly calling a specific routine in the generic interface. 
-   SUBROUTINE DCM_logMapD(DCM, logMap, ErrStat, ErrMsg, thetaOut)
+   SUBROUTINE DCM_logMapD(DCM, logMap, thetaOut)
    
    REAL(R8Ki),         INTENT(IN)    :: DCM(3,3)                  !< the direction cosine matrix, \f$\Lambda\f$             
    REAL(R8Ki),         INTENT(  OUT) :: logMap(3)                 !< vector containing \f$\lambda_1\f$, \f$\lambda_2\f$, and \f$\lambda_3\f$, the unique components of skew-symmetric matrix \f$\lambda\f$ 
    REAL(R8Ki),OPTIONAL,INTENT(  OUT) :: thetaOut                  !< the angle of rotation, \f$\theta\f$; output only for debugging
-   INTEGER(IntKi),     INTENT(  OUT) :: ErrStat                   !< Error status of the operation
-   CHARACTER(*),       INTENT(  OUT) :: ErrMsg                    !< Error message if ErrStat /= ErrID_None
    
-      ! local variables
    REAL(R8Ki)                        :: theta
    REAL(R8Ki)                        :: cosTheta
    REAL(R8Ki)                        :: TwoSinTheta
    REAL(R8Ki)                        :: v(3)
    REAL(R8Ki)                        :: divisor
-   INTEGER(IntKi)                    :: indx_max
-      
-         ! initialization
-      ErrStat = ErrID_None
-      ErrMsg  = ""   
-   
+   INTEGER(IntKi)                    :: indx_max  
    
       cosTheta = 0.5_DbKi*( trace(DCM) - 1.0_R8Ki )
       cosTheta = min( max(cosTheta,-1.0_R8Ki), 1.0_R8Ki ) !make sure it's in a valid range (to avoid cases where this is slightly outside the +/-1 range)
@@ -1372,28 +1364,20 @@ CONTAINS
    END SUBROUTINE DCM_logMapD
 !=======================================================================
 !> \copydoc nwtc_num::dcm_logmapd
-   SUBROUTINE DCM_logMapR(DCM, logMap, ErrStat, ErrMsg, thetaOut)
+   SUBROUTINE DCM_logMapR(DCM, logMap, thetaOut)
    
       ! This function computes the logarithmic map for a direction cosine matrix.
    
    REAL(SiKi),         INTENT(IN)    :: DCM(3,3)
    REAL(SiKi),         INTENT(  OUT) :: logMap(3)
    REAL(SiKi),OPTIONAL,INTENT(  OUT) :: thetaOut
-   INTEGER(IntKi),     INTENT(  OUT) :: ErrStat                   ! Error status of the operation
-   CHARACTER(*),       INTENT(  OUT) :: ErrMsg                    ! Error message if ErrStat /= ErrID_None
    
-      ! local variables
    REAL(SiKi)                        :: cosTheta
    REAL(SiKi)                        :: theta
    REAL(SiKi)                        :: TwoSinTheta
    REAL(SiKi)                        :: v(3)
    REAL(SiKi)                        :: divisor
    INTEGER(IntKi)                    :: indx_max
-      
-         ! initialization
-      ErrStat = ErrID_None
-      ErrMsg  = ""   
-   
    
       cosTheta  = 0.5_SiKi*( trace(DCM) - 1.0_SiKi )
       cosTheta  = min( max(cosTheta,-1.0_SiKi), 1.0_SiKi ) !make sure it's in a valid range (to avoid cases where this is slightly outside the +/-1 range)
@@ -1627,7 +1611,7 @@ CONTAINS
 !!
 !! Note that the numbers are added together in this routine, so overflow can result if comparing two "huge" numbers. \n
 !! Use EqualRealNos (nwtc_num::equalrealnos) instead of directly calling a specific routine in the generic interface. 
-   FUNCTION EqualRealNos4 ( ReNum1, ReNum2 )
+   PURE FUNCTION EqualRealNos4 ( ReNum1, ReNum2 )
 
       ! passed variables
 
@@ -1661,7 +1645,7 @@ CONTAINS
    END FUNCTION EqualRealNos4
 !=======================================================================
 !> \copydoc nwtc_num::equalrealnos4
-   FUNCTION EqualRealNos8 ( ReNum1, ReNum2 )
+   PURE FUNCTION EqualRealNos8 ( ReNum1, ReNum2 )
 
       ! passed variables
 
@@ -6179,7 +6163,7 @@ end function Rad2M180to180Deg
 !! \end{bmatrix}
 !! \f}   
 !> Use SkewSymMat (nwtc_num::skewsymmat) instead of directly calling a specific routine in the generic interface.
-   FUNCTION SkewSymMatR4 ( x ) RESULT(M)
+   pure FUNCTION SkewSymMatR4 ( x ) RESULT(M)
 
       ! Function arguments
 
@@ -6202,7 +6186,7 @@ end function Rad2M180to180Deg
    END FUNCTION SkewSymMatR4 
 !=======================================================================
 !> \copydoc nwtc_num::skewsymmatr4
-   FUNCTION SkewSymMatR8 ( x ) RESULT(M)
+   pure FUNCTION SkewSymMatR8 ( x ) RESULT(M)
 
       ! Function arguments
 

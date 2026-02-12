@@ -72,7 +72,7 @@ add_library(aerodynlib STATIC
   src/FVW_Tests.f90
   src/FVW_Types.f90
 )
-target_link_libraries(aerodynlib basicaerolib aeroacousticslib nwtclibs)
+target_link_libraries(aerodynlib basicaerolib aeroacousticslib seastlib nwtclibs)
 
 # ADI lib
 add_library(adilib STATIC
