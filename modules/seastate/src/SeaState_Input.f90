@@ -707,7 +707,7 @@ subroutine SeaStateInput_ProcessInitData( InitInp, p, InputFileData, ErrStat, Er
        ! WavePkShp - Peak shape parameter
    if ( InputFileData%WaveMod == WaveMod_JONSWAP ) then   ! Only used for JONSWAP/Pierson-Moskowitz spectrum
 
-      if ( ( InputFileData%Waves%WavePkShp < 1.0 ) .OR. ( InputFileData%Waves%WavePkShp > 7.0 ) )  then
+      if ( ( InputFileData%Waves%WavePkShp < 1.0_SiKi ) .OR. ( InputFileData%Waves%WavePkShp > 7.0_SiKi ) )  then
          call SetErrStat( ErrID_Fatal,'WavePkShp must be greater than or equal to 1 and less than or equal to 7.',ErrStat,ErrMsg,RoutineName)
          return
       end if
@@ -715,7 +715,7 @@ subroutine SeaStateInput_ProcessInitData( InitInp, p, InputFileData, ErrStat, Er
    else
 
       ! For nonJONSWAP/Pierson-Moskowitz spectrum, WavePkShp is not used. Force it to 1.0.
-      InputFileData%Waves%WavePkShp = 1.0
+      InputFileData%Waves%WavePkShp = 1.0_SiKi
 
    end if
 
