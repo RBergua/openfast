@@ -714,7 +714,7 @@ subroutine SeaStateInput_ProcessInitData( InitInp, p, InputFileData, ErrStat, Er
 
    else
 
-      ! For nonJONSWAP/Pieson-Moskowitz spectrum, WavePkShp is not used. Force it to 1.0.
+      ! For nonJONSWAP/Pierson-Moskowitz spectrum, WavePkShp is not used. Force it to 1.0.
       InputFileData%Waves%WavePkShp = 1.0
 
    end if
