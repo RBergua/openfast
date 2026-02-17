@@ -438,9 +438,6 @@ subroutine FAST_UpdateStates(ModData, t_initial, n_t_global, T, ErrStat, ErrMsg)
    ErrStat = ErrID_None
    ErrMsg = ''
 
-   ! Skip modules in the tight coupling category because the solver handles state updates
-   if (iand(ModData%Category, MC_Tight) /= 0) return
-
    ! Select based on module ID
    select case (ModData%ID)
 

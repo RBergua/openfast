@@ -952,6 +952,14 @@ subroutine FAST_SolverStep0(p, m, GlueModData, GlueModMaps, Turbine, ErrStat, Er
    ! Set algorithmic acceleration from actual acceleration
    m%StatePred%a = m%StatePred%vd
 
+   ! Initialize the algorithmic acceleration to actual acceleration in BeamDyn
+   do i = 1, size(GlueModData)
+      if (GlueModData(i)%ID == Module_BD) then
+         Turbine%BD%OtherSt(GlueModData(i)%Ins, STATE_CURR)%xcc = &
+            Turbine%BD%OtherSt(GlueModData(i)%Ins, STATE_CURR)%acc
+      end if
+   end do
+
    !----------------------------------------------------------------------------
    ! Set Outputs
    !----------------------------------------------------------------------------
@@ -1271,9 +1279,11 @@ subroutine FAST_SolverStep(n_t_global, t_initial, p, m, GlueModData, GlueModMaps
             call FAST_InputSolve(p%iModOpt2(i), GlueModData, GlueModMaps, INPUT_CURR, Turbine, ErrStat2, ErrMsg2)
             if (Failed()) return
 
-            ! Update states
-            call FAST_UpdateStates(ModData, t_initial, n_t_global, Turbine, ErrStat2, ErrMsg2)
-            if (Failed()) return
+            ! Update states of modules not in the tight coupling category
+            if (iand(ModData%Category, MC_Tight) == 0) then
+               call FAST_UpdateStates(ModData, t_initial, n_t_global, Turbine, ErrStat2, ErrMsg2)
+               if (Failed()) return
+            end if
 
             ! Calculate outputs
             call FAST_CalcOutput(ModData, GlueModMaps, t_global_next, INPUT_CURR, STATE_PRED, Turbine, ErrStat2, ErrMsg2)
@@ -1286,12 +1296,18 @@ subroutine FAST_SolverStep(n_t_global, t_initial, p, m, GlueModData, GlueModMaps
       !-------------------------------------------------------------------------
 
       do i = 1, size(p%iModOpt1)
+         associate (ModData => GlueModData(p%iModOpt1(i)))
 
-         call FAST_InputSolve(p%iModOpt1(i), GlueModData, GlueModMaps, INPUT_CURR, Turbine, ErrStat2, ErrMsg2)
-         if (Failed()) return
+            ! Solve for inputs to module
+            call FAST_InputSolve(p%iModOpt1(i), GlueModData, GlueModMaps, INPUT_CURR, Turbine, ErrStat2, ErrMsg2)
+            if (Failed()) return
 
-         call FAST_UpdateStates(GlueModData(p%iModOpt1(i)), t_initial, n_t_global, Turbine, ErrStat2, ErrMsg2)
-         if (Failed()) return
+            ! Update states for modules not updated in Option 2
+            if (iand(ModData%Category, MC_Option2) == 0) then
+               call FAST_UpdateStates(GlueModData(p%iModOpt1(i)), t_initial, n_t_global, Turbine, ErrStat2, ErrMsg2)
+               if (Failed()) return
+            end if
+         end associate
       end do
 
       !-------------------------------------------------------------------------
@@ -1504,9 +1520,9 @@ subroutine FAST_SolverStep(n_t_global, t_initial, p, m, GlueModData, GlueModMaps
                if (Failed()) return
 
                ! Transfer accelerations to BeamDyn
-               if (ModData%ID == Module_BD) then
-                  call SetBDAccel(ModData, m%StatePred, Turbine%BD%OtherSt(ModData%Ins, STATE_PRED))
-               end if
+               ! if (ModData%ID == Module_BD) then
+               !    call SetBDAccel(ModData, m%StatePred, Turbine%BD%OtherSt(ModData%Ins, STATE_PRED))
+               ! end if
 
             end associate
          end do
