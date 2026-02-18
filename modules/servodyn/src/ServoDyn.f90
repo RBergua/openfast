@@ -129,6 +129,7 @@ SUBROUTINE SrvD_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitO
    INTEGER(IntKi)                                 :: K              ! loop counter
    INTEGER(IntKi)                                 :: nPts           ! number of linear wind-speed points
    INTEGER(IntKi)                                 :: UnSum          ! Summary file unit
+   LOGICAL                                        :: Linearize
    INTEGER(IntKi)                                 :: ErrStat2       ! temporary Error status of the operation
    CHARACTER(ErrMsgLen)                           :: ErrMsg2        ! temporary Error message if ErrStat /= ErrID_None
    
@@ -565,7 +566,8 @@ SUBROUTINE SrvD_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitO
       !............................................................................................
       ! Initialize module variables
       !............................................................................................
-   call SrvD_InitVars( InitInp, u, p, x, y, m, InitOut, InitInp%Linearize, ErrStat2, ErrMsg2 )
+   Linearize = InitInp%Linearize .or. ((p%NumBStC + p%NumNStC + p%NumTStC + p%NumSStC) > 0)
+   call SrvD_InitVars( InitInp, u, p, x, y, m, InitOut, Linearize, ErrStat2, ErrMsg2 )
    call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 
       !............................................................................................
@@ -698,19 +700,31 @@ subroutine SrvD_InitVars(InitInp, u, p, x, y, m, InitOut, Linearize, ErrStat, Er
                   DatLoc(SrvD_u_BlPitch), &
                   Flags=VF_RotFrame + VF_2PI, &
                   Num=size(u%BlPitch), &
+                  Perturb=uPerturbAng, &
                   LinNames=[('BlPitch('//trim(Num2LStr(i))//'), rad', i = 1, size(u%BlPitch))])
 
    call MV_AddVar(InitOut%Vars%u, "BlPRate", FieldScalar, &
                   DatLoc(SrvD_u_BlPRate), &
                   Flags=VF_RotFrame, &
                   Num=size(u%BlPRate), &
+                  Perturb=uPerturbAng, &
                   LinNames=[('BlPRate('//trim(Num2LStr(i))//'), rad/s', i = 1, size(u%BlPRate))])
 
-   call MV_AddVar(InitOut%Vars%u, "Yaw", FieldScalar, DatLoc(SrvD_u_Yaw), Flags=VF_2PI, LinNames=['Yaw, rad'])
+   call MV_AddVar(InitOut%Vars%u, "Yaw", FieldScalar, &
+                  DatLoc(SrvD_u_Yaw), &
+                  Flags=VF_2PI, &
+                  Perturb=uPerturbAng, &
+                  LinNames=['Yaw, rad'])
 
-   call MV_AddVar(InitOut%Vars%u, "YawRate", FieldScalar, DatLoc(SrvD_u_YawRate), LinNames=['YawRate, rad/s'])
+   call MV_AddVar(InitOut%Vars%u, "YawRate", FieldScalar, &
+                  DatLoc(SrvD_u_YawRate), &
+                  Perturb=uPerturbAng, &
+                  LinNames=['YawRate, rad/s'])
 
-   call MV_AddVar(InitOut%Vars%u, "HSS_Spd", FieldScalar, DatLoc(SrvD_u_HSS_Spd), LinNames=['HSS_Spd, rad/s'])
+   call MV_AddVar(InitOut%Vars%u, "HSS_Spd", FieldScalar, &
+                  DatLoc(SrvD_u_HSS_Spd), &
+                  Perturb=0.1_R8Ki, &
+                  LinNames=['HSS_Spd, rad/s'])
 
    ! Structural controllers
    do j = 1, p%NumBStC
@@ -2845,7 +2859,8 @@ END SUBROUTINE SrvD_CalcConstrStateResidual
 !----------------------------------------------------------------------------------------------------------------------------------
 !> Routine to compute the Jacobians of the output (Y), continuous- (X), discrete- (Xd), and constraint-state (Z) functions
 !! with respect to the inputs (u). The partial derivatives dY/du and dX/du are returned.
-SUBROUTINE SrvD_JacobianPInput( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg, dYdu, dXdu, dXddu, dZdu )
+SUBROUTINE SrvD_JacobianPInput(Vars, t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg, dYdu, dXdu, dXddu, dZdu )
+   type(ModVarsType),                  intent(in   )  :: Vars       !< Module vars
    real(DbKi),                         intent(in   )  :: t          !< Time in seconds at operating point
    type(SrvD_InputType),               intent(inout)  :: u          !< Inputs at operating point (may change to inout if a mesh copy is required)
    type(SrvD_ParameterType),           intent(in   )  :: p          !< Parameters
@@ -2869,33 +2884,106 @@ SUBROUTINE SrvD_JacobianPInput( t, u, p, x, xd, z, OtherState, y, m, ErrStat, Er
    real(R8Ki), allocatable, optional,  intent(inout)  :: dZdu(:,:)  !< Partial derivatives of constraint state
                                                                     !!   functions (Z) with respect to inputs (u) [intent in to avoid deallocation]
 
-      ! local variables
-   integer(IntKi)                                     :: ErrStat2               ! Error status of the operation
-   character(ErrMsgLen)                               :: ErrMsg2                ! Error message if ErrStat /= ErrID_None
-   character(*), parameter                            :: RoutineName = 'SrvD_JacobianPInput'
+   character(*), parameter    :: RoutineName = 'SrvD_JacobianPInput'
+   integer(IntKi)             :: ErrStat2               ! Error status of the operation
+   character(ErrMsgLen)       :: ErrMsg2                ! Error message if ErrStat /= ErrID_None
+   integer(IntKi)             :: i, j, iCol             ! Loop indices
 
-      ! Initialize ErrStat
+   ! Initialize ErrStat
    ErrStat = ErrID_None
    ErrMsg  = ''
 
+   ! Update copy of the inputs to perturb
+   call SrvD_CopyInput(u, m%u_perturb, MESH_UPDATECOPY, ErrStat2, ErrMsg2); if (Failed()) return
+   call SrvD_VarsPackInput(Vars, u, m%Jac%u)
+
       ! Calculate the partial derivative of the output functions (Y) with respect to the inputs (u) here:
-   IF ( PRESENT( dYdu ) ) THEN
-      call Jac_dYdu( t, u, p, x, xd, z, OtherState, y, m, ErrStat2, ErrMsg2, dYdu )
-      if (Failed())  return
+   if (present(dYdu)) then
+
+      if (.not. allocated(dYdu)) then
+         call AllocAry(dYdu, Vars%Ny, Vars%Nu, 'dYdu', ErrStat2, ErrMsg2)
+         if (Failed()) return
+      end if
+
+      ! Update copy of the inputs to perturb
+      call SrvD_CopyInput(u, m%u_perturb, MESH_UPDATECOPY, ErrStat2, ErrMsg2); if (Failed()) return
+      call SrvD_VarsPackInput(Vars, u, m%Jac%u)
+
+      ! Loop through input variables
+      do i = 1, size(Vars%u)
+
+         ! Loop through number of linearization perturbations in variable
+         do j = 1, Vars%u(i)%Num
+
+            ! Calculate column index
+            iCol = Vars%u(i)%iLoc(1) + j - 1
+
+            ! Calculate positive perturbation
+            call MV_Perturb(Vars%u(i), j, 1, m%Jac%u, m%Jac%u_perturb)
+            call SrvD_VarsUnpackInput(Vars, m%Jac%u_perturb, m%u_perturb)
+            call SrvD_CalcOutput(t, m%u_perturb, p, x, xd, z, OtherState, m%y_lin, m, ErrStat2, ErrMsg2); if (Failed()) return
+            call SrvD_VarsPackOutput(Vars, m%y_lin, m%Jac%y_pos)
+
+            ! Calculate negative perturbation
+            call MV_Perturb(Vars%u(i), j, -1, m%Jac%u, m%Jac%u_perturb)
+            call SrvD_VarsUnpackInput(Vars, m%Jac%u_perturb, m%u_perturb)
+            call SrvD_CalcOutput(t, m%u_perturb, p, x, xd, z, OtherState, m%y_lin, m, ErrStat2, ErrMsg2); if (Failed()) return
+            call SrvD_VarsPackOutput(Vars, m%y_lin, m%Jac%y_neg)
+
+            ! Get partial derivative via central difference and store in full linearization array
+            call MV_ComputeCentralDiff(Vars%y, Vars%u(i)%Perturb, m%Jac%y_pos, m%Jac%y_neg, dYdu(:,iCol))
+         end do
+      end do
+
+      ! call Jac_dYdu(Vars, t, u, p, x, xd, z, OtherState, y, m, ErrStat2, ErrMsg2, dYdu )
+      ! if (Failed())  return
    END IF
 
-   IF ( PRESENT( dXdu ) ) THEN
-      call Jac_dXdu( t, u, p, x, xd, z, OtherState, m, ErrStat2, ErrMsg2, dXdu )
-      if (Failed())  return
+   ! Calculate the partial derivative of the continuous state functions (X) with respect to the inputs (u) here:
+   if (present(dXdu) .and. (m%Jac%Nx > 0)) then
+
+      ! Allocate dXdu if not allocated
+      if (.not. allocated(dXdu)) then
+         call AllocAry(dXdu, m%Jac%Nx, m%Jac%Nu, 'dXdu', ErrStat2, ErrMsg2); if (Failed()) return
+      end if
+   
+      ! Loop through input variables
+      do i = 1, size(Vars%u)
+
+         ! Loop through number of linearization perturbations in variable
+         do j = 1, Vars%u(i)%Num
+
+            ! Calculate column index
+            iCol = Vars%u(i)%iLoc(1) + j - 1
+
+            ! Calculate positive perturbation
+            call MV_Perturb(Vars%u(i), j, 1, m%Jac%u, m%Jac%u_perturb)
+            call SrvD_VarsUnpackInput(Vars, m%Jac%u_perturb, m%u_perturb)
+            call SrvD_CalcContStateDeriv(t, m%u_perturb, p, x, xd, z, OtherState, m, m%dxdt_lin, ErrStat2, ErrMsg2); if (Failed()) return
+            call SrvD_VarsPackContState(Vars, m%dxdt_lin, m%Jac%x_pos)
+
+            ! Calculate negative perturbation
+            call MV_Perturb(Vars%u(i), j, -1, m%Jac%u, m%Jac%u_perturb)
+            call SrvD_VarsUnpackInput(Vars, m%Jac%u_perturb, m%u_perturb)
+            call SrvD_CalcContStateDeriv(t, m%u_perturb, p, x, xd, z, OtherState, m, m%dxdt_lin, ErrStat2, ErrMsg2); if (Failed()) return
+            call SrvD_VarsPackContState(Vars, m%dxdt_lin, m%Jac%x_neg)
+
+            ! Get partial derivative via central difference and store in full linearization array
+            dXdu(:,iCol) = (m%Jac%x_pos - m%Jac%x_neg) / (2.0_R8Ki * Vars%u(i)%Perturb)
+         end do
+      end do
+
+      ! call Jac_dXdu( t, u, p, x, xd, z, OtherState, m, ErrStat2, ErrMsg2, dXdu )
+      ! if (Failed())  return
    END IF
 
-   IF ( PRESENT( dXddu ) ) THEN
+   if (present(dXddu)) then
       if (allocated(dXddu)) deallocate(dXddu)
-   END IF
+   end if
 
-   IF ( PRESENT( dZdu ) ) THEN
+   if (present(dZdu)) then
       if (allocated(dZdu)) deallocate(dZdu)
-   END IF
+   end if
 
 contains
    logical function Failed()
@@ -3874,8 +3962,9 @@ end subroutine Compute_dX
 !> Routine to compute the Jacobians of the output (Y), continuous- (X), discrete- (Xd), and constraint-state (Z) functions
 !! with respect to the continuous states (x). The partial derivatives dY/dx, dX/dx, dXd/dx, and DZ/dx are returned.
 !! Note SrvD does not have continuous states, so these are not set.
-SUBROUTINE SrvD_JacobianPContState( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg, dYdx, dXdx, dXddx, dZdx )
+SUBROUTINE SrvD_JacobianPContState(Vars, t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg, dYdx, dXdx, dXddx, dZdx )
 !..................................................................................................................................
+   type(ModVarsType),                     intent(in   )  :: Vars       !< Module vars
    real(DbKi),                            intent(in   )  :: t          !< Time in seconds at operating point
    type(SrvD_InputType),                  intent(in   )  :: u          !< Inputs at operating point (may change to inout if a mesh copy is required)
    type(SrvD_ParameterType),              intent(in   )  :: p          !< Parameters
@@ -3906,21 +3995,91 @@ SUBROUTINE SrvD_JacobianPContState( t, u, p, x, xd, z, OtherState, y, m, ErrStat
    integer(IntKi)                                                  :: ErrStat2               ! Error status of the operation
    character(ErrMsgLen)                                            :: ErrMsg2                ! Error message if ErrStat /= ErrID_None
    character(*), parameter                                         :: RoutineName = 'SrvD_JacobianPContState'
+   integer(IntKi)                                                  :: i, j, iCol
 
       ! Initialize ErrStat
    ErrStat = ErrID_None
    ErrMsg  = ''
 
-      ! Calculate the partial derivative of the output functions (Y) with respect to the inputs (u) here:
-   IF ( PRESENT( dYdx ) ) THEN
-      call Jac_dYdx( t, u, p, x, xd, z, OtherState, y, m, ErrStat2, ErrMsg2, dYdx )
-      if (Failed())  return
+   ! Copy state values
+   call SrvD_CopyContState(x, m%x_perturb, MESH_UPDATECOPY, ErrStat2, ErrMsg2); if (Failed()) return
+   call SrvD_VarsPackContState(Vars, x, m%Jac%x)
+
+   ! Calculate the partial derivative of the output functions (Y) with respect to the inputs (u) here:
+   if (present(dYdx)) then
+
+      ! Allocate dYdx if not allocated
+      if (.not. allocated(dYdx)) then
+         call AllocAry(dYdx, m%Jac%Ny, m%Jac%Nx, 'dYdx', ErrStat2, ErrMsg2); if (Failed()) return
+      end if
+
+      ! Loop through state variables
+      do i = 1, size(Vars%x)
+
+         ! Loop through number of linearization perturbations in variable
+         do j = 1, Vars%x(i)%Num
+
+            ! Calculate column index
+            iCol = Vars%x(i)%iLoc(1) + j - 1
+
+            ! Calculate positive perturbation
+            call MV_Perturb(Vars%x(i), j, 1, m%Jac%x, m%Jac%x_perturb)
+            call SrvD_VarsUnpackContState(Vars, m%Jac%x_perturb, m%x_perturb)
+            call SrvD_CalcOutput(t, u, p, m%x_perturb, xd, z, OtherState, m%y_lin, m, ErrStat2, ErrMsg2); if (Failed()) return
+            call SrvD_VarsPackOutput(Vars, m%y_lin, m%Jac%y_pos)
+
+            ! Calculate negative perturbation
+            call MV_Perturb(Vars%x(i), j, -1, m%Jac%x, m%Jac%x_perturb)
+            call SrvD_VarsUnpackContState(Vars, m%Jac%x_perturb, m%x_perturb)
+            call SrvD_CalcOutput(t, u, p, m%x_perturb, xd, z, OtherState, m%y_lin, m, ErrStat2, ErrMsg2); if (Failed()) return
+            call SrvD_VarsPackOutput(Vars, m%y_lin, m%Jac%y_neg)
+
+            ! Get partial derivative via central difference and store in full linearization array
+            call MV_ComputeCentralDiff(Vars%y, Vars%x(i)%Perturb, m%Jac%y_pos, m%Jac%y_neg, dYdx(:,iCol))
+         end do
+      end do
+
+      ! call Jac_dYdx( t, u, p, x, xd, z, OtherState, y, m, ErrStat2, ErrMsg2, dYdx )
+      ! if (Failed())  return
    END IF
 
-   IF ( PRESENT( dXdx ) ) THEN
-      call Jac_dXdx( t, u, p, x, xd, z, OtherState, m, ErrStat2, ErrMsg2, dXdx )
-      if (Failed())  return
-   END IF
+   ! Calculate the partial derivative of the continuous state functions (X) with respect to the continuous states (x) here:
+   if (present(dXdx) .and. (m%Jac%Nx > 0)) then
+
+      ! Allocate dXdx if not allocated
+      if (.not. allocated(dXdx)) then
+         call AllocAry(dXdx, m%Jac%Nx, m%Jac%Nx, 'dXdx', ErrStat2, ErrMsg2); if (Failed()) return
+      end if
+
+      ! Loop through state variables
+      do i = 1, size(Vars%x)
+
+         ! Loop through number of linearization perturbations in variable
+         do j = 1, Vars%x(i)%Num
+
+            ! Calculate column index
+            iCol = Vars%x(i)%iLoc(1) + j - 1
+
+            ! Calculate positive perturbation
+            call MV_Perturb(Vars%x(i), j, 1, m%Jac%x, m%Jac%x_perturb)
+            call SrvD_VarsUnpackContState(Vars, m%Jac%x_perturb, m%x_perturb)
+            call SrvD_CalcContStateDeriv(t, u, p, m%x_perturb, xd, z, OtherState, m, m%dxdt_lin, ErrStat2, ErrMsg2); if (Failed()) return
+            call SrvD_VarsPackContState(Vars, m%dxdt_lin, m%Jac%x_pos)
+
+            ! Calculate negative perturbation
+            call MV_Perturb(Vars%x(i), j, -1, m%Jac%x, m%Jac%x_perturb)
+            call SrvD_VarsUnpackContState(Vars, m%Jac%x_perturb, m%x_perturb)
+            call SrvD_CalcContStateDeriv(t, u, p, m%x_perturb, xd, z, OtherState, m, m%dxdt_lin, ErrStat2, ErrMsg2); if (Failed()) return
+            call SrvD_VarsPackContState(Vars, m%dxdt_lin, m%Jac%x_neg)
+
+            ! Get partial derivative via central difference and store in full linearization array
+            dXdx(:,iCol) = (m%Jac%x_pos - m%Jac%x_neg) / (2.0_R8Ki * Vars%x(i)%Perturb)
+         end do
+      end do
+
+      ! call Jac_dXdx( t, u, p, x, xd, z, OtherState, m, ErrStat2, ErrMsg2, dXdx )
+      ! if (Failed())  return
+   end if
 
    IF ( PRESENT( dXddx ) ) THEN
       if (allocated(dXddx)) deallocate(dXddx)
