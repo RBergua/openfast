@@ -919,7 +919,7 @@ class InputReader_OpenFAST(object):
         f.readline()
         f.readline()
         f.readline()
-        #---------------------- Stiffness-Proportional Damping -----------------
+        #------ Stiffness-Proportional Damping [used only if damp_type=1] ---------------
         ln = f.readline().split()
         self.fst_vt['BeamDynBlade'][BladeNumber]['mu1']           = float(ln[0])
         self.fst_vt['BeamDynBlade'][BladeNumber]['mu2']           = float(ln[1])
@@ -929,11 +929,11 @@ class InputReader_OpenFAST(object):
         self.fst_vt['BeamDynBlade'][BladeNumber]['mu6']           = float(ln[5])
         f.readline()
         # ------ Modal Damping [used only if damp_type=2] --------------------------------
-        
-        self.fst_vt['BeamDynBlade'][BladeNumber]['n_modes']       = int_read(f.readline().split()[0])
-        self.fst_vt['BeamDynBlade'][BladeNumber]['zeta']          = np.array([f.readline().strip().split()[:self.fst_vt['BeamDynBlade'][BladeNumber]['n_modes']]], dtype=float)
+        n_modes = int(f.readline().split()[0])
+        self.fst_vt['BeamDynBlade'][BladeNumber]['n_modes']       = n_modes
+        self.fst_vt['BeamDynBlade'][BladeNumber]['zeta']          = np.array(f.readline().strip().replace(',', ' ').split()[:n_modes], dtype=float).tolist()
         f.readline()
-        #---------------------- DISTRIBUTED PROPERTIES---------------------------------
+        #------ Distributed Properties --------------------------------------------------
         
         self.fst_vt['BeamDynBlade'][BladeNumber]['radial_stations'] = np.zeros((self.fst_vt['BeamDynBlade'][BladeNumber]['station_total']))
         self.fst_vt['BeamDynBlade'][BladeNumber]['beam_stiff']      = np.zeros((self.fst_vt['BeamDynBlade'][BladeNumber]['station_total'], 6, 6))
