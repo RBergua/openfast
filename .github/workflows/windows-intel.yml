@@ -10,71 +10,51 @@ jobs:
     runs-on: windows-2022
 
     steps:
-    # -------------------------
-    # Checkout (WITH submodules)
-    # -------------------------
     - name: Checkout
       uses: actions/checkout@v4
       with:
         submodules: recursive
 
-    # -------------------------
-    # Install Intel oneAPI
-    # -------------------------
+    # Install Intel oneAPI (CORRECT ACTION NAME)
     - name: Install Intel oneAPI
-      uses: intel/setup-oneapi@v1
+      uses: oneapi-src/setup-oneapi@v1
       with:
         components: >
           compiler-fortran
           compiler-dpcpp-cpp
 
-    # -------------------------
-    # Setup MSVC environment
-    # -------------------------
+    # MSVC environment
     - name: Setup MSVC
       uses: ilammy/msvc-dev-cmd@v1
       with:
         arch: x64
 
-    # -------------------------
-    # Verify Intel compiler (debug safety)
-    # -------------------------
-    - name: Check Intel Fortran
+    # Sanity check
+    - name: Check compiler
       shell: pwsh
-      run: |
-        ifx --version
+      run: ifx --version
 
-    # -------------------------
     # Configure
-    # -------------------------
-    - name: Configure CMake
+    - name: Configure
       shell: pwsh
       run: |
-        New-Item -ItemType Directory -Force -Path build
+        mkdir build
         cd build
-
         cmake .. `
           -G "NMake Makefiles" `
           -DCMAKE_BUILD_TYPE=Release `
-          -DBUILD_SHARED_LIBS=OFF `
-          -DCMAKE_Fortran_COMPILER=ifx `
-          -DCMAKE_EXE_LINKER_FLAGS="/libs:static"
+          -DCMAKE_Fortran_COMPILER=ifx
 
-    # -------------------------
     # Build
-    # -------------------------
     - name: Build
       shell: pwsh
       run: |
         cd build
         cmake --build . --parallel
 
-    # -------------------------
     # Upload exe
-    # -------------------------
-    - name: Upload artifact
+    - name: Upload
       uses: actions/upload-artifact@v4
       with:
-        name: openfast-windows-intel
-        path: |
-          build/**/*.exe
+        name: openfast-windows
+        path: build/**/*.exe
