@@ -10,6 +10,9 @@ jobs:
     runs-on: windows-2022
 
     steps:
+    # -------------------------
+    # Checkout (WITH submodules)
+    # -------------------------
     - name: Checkout
       uses: actions/checkout@v4
       with:
@@ -18,12 +21,12 @@ jobs:
     # -------------------------
     # Install Intel oneAPI
     # -------------------------
-    - name: Install Intel oneAPI Fortran
+    - name: Install Intel oneAPI
       uses: intel/setup-oneapi@v1
       with:
         components: >
-          intel-oneapi-compiler-fortran
-          intel-oneapi-compiler-dpcpp-cpp
+          compiler-fortran
+          compiler-dpcpp-cpp
 
     # -------------------------
     # Setup MSVC environment
@@ -34,12 +37,20 @@ jobs:
         arch: x64
 
     # -------------------------
+    # Verify Intel compiler (debug safety)
+    # -------------------------
+    - name: Check Intel Fortran
+      shell: pwsh
+      run: |
+        ifx --version
+
+    # -------------------------
     # Configure
     # -------------------------
     - name: Configure CMake
       shell: pwsh
       run: |
-        mkdir build
+        New-Item -ItemType Directory -Force -Path build
         cd build
 
         cmake .. `
@@ -47,8 +58,7 @@ jobs:
           -DCMAKE_BUILD_TYPE=Release `
           -DBUILD_SHARED_LIBS=OFF `
           -DCMAKE_Fortran_COMPILER=ifx `
-          -DCMAKE_C_COMPILER=cl `
-          -DCMAKE_CXX_COMPILER=cl
+          -DCMAKE_EXE_LINKER_FLAGS="/libs:static"
 
     # -------------------------
     # Build
@@ -57,7 +67,7 @@ jobs:
       shell: pwsh
       run: |
         cd build
-        cmake --build . --config Release --parallel
+        cmake --build . --parallel
 
     # -------------------------
     # Upload exe
@@ -66,4 +76,5 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: openfast-windows-intel
-        path: build/**/*.exe
+        path: |
+          build/**/*.exe
