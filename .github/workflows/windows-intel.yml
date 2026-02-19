@@ -8,52 +8,55 @@ jobs:
     runs-on: windows-2022
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-    # Install Intel compiler via Chocolatey (robust method)
-    - name: Install Intel oneAPI Fortran
-      shell: powershell
-      run: |
-        choco install intel-oneapi-compiler-fortran -y --no-progress
+      # Install Intel compiler via Chocolatey
+      - name: Install Intel oneAPI Fortran
+        shell: powershell
+        run: |
+          choco install intel-oneapi-compiler-fortran -y --no-progress
 
-    # Setup MSVC
-    - name: Setup MSVC
-      uses: ilammy/msvc-dev-cmd@v1
-      with:
-        arch: x64
+      # Setup MSVC
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
 
-    # Load Intel environment
-    - name: Load Intel env
-      shell: powershell
-      run: |
-        & "C:\Program Files (x86)\Intel\oneAPI\setvars.bat"
+      # Load Intel environment
+      - name: Load Intel env
+        shell: powershell
+        run: |
+          & "C:\Program Files (x86)\Intel\oneAPI\setvars.bat"
 
-    # Verify compiler
-    - name: Check compiler
-      shell: powershell
-      run: ifx --version
+      # Verify compiler
+      - name: Check compiler
+        shell: powershell
+        run: ifx --version
 
-    # Configure
-    - name: Configure
-      shell: powershell
-      run: |
-        mkdir build
-        cd build
-        cmake .. -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_Fortran_COMPILER=ifx
+      # Configure
+      - name: Configure
+        shell: powershell
+        run: |
+          if (Test-Path build) { Remove-Item build -Recurse -Force }
+          mkdir build
+          cd build
+          cmake .. -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Release `
+                    -DCMAKE_Fortran_COMPILER=ifx `
+                    -DCMAKE_EXECUTABLE_SUFFIX=.exe
 
-    # Build
-    - name: Build
-      shell: powershell
-      run: |
-        cd build
-        cmake --build . --parallel
+      # Build
+      - name: Build
+        shell: powershell
+        run: |
+          cd build
+          cmake --build . --parallel
 
-    # Upload exe
-    - name: Upload
-      uses: actions/upload-artifact@v4
-      with:
-        name: openfast-windows
-        path: build/**/*.exe
+      # Upload exe
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: openfast-windows
+          path: build/**/*.exe
