@@ -1,8 +1,6 @@
 name: OpenFAST Windows Intel build
 
 on:
-  push:
-  pull_request:
   workflow_dispatch:
 
 jobs:
@@ -15,39 +13,40 @@ jobs:
       with:
         submodules: recursive
 
-    # Install Intel oneAPI (CORRECT ACTION NAME)
-    - name: Install Intel oneAPI
-      uses: oneapi-src/setup-oneapi@v1
-      with:
-        components: >
-          compiler-fortran
-          compiler-dpcpp-cpp
+    # Install Intel compiler via Chocolatey (robust method)
+    - name: Install Intel oneAPI Fortran
+      shell: powershell
+      run: |
+        choco install intel-oneapi-compiler-fortran -y --no-progress
 
-    # MSVC environment
+    # Setup MSVC
     - name: Setup MSVC
       uses: ilammy/msvc-dev-cmd@v1
       with:
         arch: x64
 
-    # Sanity check
+    # Load Intel environment
+    - name: Load Intel env
+      shell: powershell
+      run: |
+        & "C:\Program Files (x86)\Intel\oneAPI\setvars.bat"
+
+    # Verify compiler
     - name: Check compiler
-      shell: pwsh
+      shell: powershell
       run: ifx --version
 
     # Configure
     - name: Configure
-      shell: pwsh
+      shell: powershell
       run: |
         mkdir build
         cd build
-        cmake .. `
-          -G "NMake Makefiles" `
-          -DCMAKE_BUILD_TYPE=Release `
-          -DCMAKE_Fortran_COMPILER=ifx
+        cmake .. -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_Fortran_COMPILER=ifx
 
     # Build
     - name: Build
-      shell: pwsh
+      shell: powershell
       run: |
         cd build
         cmake --build . --parallel
