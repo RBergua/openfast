@@ -1,4 +1,4 @@
-name: OpenFAST Windows Intel build
+name: OpenFAST Windows Intel 64-bit Build
 
 on:
   workflow_dispatch:
@@ -8,54 +8,55 @@ jobs:
     runs-on: windows-2022
 
     steps:
+      # 1️⃣ Checkout repository with submodules
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      # Install Intel compiler via Chocolatey
+      # 2️⃣ Install Intel oneAPI Fortran compiler
       - name: Install Intel oneAPI Fortran
         shell: powershell
         run: |
           choco install intel-oneapi-compiler-fortran -y --no-progress
 
-      # Setup MSVC
+      # 3️⃣ Setup MSVC x64 environment
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
 
-      # Load Intel environment
+      # 4️⃣ Load Intel oneAPI environment (64-bit)
       - name: Load Intel env
         shell: powershell
         run: |
-          & "C:\Program Files (x86)\Intel\oneAPI\setvars.bat"
+          & "C:\Program Files (x86)\Intel\oneAPI\setvars.bat" -arch x64
 
-      # Verify compiler
+      # 5️⃣ Verify Intel Fortran compiler
       - name: Check compiler
         shell: powershell
         run: ifx --version
 
-      # Configure
+      # 6️⃣ Configure CMake (clean build, 64-bit, Release)
       - name: Configure
         shell: powershell
         run: |
           if (Test-Path build) { Remove-Item build -Recurse -Force }
           mkdir build
           cd build
-          cmake .. -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Release `
-                    -DCMAKE_Fortran_COMPILER=ifx `
-                    -DCMAKE_EXECUTABLE_SUFFIX=.exe
+          cmake .. -G "Visual Studio 17 2022" -A x64 `
+                    -DCMAKE_BUILD_TYPE=Release `
+                    -DCMAKE_Fortran_COMPILER=ifx
 
-      # Build
+      # 7️⃣ Build the executable (Release)
       - name: Build
         shell: powershell
         run: |
           cd build
-          cmake --build . --parallel
+          cmake --build . --config Release
 
-      # Upload exe
-      - name: Upload
+      # 8️⃣ Upload built .exe files
+      - name: Upload Executables
         uses: actions/upload-artifact@v4
         with:
           name: openfast-windows
