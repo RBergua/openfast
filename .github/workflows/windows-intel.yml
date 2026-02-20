@@ -1,63 +1,56 @@
-name: OpenFAST Windows Intel 64-bit Build
+name: OpenFAST Windows
 
 on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-windows-executables:
     runs-on: windows-2022
 
     steps:
-      # 1️⃣ Checkout repository with submodules
+      # Checkout
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: true
+          fetch-depth: 0
 
-      # 2️⃣ Install Intel oneAPI Fortran compiler
-      - name: Install Intel oneAPI Fortran
-        shell: powershell
+      # Ensure VS environment works
+      - name: Test devenv
+        shell: cmd
+        run: .github/scripts/windows_devenv_test.bat
+
+      # Install Intel Fortran (official upstream method)
+      - name: Install Intel Fortran Essentials
+        shell: cmd
+        env:
+          URL: https://registrationcenter-download.intel.com/akdlm/IRC_NAS/33676fcf-14a3-4e96-a9b9-72976b1145d9/intel-fortran-essentials-2025.3.1.25_offline.exe
         run: |
-          choco install intel-oneapi-compiler-fortran -y --no-progress
+          curl.exe --output %TEMP%\intel.exe --url %URL% --retry 5 --retry-delay 5
+          %TEMP%\intel.exe -s -a --silent --eula accept -p=NEED_VS2022_INTEGRATION=1 --log-dir=.
+          exit /b %ERRORLEVEL%
 
-      # 3️⃣ Setup MSVC x64 environment
-      - name: Setup MSVC
-        uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: x64
-
-      # 4️⃣ Load Intel oneAPI environment (64-bit)
-      - name: Load Intel env
-        shell: powershell
+      # Clean build folder
+      - name: Clean build
+        shell: cmd
         run: |
-          & "C:\Program Files (x86)\Intel\oneAPI\setvars.bat" -arch x64
+          if exist build rmdir /s /q build
 
-      # 5️⃣ Verify Intel Fortran compiler
-      - name: Check compiler
-        shell: powershell
-        run: ifx --version
+      # Build executables (OFFICIAL upstream script)
+      - name: Build executables
+        shell: cmd
+        run: .github/scripts/build_windows_executables.bat
 
-      # 6️⃣ Configure CMake (clean build, 64-bit, Release)
-      - name: Configure
-        shell: powershell
-        run: |
-          if (Test-Path build) { Remove-Item build -Recurse -Force }
-          mkdir build
-          cd build
-          cmake .. -G "Visual Studio 17 2022" -A x64 `
-                    -DCMAKE_BUILD_TYPE=Release `
-                    -DCMAKE_Fortran_COMPILER=ifx
+      # Verify exe exists
+      - name: List output
+        shell: cmd
+        run: dir build\bin
 
-      # 7️⃣ Build the executable (Release)
-      - name: Build
-        shell: powershell
-        run: |
-          cd build
-          cmake --build . --config Release
-
-      # 8️⃣ Upload built .exe files
-      - name: Upload Executables
+      # Upload exe + dll only
+      - name: Upload binaries
         uses: actions/upload-artifact@v4
         with:
           name: openfast-windows
-          path: build/**/*.exe
+          path: |
+            build/bin/*.exe
+            build/bin/*.dll
