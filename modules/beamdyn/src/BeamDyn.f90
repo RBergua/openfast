@@ -5181,7 +5181,7 @@ SUBROUTINE BD_FD_GA2_DAMPING(p_in, x_in, OtherState_in, m_in)
    print *, 'Error Diff Norm: \n', sum(Damping_Diff*Damping_Diff)
    print *, 'Relative Error Norm: \n', sum(Damping_Diff*Damping_Diff) / sum(Damping_FD*Damping_FD)
 
-END SUBROUTINE
+END SUBROUTINE BD_FD_GA2_DAMPING
 
 !-----------------------------------------------------------------------------------------------------------------------------------
 !> This subroutine updates the 1) displacements/rotations(uf)

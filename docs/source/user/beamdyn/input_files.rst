@@ -574,7 +574,8 @@ Recommendations:
 Notes:
 
 - Modal damping is experimental in OpenFAST 5.0, so should be used with care.
-- Modal damping is only supported for tight coupling with OpenFAST. The solver implementation for loose coupling and stand-alone BeamDyn are not yet supported.
+- Modal damping is mainly supported for tight coupling with OpenFAST.
+- In some cases, when used with loose coupling or BeamDyn Driver, a much smaller time step may be needed to get reaction forces to converge with the tight coupling case and/or stiffness-proportional damping (:math:`\mu`) case. 
 - Output forces internal forces from BeamDyn at quadrature points do not capture contributions from the modal damping forces.
 
 Distributed Properties
