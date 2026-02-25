@@ -218,7 +218,7 @@ SUBROUTINE StC_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitOu
       x%StC_x(2,i_pt) = 0
       x%StC_x(3,i_pt) = InputFileData%StC_Y_DSP
       x%StC_x(4,i_pt) = 0
-      if ((p%StC_DOF_MODE == DOFMode_Indept) .and. p%StC_Z_DOF) then    ! Should be zero for omni and TLCD
+      if (((p%StC_DOF_MODE == DOFMode_Indept) .and. p%StC_Z_DOF) .or. (p%StC_DOF_MODE == DOFMode_Omni3)) then    ! Should be zero for omni and TLCD
          x%StC_x(5,i_pt) = InputFileData%StC_Z_DSP
       else
          x%StC_x(5,i_pt) = 0.0_ReKi
@@ -889,6 +889,7 @@ SUBROUTINE StC_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrM
             ! forces and moments in local coordinates
             m%F_P(1:3,i_pt) = m%K(1:3,i_pt) * x%StC_x([1,3,5],i_pt) + (m%C_ctrl(1:3,i_pt) + m%C_Brake(1:3,i_pt)) * x%StC_x([2,4,6],i_pt) &
                             - m%F_stop(1:3,i_pt) - m%F_ext(1:3,i_pt) - m%F_fr(1:3,i_pt) + m%F_table(1:3,i_pt)*(m%F_k(1:3,i_pt))
+            m%F_P(  3,i_pt) = m%F_P(  3,i_pt) - p%StC_Z_PreLd
             m%M_P(1:3,i_pt) = cross_product( x%StC_x([1,3,5],i_pt), m%F_P(1:3,i_pt) )
 
             ! forces and moments in global coordinates
@@ -1128,9 +1129,9 @@ SUBROUTINE StC_CalcContStateDeriv( Time, u, p, x, xd, z, OtherState, m, dxdt, Er
 
          do i_pt=1,p%NumMeshPts
             ! Aggregate acceleration terms
-            m%Acc(1,i_pt) = - m%rddot_P(1,i_pt) + m%a_G(1,i_pt) + 1 / p%M_X * ( m%F_ext(1,i_pt) + m%F_stop(1,i_pt) - m%F_table(1,i_pt) )
-            m%Acc(2,i_pt) = - m%rddot_P(2,i_pt) + m%a_G(2,i_pt) + 1 / p%M_Y * ( m%F_ext(2,i_pt) + m%F_stop(2,i_pt) - m%F_table(2,i_pt) )
-            m%Acc(3,i_pt) = - m%rddot_P(3,i_pt) + m%a_G(3,i_pt) + 1 / p%M_Z * ( m%F_ext(3,i_pt) + m%F_stop(3,i_pt) - m%F_table(3,i_pt) + p%StC_Z_PreLd )
+            m%Acc(1,i_pt) = - m%rddot_P(1,i_pt) + m%a_G(1,i_pt) + 1.0_ReKi / p%M_X * ( m%F_ext(1,i_pt) + m%F_stop(1,i_pt) - m%F_table(1,i_pt) )
+            m%Acc(2,i_pt) = - m%rddot_P(2,i_pt) + m%a_G(2,i_pt) + 1.0_ReKi / p%M_Y * ( m%F_ext(2,i_pt) + m%F_stop(2,i_pt) - m%F_table(2,i_pt) )
+            m%Acc(3,i_pt) = - m%rddot_P(3,i_pt) + m%a_G(3,i_pt) + 1.0_ReKi / p%M_Z * ( m%F_ext(3,i_pt) + m%F_stop(3,i_pt) - m%F_table(3,i_pt) + p%StC_Z_PreLd )
          enddo
 
       ELSE IF (p%StC_DOF_MODE == DOFMode_Omni) THEN
@@ -1145,8 +1146,8 @@ SUBROUTINE StC_CalcContStateDeriv( Time, u, p, x, xd, z, OtherState, m, dxdt, Er
             m%F_k(3,i_pt) = 0.0_ReKi
 
             ! Aggregate acceleration terms
-            m%Acc(1,i_pt) = - m%rddot_P(1,i_pt) + m%a_G(1,i_pt) + 1 / p%M_XY * ( m%F_ext(1,i_pt) + m%F_stop(1,i_pt) - m%F_table(1,i_pt)*(m%F_k(1,i_pt)) )
-            m%Acc(2,i_pt) = - m%rddot_P(2,i_pt) + m%a_G(2,i_pt) + 1 / p%M_XY * ( m%F_ext(2,i_pt) + m%F_stop(2,i_pt) - m%F_table(2,i_pt)*(m%F_k(2,i_pt)) )
+            m%Acc(1,i_pt) = - m%rddot_P(1,i_pt) + m%a_G(1,i_pt) + 1.0_ReKi / p%M_XY * ( m%F_ext(1,i_pt) + m%F_stop(1,i_pt) - m%F_table(1,i_pt)*(m%F_k(1,i_pt)) )
+            m%Acc(2,i_pt) = - m%rddot_P(2,i_pt) + m%a_G(2,i_pt) + 1.0_ReKi / p%M_XY * ( m%F_ext(2,i_pt) + m%F_stop(2,i_pt) - m%F_table(2,i_pt)*(m%F_k(2,i_pt)) )
             m%Acc(3,i_pt) = 0.0_ReKi
          enddo
 
@@ -1162,6 +1163,7 @@ SUBROUTINE StC_CalcContStateDeriv( Time, u, p, x, xd, z, OtherState, m, dxdt, Er
 
             ! Aggregate acceleration terms (this is the difference between the absolute accelerations of the TMD and P in N frame)
             m%Acc(1:3,i_pt) = - m%rddot_P(1:3,i_pt) + m%a_G(1:3,i_pt) + 1.0_ReKi / p%M_XY * ( m%F_ext(1:3,i_pt) + m%F_stop(1:3,i_pt) - m%F_table(1:3,i_pt)*(m%F_k(1:3,i_pt)) )
+            m%Acc(  3,i_pt) = m%Acc(  3,i_pt) + p%StC_Z_PreLd / p%M_Z
          enddo
 
       ENDIF
@@ -2492,10 +2494,14 @@ SUBROUTINE StC_SetParameters( InputFileData, InitInp, p, Interval, ErrStat, ErrM
    p%StC_Z_PreLd = 0.0_ReKi
    TmpCh = trim(InputFileData%StC_Z_PreLdC)
    call Conv2UC(TmpCh)
-   if (InputFileData%StC_DOF_MODE == DOFMode_Indept .and. InputFileData%StC_Z_DOF .and. &
-         (INDEX(TmpCh, "NONE") /= 1) ) then
+   if ( ((InputFileData%StC_DOF_MODE == DOFMode_Indept .and. InputFileData%StC_Z_DOF) .or. (InputFileData%StC_DOF_MODE == DOFMode_Omni3)) &
+         .and. (INDEX(TmpCh, "NONE") /= 1) ) then
       if (INDEX(TmpCh, "GRAVITY") == 1 ) then  ! if gravity, then calculate
-         p%StC_Z_PreLd = -p%Gravity(3)*p%M_Z
+         if ( InputFileData%StC_DOF_MODE == DOFMode_Indept ) then
+            p%StC_Z_PreLd = -p%Gravity(3)*p%M_Z
+         else
+            p%StC_Z_PreLd = -p%Gravity(3)*p%M_XY
+         end if
       else
          READ (InputFileData%StC_Z_PreLdC,*,IOSTAT=ErrStat2)   p%StC_Z_PreLd     ! Read a real number and store
          if (ErrStat2 /= 0) call SetErrStat(ErrID_Fatal,'StC_Z_PreLd must be "gravity", "none" or a real number', ErrStat,ErrMsg,RoutineName)
