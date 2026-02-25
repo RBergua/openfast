@@ -1163,7 +1163,7 @@ SUBROUTINE StC_CalcContStateDeriv( Time, u, p, x, xd, z, OtherState, m, dxdt, Er
 
             ! Aggregate acceleration terms (this is the difference between the absolute accelerations of the TMD and P in N frame)
             m%Acc(1:3,i_pt) = - m%rddot_P(1:3,i_pt) + m%a_G(1:3,i_pt) + 1.0_ReKi / p%M_XY * ( m%F_ext(1:3,i_pt) + m%F_stop(1:3,i_pt) - m%F_table(1:3,i_pt)*(m%F_k(1:3,i_pt)) )
-            m%Acc(  3,i_pt) = m%Acc(  3,i_pt) + p%StC_Z_PreLd / p%M_Z
+            m%Acc(  3,i_pt) = m%Acc(  3,i_pt) + p%StC_Z_PreLd / p%M_XY
          enddo
 
       ENDIF
