@@ -6,6 +6,7 @@ MODULE StrucCtrl
 
    USE StrucCtrl_Types
    USE NWTC_Library
+   USE UserSubs, ONLY: UserStC
 
    IMPLICIT NONE
 
@@ -1769,11 +1770,13 @@ SUBROUTINE StC_ActiveCtrl_UsrSub(u,x,p,K_ctrl,C_ctrl,C_Brake,F_ctrl,M_ctrl)
    real(ReKi),                            intent(inout)  :: M_ctrl(:,:)    !< moment    commanded by dll
    integer(IntKi)                                        :: i_pt           ! counter for mesh points
    do i_pt=1,p%NumMeshPts
-      K_ctrl(1:3,i_pt)  = [p%K_X,p%K_Y,p%K_Z]
-      C_ctrl(1:3,i_pt)  = [p%C_X,p%C_Y,p%C_Z]
-      C_Brake(1:3,i_pt) = 0.0_ReKi
-      F_ctrl(1:3,i_pt)  = 0.0_ReKi
-      M_ctrl(1:3,i_pt)  = 0.0_ReKi
+      call UserStC(x%StC_x([1,3,5],i_pt),& ! Apparent relative displacement
+                   x%StC_x([2,4,6],i_pt),& ! Apparent relative velocity
+                   K_ctrl (1:3,i_pt),&
+                   C_ctrl (1:3,i_pt),&
+                   C_Brake(1:3,i_pt),&
+                   F_ctrl (1:3,i_pt),&
+                   M_ctrl (1:3,i_pt))
    enddo
 
 END SUBROUTINE StC_ActiveCtrl_UsrSub
