@@ -54,6 +54,7 @@ MODULE StrucCtrl
    INTEGER(IntKi), PRIVATE, PARAMETER :: DOFMode_Omni3         = 6          !< 3DOF omni-directional
 
    INTEGER(IntKi), PRIVATE, PARAMETER :: CMODE_Semi            = 1          !< semi-active control
+   INTEGER(IntKi), PRIVATE, PARAMETER :: CMODE_ActiveUsrSub    = 3          !< active control based on user subroutine
    INTEGER(IntKi), PRIVATE, PARAMETER :: CMODE_ActiveEXTERN    = 4          !< active control
    INTEGER(IntKi), PRIVATE, PARAMETER :: CMODE_ActiveDLL       = 5          !< active control
 
@@ -1227,7 +1228,7 @@ SUBROUTINE StC_CalcContStateDeriv( Time, u, p, x, xd, z, OtherState, m, dxdt, Er
       ELSE IF (p%StC_CMODE == CMODE_Semi) THEN ! ground hook control
          CALL StC_GroundHookDamp(dxdt,x,u,p,m%rdisp_P,m%rdot_P,m%C_ctrl,m%C_Brake,m%F_fr)
       ELSE IF (p%StC_CMODE == CMODE_ActiveDLL) THEN   ! Active control from DLL
-         call StC_ActiveCtrl_StiffDamp(u,p,m%K,m%C_ctrl,m%C_Brake,m%F_ext,m%M_ext)
+         call StC_ActiveCtrl_StiffDamp(u,x,p,m%K,m%C_ctrl,m%C_Brake,m%F_ext,m%M_ext)
          m%F_fr    = 0.0_ReKi
          if (.not. p%Use_F_TBL) then
             K(1:3,:) = m%K(1:3,:)
@@ -1240,6 +1241,12 @@ SUBROUTINE StC_CalcContStateDeriv( Time, u, p, x, xd, z, OtherState, m, dxdt, Er
          !   do i_pt=1,p%NumMeshPts
          !      K(1:3,i_pt) = m%F_table(1:3,i_pt) - m%K(1:3,i_pt)
          !   enddo
+         endif
+      ELSE IF (p%StC_CMODE == CMODE_ActiveUsrSub) THEN   ! Active control from user subroutine
+         call StC_ActiveCtrl_UsrSub(u,x,p,m%K,m%C_ctrl,m%C_Brake,m%F_ext,m%M_ext)
+         m%F_fr    = 0.0_ReKi
+         if (.not. p%Use_F_TBL) then
+            K(1:3,:) = m%K(1:3,:)
          endif
       END IF
 
@@ -1722,8 +1729,9 @@ SUBROUTINE StC_GroundHookDamp(dxdt,x,u,p,rdisp_P,rdot_P,C_ctrl,C_Brake,F_fr)
    enddo
 END SUBROUTINE StC_GroundHookDamp
 !----------------------------------------------------------------------------------------------------------------------------------
-SUBROUTINE StC_ActiveCtrl_StiffDamp(u,p,K_ctrl,C_ctrl,C_Brake,F_ctrl,M_ctrl)
+SUBROUTINE StC_ActiveCtrl_StiffDamp(u,x,p,K_ctrl,C_ctrl,C_Brake,F_ctrl,M_ctrl)
    TYPE(StC_InputType),                   INTENT(IN   )  :: u              !< Inputs at Time
+   TYPE(StC_ContinuousStateType),         INTENT(IN   )  :: x              !< State at Time
    TYPE(StC_ParameterType),               INTENT(IN   )  :: p              !< The module's parameter data
    real(ReKi),                            intent(inout)  :: K_ctrl(:,:)    !< stiffness commanded by dll -- leave alone if no ctrl
    real(ReKi),                            intent(inout)  :: C_ctrl(:,:)    !< damping   commanded by dll
@@ -1738,16 +1746,38 @@ SUBROUTINE StC_ActiveCtrl_StiffDamp(u,p,K_ctrl,C_ctrl,C_Brake,F_ctrl,M_ctrl)
          C_Brake(1:3,i_pt) = u%CmdBrake(1:3,p%StC_CChan(i_pt))
          F_ctrl(1:3,i_pt)  = u%CmdForce(1:3,p%StC_CChan(i_pt))
          M_ctrl(1:3,i_pt)  = u%CmdMoment(1:3,p%StC_CChan(i_pt))
-      else  ! Use parameters from file (as if no control) -- leave K value as that may be set by table prior
-         C_ctrl(1,:) = p%C_X
-         C_ctrl(2,:) = p%C_Y
-         C_ctrl(3,:) = p%C_Z
-         C_Brake     = 0.0_ReKi
-         F_ctrl      = 0.0_ReKi
-         M_ctrl      = 0.0_ReKi
+      else  ! Use parameters from file (as if no control) -- leave K value as that may be set by table prior; yes, but K_ctrl is not used if table is used
+         K_ctrl(1:3,i_pt)  = [p%K_X,p%K_Y,p%K_Z]
+         C_ctrl(1:3,i_pt)  = [p%C_X,p%C_Y,p%C_Z]
+         C_Brake(1:3,i_pt) = 0.0_ReKi
+         F_ctrl(1:3,i_pt)  = 0.0_ReKi
+         M_ctrl(1:3,i_pt)  = 0.0_ReKi
       endif
    enddo
 END SUBROUTINE StC_ActiveCtrl_StiffDamp
+
+!----------------------------------------------------------------------------------------------------------------------------------
+!> Example user subroutine for active structure control
+SUBROUTINE StC_ActiveCtrl_UsrSub(u,x,p,K_ctrl,C_ctrl,C_Brake,F_ctrl,M_ctrl)
+   TYPE(StC_InputType),                   INTENT(IN   )  :: u              !< Inputs at Time
+   TYPE(StC_ContinuousStateType),         INTENT(IN   )  :: x              !< State at Time
+   TYPE(StC_ParameterType),               INTENT(IN   )  :: p              !< The module's parameter data
+   real(ReKi),                            intent(inout)  :: K_ctrl(:,:)    !< stiffness commanded by dll -- leave alone if no ctrl
+   real(ReKi),                            intent(inout)  :: C_ctrl(:,:)    !< damping   commanded by dll
+   real(ReKi),                            intent(inout)  :: C_Brake(:,:)   !< brake     commanded by dll
+   real(ReKi),                            intent(inout)  :: F_ctrl(:,:)    !< force     commanded by dll
+   real(ReKi),                            intent(inout)  :: M_ctrl(:,:)    !< moment    commanded by dll
+   integer(IntKi)                                        :: i_pt           ! counter for mesh points
+   do i_pt=1,p%NumMeshPts
+      K_ctrl(1:3,i_pt)  = [p%K_X,p%K_Y,p%K_Z]
+      C_ctrl(1:3,i_pt)  = [p%C_X,p%C_Y,p%C_Z]
+      C_Brake(1:3,i_pt) = 0.0_ReKi
+      F_ctrl(1:3,i_pt)  = 0.0_ReKi
+      M_ctrl(1:3,i_pt)  = 0.0_ReKi
+   enddo
+
+END SUBROUTINE StC_ActiveCtrl_UsrSub
+
 !----------------------------------------------------------------------------------------------------------------------------------
 !> Extrapolate or interpolate stiffness value based on stiffness table.
 SUBROUTINE SpringForceExtrapInterp(x, p, F_table,ErrStat,ErrMsg)
@@ -2255,20 +2285,22 @@ subroutine    StC_ValidatePrimaryData( InputFileData, InitInp, ErrStat, ErrMsg )
       ! Check control modes
    IF (  InputFileData%StC_CMODE /= ControlMode_None     .and. &
          InputFileData%StC_CMODE /= CMODE_Semi           .and. &
+         InputFileData%StC_CMODE /= CMODE_ActiveUsrSub   .and. &
          InputFileData%StC_CMODE /= CMODE_ActiveDLL ) &
          !InputFileData%StC_CMode /= CMODE_ActiveEXTERN   .and. &    ! Not an option at the moment --> 4 (active with Simulink control),
-      CALL SetErrStat( ErrID_Fatal, 'Control mode (StC_CMode) must be 0 (none), 1 (semi-active),'// &
+      CALL SetErrStat( ErrID_Fatal, 'Control mode (StC_CMode) must be 0 (none), 1 (semi-active), 3 (active with user subroutine)'// &
             ' or 5 (active with DLL control) in this version of StrucCtrl.', ErrStat, ErrMsg, RoutineName )
 
       ! Check control channel
-   if ( InputFileData%StC_CMode == CMODE_ActiveDLL ) then
+   if ( InputFileData%StC_CMode == CMODE_ActiveDLL .or. InputFileData%StC_CMode == CMODE_ActiveUsrSub ) then
       if ( InputFileData%StC_DOF_MODE /= DOFMode_Indept .and. &
            InputFileData%StC_DOF_MODE /= DOFMode_Omni   .and. &
            InputFileData%StC_DOF_MODE /= DOFMode_Omni3  .and. &
            InputFileData%StC_DOF_MODE /= DOFMode_ForceDLL) then
-         call SetErrStat( ErrID_Fatal, 'Control mode 4 (active with Simulink control), or 5 (active with DLL control) '// &
-               'can only be used with independent or omni DOF (StC_DOF_Mode=1, 2, or 6) or force from external DLL '// &
-               '(StC_DOF_Mode = 5) in this version of StrucCtrl.', ErrStat, ErrMsg, RoutineName )
+         call SetErrStat( ErrID_Fatal, &
+               'Control mode 3 (active with user subroutine), 4 (active with Simulink control), or 5 (active with DLL control) '// &
+               'can only be used with independent or omni DOF (StC_DOF_Mode=1, 2, or 6) or external force (StC_DOF_Mode = 5) '// &
+               'in this version of StrucCtrl.', ErrStat, ErrMsg, RoutineName )
       endif
       if (InitInp%NumMeshPts > 1) then
          do i=2,InitInp%NumMeshPts  ! Warn if controlling multiple mesh points with single instance (blade TMD)
@@ -2317,8 +2349,8 @@ subroutine    StC_ValidatePrimaryData( InputFileData, InitInp, ErrStat, ErrMsg )
       endif
 
       ! Need active DLL control
-      if (InputFileData%StC_CMODE /= CMODE_ActiveDLL) THEN
-         call SetErrStat( ErrID_Fatal, 'StC_CMODE must be '//trim(Num2LStr(CMODE_ActiveDLL))//   &
+      if (InputFileData%StC_CMODE /= CMODE_ActiveDLL .and. InputFileData%StC_CMODE /= CMODE_ActiveUsrSub) THEN
+         call SetErrStat( ErrID_Fatal, 'StC_CMODE must be '//trim(Num2LStr(CMODE_ActiveUsrSub))//' or '//trim(Num2LStr(CMODE_ActiveDLL))//   &
                                  ' when StC_DOF_MODE is '//trim(Num2LStr(DOFMode_ForceDLL)) , ErrStat, ErrMsg, RoutineName )
       endif
    endif
