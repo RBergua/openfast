@@ -1440,7 +1440,7 @@ subroutine FAST_JacobianPInput(ModData, ThisTime, iInput, iState, T, ErrStat, Er
                                 dYdu=dYdu, dXdu=dXdu)
 
    case (Module_SrvD)
-      call SrvD_JacobianPInput(ThisTime, T%SrvD%Input(iInput, ModData%Ins), T%SrvD%p(ModData%Ins), &
+      call SrvD_JacobianPInput(ModData%Vars, ThisTime, T%SrvD%Input(iInput, ModData%Ins), T%SrvD%p(ModData%Ins), &
                                T%SrvD%x(ModData%Ins, iState), T%SrvD%xd(ModData%Ins, iState), &
                                T%SrvD%z(ModData%Ins, iState), T%SrvD%OtherSt(ModData%Ins, iState), &
                                T%SrvD%y(ModData%Ins), T%SrvD%m(ModData%Ins), &
@@ -1563,7 +1563,7 @@ subroutine FAST_JacobianPContState(ModData, ThisTime, iInput, iState, T, ErrStat
                                     dYdx=dYdx, dXdx=dXdx)
 
    case (Module_SrvD)
-      call SrvD_JacobianPContState(ThisTime, T%SrvD%Input(iInput, ModData%Ins), T%SrvD%p(ModData%Ins), &
+      call SrvD_JacobianPContState(ModData%Vars, ThisTime, T%SrvD%Input(iInput, ModData%Ins), T%SrvD%p(ModData%Ins), &
                                    T%SrvD%x(ModData%Ins, iState), T%SrvD%xd(ModData%Ins, iState), &
                                    T%SrvD%z(ModData%Ins, iState), T%SrvD%OtherSt(ModData%Ins, iState), &
                                    T%SrvD%y(ModData%Ins), T%SrvD%m(ModData%Ins), ErrStat2, ErrMsg2, &
