@@ -485,11 +485,44 @@ REAL(ReKi), INTENT(OUT)  :: F_ctrl(3)  !< force      commanded
 REAL(ReKi), INTENT(OUT)  :: M_ctrl(3)  !< moment     commanded
 
 ! Replace the lines below with controller/actuator logic
+real(ReKi),  parameter     :: PTOStff = 1.00e6
+real(ReKi),  parameter     :: PTODmpg = 1.20e6
+real(ReKi),  parameter     :: l0 = 4.9999
+real(ReKi)                 :: xHull(6,3)
+real(ReKi)                 :: xIRM (6,3)
+real(ReKi)                 :: PTODir(3)
+integer(IntKi)             :: i
+real(ReKi)                 :: dx, dy, dz, l, dldt
+
+xHull(1,1:3) = [ 5.0000_ReKi,  0.0000_ReKi, -8.6600_ReKi]
+xHull(2,1:3) = [-2.5000_ReKi,  4.3301_ReKi, -8.6600_ReKi]
+xHull(3,1:3) = [-2.5000_ReKi, -4.3301_ReKi, -8.6600_ReKi]
+xHull(4,1:3) = [ 5.0000_ReKi,  0.0000_ReKi,  8.6600_ReKi]
+xHull(5,1:3) = [-2.5000_ReKi,  4.3301_ReKi,  8.6600_ReKi]
+xHull(6,1:3) = [-2.5000_ReKi, -4.3301_ReKi,  8.6600_ReKi]
+
+xIRM (1,1:3) = [ 2.5000_ReKi,  0.0000_ReKi, -4.3300_ReKi]
+xIRM (2,1:3) = [-1.2500_ReKi,  2.1651_ReKi, -4.3300_ReKi]
+xIRM (3,1:3) = [-1.2500_ReKi, -2.1651_ReKi, -4.3300_ReKi]
+xIRM (4,1:3) = [ 2.5000_ReKi,  0.0000_ReKi,  4.3300_ReKi]
+xIRM (5,1:3) = [-1.2500_ReKi,  2.1651_ReKi,  4.3300_ReKi]
+xIRM (6,1:3) = [-1.2500_ReKi, -2.1651_ReKi,  4.3300_ReKi]
+
+F_ctrl = 0.0_ReKi
+do i = 1,6
+   dx = d(1)+xIRM(i,1)-xHull(i,1)
+   dy = d(2)+xIRM(i,2)-xHull(i,2)
+   dz = d(3)+xIRM(i,3)-xHull(i,3)
+   l  = sqrt(dx*dx+dy*dy+dz*dz)
+   PTODir = [dx,dy,dz]/l
+   dldt = (dx*v(1) + dy*v(2) + dz*v(3))/l
+   F_ctrl = F_ctrl - ( PTOStff * (l-l0) + PTODmpg * dldt ) * PTOdir
+end do
+
+M_ctrl  = 0.0_ReKi
 K_ctrl  = 0.0_ReKi
 C_ctrl  = 0.0_ReKi
 C_Brake = 0.0_ReKi
-F_ctrl  = 0.0_ReKi
-M_ctrl  = 0.0_ReKi
 
 END SUBROUTINE UserStc
 
