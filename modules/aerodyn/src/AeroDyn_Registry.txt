@@ -517,6 +517,7 @@ typedef	^	RotMiscVarType	ReKi	TFinVrel_i 	3	-	-	"Relative velocity at the refere
 typedef	^	RotMiscVarType	ReKi	TFinSTV_i 	3	-	-	"Structural velocity at the reference point of the fin in the inertial system"
 typedef	^	RotMiscVarType	ReKi	TFinF_i 	3	-	-	"Forces at the reference point of the fin in the inertial system"
 typedef	^	RotMiscVarType	ReKi	TFinM_i 	3	-	-	"Moments at the reference point of the fin in the inertial system"
+typedef	^	RotMiscVarType	GridInterp_MiscVarType	WaveField_m	-	-	-	"misc var information from the GridInterp module"
 
 typedef	^	MiscVarType	RotMiscVarType	rotors	{:}	-	-	"MiscVars for each rotor"	-
 typedef	^	MiscVarType	FVW_InputType	FVW_u	:	-	-	"Inputs to the FVW module"	-
@@ -525,7 +526,7 @@ typedef	^	MiscVarType	FVW_MiscVarType	FVW	-	-	-	"MiscVars from the FVW module"	-
 typedef	^	MiscVarType	ReKi            WindPos	{:}{:} - -	"XYZ coordinates to query for wind velocity/acceleration"	-
 typedef	^	MiscVarType	ReKi            WindVel	{:}{:} - -	"XYZ components of wind velocity"	-
 typedef	^	MiscVarType	ReKi            WindAcc	{:}{:} - -	"XYZ components of wind acceleration"	-
-typedef ^   MiscVarType GridInterp_MiscVarType WaveField_m - - - "misc var information from the SeaState WaveField module"   -
+typedef	^	MiscVarType	GridInterp_MiscVarType	WaveField_m	-	-	-	"misc var information from the GridInterp module"	-
 typedef	^	MiscVarType	AD_InflowType	Inflow	{:}	-	-	"Inflow storage (size of u for history of inputs)"	-
 typedef	^	MiscVarType	AD_InputType	u_perturb	-	-	-	"input perturbation for linearization"	-
 typedef	^	MiscVarType	AD_OutputType	y_lin	-	-	-	"output perturbation for linearization"	-
