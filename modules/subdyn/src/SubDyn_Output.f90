@@ -470,7 +470,8 @@ SUBROUTINE SDOut_MapOutputs(u,p,x, y, m, AllOuts, ErrStat, ErrMsg )
          ! NEED TO ADD HYDRODYNAMIC FORCES AT THE RESTRAINT NODES
          iSDNode   = p%Nodes_C(I,1) 
          iMeshNode = iSDNode ! input and Y2 mesh nodes are the same as subdyn
-         Fext =  (/ u%LMesh%Force(:,iMeshNode), u%LMesh%Moment(:,iMeshNode) /)
+         Fext =  (/ u%LMesh%Force(:,iMeshNode), u%LMesh%Moment(:,iMeshNode) /) + p%FG(p%NodesDOF(iMeshNode)%List(1:6))
+         Fext(1:3) = Fext(1:3) + p%FC(p%NodesDOF(iMeshNode)%List(1:3))
          ReactNs((I-1)*6+1:6*I) = FK_elm2 - Fext  !Accumulate reactions from all nodes in GLOBAL COORDINATES
       ENDDO
       ! Store into AllOuts
