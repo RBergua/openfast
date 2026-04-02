@@ -2478,7 +2478,7 @@ subroutine RotCavtCrit(u, p, m, errStat, errMsg)
                SigmaCavitCrit = ( p%rotors(iR)%Patm + ( p%rotors(iR)%Gravity * ( abs( u%rotors(iR)%BladeMotion(j)%Position(3,i) + u%rotors(iR)%BladeMotion(j)%TranslationDisp(3,i) ) + p%rotors(iR)%MSL2SWL ) * p%rotors(iR)%airDens ) - p%rotors(iR)%Pvap ) / ( 0.5_ReKi * p%rotors(iR)%airDens * Vreltemp**2 )  ! Critical value of Sigma, cavitation occurs if local cavitation number is greater than this
                                                                         
                if ( ( SigmaCavitCrit < SigmaCavit ) .and. ( .not. ( m%rotors(iR)%CavitWarnSet(i,j) ) ) ) then     
-                  call WrScr( NewLine//'Cavitation occurred at blade '//trim(num2lstr(j))//' and node '//trim(num2lstr(i))//'.' )
+                  call WrScr( NewLine//'Cavitation occurred at rotor '//trim(num2lstr(iR))//', blade '//trim(num2lstr(j))//', and node '//trim(num2lstr(i))//'.' )
                   m%rotors(iR)%CavitWarnSet(i,j) = .true.
                end if 
                            
