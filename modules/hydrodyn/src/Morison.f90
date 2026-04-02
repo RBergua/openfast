@@ -3264,7 +3264,15 @@ subroutine VisMeshSetup(u,p,y,m,InitOut,ErrStat,ErrMsg)
          NdPos = u%Mesh%Position(:,NdIdx)          ! node position
          call MeshPositionNode (y%VisMesh, NdNum, u%Mesh%Position(:,NdIdx), ErrStat2,  ErrMsg2, Orient=MemberOrient)
          if (Failed())  return
-         InitOut%MorisonVisRad(NdNum) = p%Members(iMem)%RMG(iNd)   ! radius (including marine growth) for visualization
+         select case ( p%Members(iMem)%MSecGeom )
+            case (MSecGeom_Cyl)
+               InitOut%MorisonVisRad(NdNum) = p%Members(iMem)%RMG(iNd)   ! radius (including marine growth) for visualization
+            case (MSecGeom_Rec)
+               InitOut%MorisonVisRad(NdNum) = sqrt(p%Members(iMem)%SaMG(iNd)*p%Members(iMem)%SbMG(iNd)/Pi)   ! equivalent radius (including marine growth) for visualization
+            case default
+               call SetErrStat( ErrId_Fatal, " Unrecognized member cross section geometry ", ErrStat, ErrMsg, RoutineName )
+               return
+         end select
       enddo
    enddo
 
