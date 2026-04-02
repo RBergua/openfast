@@ -9328,7 +9328,7 @@ AeroDyn_Nodes['Fxa']          = False     # (N/m); Normal force (to chord) per u
 AeroDyn_Nodes['Ft']           = False     # (N/m); Tangential force (to chord) per unit length at each node - Negative along ya!; airfoil coordinate system
 AeroDyn_Nodes['Gam']          = False     # (m^2/s); Gamma -- circulation on blade; about za, airfoil coordinate system
 AeroDyn_Nodes['Clrnc']        = False     # (m); Tower clearance at each node (based on the absolute distance to the nearest point in the tower from blade node B#N# minus the local tower radius, in the deflected configuration); please note that this clearance is only approximate because the calculation assumes that the blade is a line with no volume (however, the calculation does use the local tower radius); when blade node B#N# is above the tower top (or below the tower base), the absolute distance to the tower top (or base) minus the local tower radius, in the deflected configuration, is output; 
-AeroDyn_Nodes['GeomPhi']      = False     # (1/0); Geometric phi? If phi was solved using normal BEMT equations, GeomPhi = 1; otherwise, if it was solved geometrically, GeomPhi = 0.; 
+AeroDyn_Nodes['GeomPhi']      = False     # (1/0); Geometric phi? If phi was solved using normal BEMT equations, GeomPhi = 0; otherwise, if it was solved geometrically, GeomPhi = 1.; 
 AeroDyn_Nodes['Chi']          = False     # (deg); Skew angle (used in skewed wake correction); 
 AeroDyn_Nodes['UA_Flag']      = False     # (-); Flag indicating if UA is turned on for this node.; 
 AeroDyn_Nodes['UA_x1']        = False     # (rad); time-history of wake vorticity contributing to effective angle of attack; 

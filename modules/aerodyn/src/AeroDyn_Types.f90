@@ -557,6 +557,7 @@ IMPLICIT NONE
     REAL(ReKi) , DIMENSION(1:3)  :: TFinSTV_i = 0.0_ReKi      !< Structural velocity at the reference point of the fin in the inertial system [-]
     REAL(ReKi) , DIMENSION(1:3)  :: TFinF_i = 0.0_ReKi      !< Forces at the reference point of the fin in the inertial system [-]
     REAL(ReKi) , DIMENSION(1:3)  :: TFinM_i = 0.0_ReKi      !< Moments at the reference point of the fin in the inertial system [-]
+    TYPE(GridInterp_MiscVarType)  :: WaveField_m      !< misc var information from the GridInterp module [-]
   END TYPE RotMiscVarType
 ! =======================
 ! =========  AD_MiscVarType  =======
@@ -568,7 +569,7 @@ IMPLICIT NONE
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: WindPos      !< XYZ coordinates to query for wind velocity/acceleration [-]
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: WindVel      !< XYZ components of wind velocity [-]
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: WindAcc      !< XYZ components of wind acceleration [-]
-    TYPE(GridInterp_MiscVarType)  :: WaveField_m      !< misc var information from the SeaState WaveField module [-]
+    TYPE(GridInterp_MiscVarType)  :: WaveField_m      !< misc var information from the GridInterp module [-]
     TYPE(AD_InflowType) , DIMENSION(:), ALLOCATABLE  :: Inflow      !< Inflow storage (size of u for history of inputs) [-]
     TYPE(AD_InputType)  :: u_perturb      !< input perturbation for linearization [-]
     TYPE(AD_OutputType)  :: y_lin      !< output perturbation for linearization [-]
@@ -5553,6 +5554,9 @@ subroutine AD_CopyRotMiscVarType(SrcRotMiscVarTypeData, DstRotMiscVarTypeData, C
    DstRotMiscVarTypeData%TFinSTV_i = SrcRotMiscVarTypeData%TFinSTV_i
    DstRotMiscVarTypeData%TFinF_i = SrcRotMiscVarTypeData%TFinF_i
    DstRotMiscVarTypeData%TFinM_i = SrcRotMiscVarTypeData%TFinM_i
+   call GridInterp_CopyMisc(SrcRotMiscVarTypeData%WaveField_m, DstRotMiscVarTypeData%WaveField_m, CtrlCode, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if (ErrStat >= AbortErrLev) return
 end subroutine
 
 subroutine AD_DestroyRotMiscVarType(RotMiscVarTypeData, ErrStat, ErrMsg)
@@ -5776,6 +5780,8 @@ subroutine AD_DestroyRotMiscVarType(RotMiscVarTypeData, ErrStat, ErrMsg)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    call NWTC_Library_DestroyMeshMapType(RotMiscVarTypeData%T_P_2_T_L, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   call GridInterp_DestroyMisc(RotMiscVarTypeData%WaveField_m, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
 end subroutine
 
 subroutine AD_PackRotMiscVarType(RF, Indata)
@@ -5916,6 +5922,7 @@ subroutine AD_PackRotMiscVarType(RF, Indata)
    call RegPack(RF, InData%TFinSTV_i)
    call RegPack(RF, InData%TFinF_i)
    call RegPack(RF, InData%TFinM_i)
+   call GridInterp_PackMisc(RF, InData%WaveField_m) 
    if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
@@ -6083,6 +6090,7 @@ subroutine AD_UnPackRotMiscVarType(RF, OutData)
    call RegUnpack(RF, OutData%TFinSTV_i); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%TFinF_i); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%TFinM_i); if (RegCheckErr(RF, RoutineName)) return
+   call GridInterp_UnpackMisc(RF, OutData%WaveField_m) ! WaveField_m 
 end subroutine
 
 subroutine AD_CopyMisc(SrcMiscData, DstMiscData, CtrlCode, ErrStat, ErrMsg)
