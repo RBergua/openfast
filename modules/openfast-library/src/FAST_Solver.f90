@@ -64,6 +64,9 @@ subroutine FAST_SolverInit(p_FAST, p, m, GlueModData, GlueModMaps, Turbine, ErrS
    ! Convergence tolerance
    p%ConvTol = p_FAST%ConvTol
 
+   ! Under-relaxation factor
+   p%Relax = p_FAST%Relax
+
    ! Solver time step
    p%h = p_FAST%DT
 
@@ -1562,7 +1565,7 @@ subroutine FAST_SolverStep(n_t_global, t_initial, p, m, GlueModData, GlueModMaps
          !----------------------------------------------------------------------
 
          ! Add change in inputs
-         if (p%iJU(1) > 0) call MV_AddDelta(m%Mod%Vars%u, m%XB(p%iJU(1):p%iJU(2), 1), m%Mod%Lin%u)
+         if (p%iJU(1) > 0) call MV_AddDelta(m%Mod%Vars%u, m%XB(p%iJU(1):p%iJU(2), 1), m%Mod%Lin%u, RelaxIn=p%Relax)
 
          !----------------------------------------------------------------------
          ! TC and Option 1: Transfer updated states and inputs to modules
@@ -1831,7 +1834,7 @@ subroutine FAST_CalcOutputsAndSolveForInputs(p, m, GlueModData, GlueModMaps, Thi
       !-------------------------------------------------------------------------
 
       ! Add change in inputs
-      call MV_AddDelta(m%Mod%Vars%u, m%IO_X(:, 1), m%Mod%Lin%u)
+      call MV_AddDelta(m%Mod%Vars%u, m%IO_X(:, 1), m%Mod%Lin%u, RelaxIn=p%Relax)
 
       ! Transfer updated TC and Option 1 inputs to modules
       do i = 1, size(m%Mod%ModData)

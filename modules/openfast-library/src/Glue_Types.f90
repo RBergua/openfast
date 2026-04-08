@@ -101,6 +101,7 @@ IMPLICIT NONE
     INTEGER(IntKi)  :: ModCoupling = 0_IntKi      !< Module coupling method {1=loose; 2=tight with fixed Jacobian updates (DT_UJac); 3=tight with automatic Jacobian updates} [-]
     INTEGER(IntKi)  :: NumCrctn = 0_IntKi      !<  [-]
     INTEGER(IntKi)  :: MaxConvIter = 0_IntKi      !<  [-]
+    REAL(R8Ki)  :: Relax = 1.0_R8Ki      !< Under-relaxation factor for the iterative solver [-]
     INTEGER(IntKi)  :: NIter_UJac = 0_IntKi      !< Number of solution iterations between updating the Jacobian [-]
     INTEGER(IntKi)  :: NStep_UJac = 0_IntKi      !< Number of global time steps between updating the Jacobian [-]
     REAL(R8Ki)  :: Scale_UJac = 0.0_R8Ki      !< Jacobian load scaling factor [-]
@@ -742,6 +743,7 @@ subroutine Glue_CopyTCParam(SrcTCParamData, DstTCParamData, CtrlCode, ErrStat, E
    DstTCParamData%ModCoupling = SrcTCParamData%ModCoupling
    DstTCParamData%NumCrctn = SrcTCParamData%NumCrctn
    DstTCParamData%MaxConvIter = SrcTCParamData%MaxConvIter
+   DstTCParamData%Relax = SrcTCParamData%Relax
    DstTCParamData%NIter_UJac = SrcTCParamData%NIter_UJac
    DstTCParamData%NStep_UJac = SrcTCParamData%NStep_UJac
    DstTCParamData%Scale_UJac = SrcTCParamData%Scale_UJac
@@ -863,6 +865,7 @@ subroutine Glue_PackTCParam(RF, Indata)
    call RegPack(RF, InData%ModCoupling)
    call RegPack(RF, InData%NumCrctn)
    call RegPack(RF, InData%MaxConvIter)
+   call RegPack(RF, InData%Relax)
    call RegPack(RF, InData%NIter_UJac)
    call RegPack(RF, InData%NStep_UJac)
    call RegPack(RF, InData%Scale_UJac)
@@ -909,6 +912,7 @@ subroutine Glue_UnPackTCParam(RF, OutData)
    call RegUnpack(RF, OutData%ModCoupling); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%NumCrctn); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%MaxConvIter); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%Relax); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%NIter_UJac); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%NStep_UJac); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%Scale_UJac); if (RegCheckErr(RF, RoutineName)) return

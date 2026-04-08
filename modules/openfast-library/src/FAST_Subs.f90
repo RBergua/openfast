@@ -1982,6 +1982,10 @@ SUBROUTINE ValidateInputData(p, m_FAST, ErrStat, ErrMsg)
       CALL SetErrStat( ErrID_Fatal, 'MaxIter must be at least 1.', ErrStat, ErrMsg, RoutineName )
    END IF
 
+   IF ( (p%Relax <= 0.0_DbKi) .or. (p%Relax > 1.0_DbKi) ) THEN
+      CALL SetErrStat( ErrID_Fatal, 'Relax must be positive and less than or equal to 1.', ErrStat, ErrMsg, RoutineName )
+   END IF
+
       ! Check that InputFileData%OutFmt is a valid format specifier and will fit over the column headings
    CALL ChkRealFmtStr( p%OutFmt, 'OutFmt', p%FmtWidth, ErrStat2, ErrMsg2 )
       call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
@@ -2838,6 +2842,10 @@ SUBROUTINE FAST_ReadPrimaryFile( InputFile, p, m_FAST, OverrideAbortErrLev, ErrS
                      "for tight coupling generalized alpha integrator (-)", ErrStat2, ErrMsg2, UnEc)
    if (Failed()) return
       
+      ! Relax - Under-relaxation factor for the iterative solver (-) [>0 and <=1]
+   CALL ReadVar( UnIn, InputFile, p%Relax, "Relax", "Under-relaxation factor for the iterative solver (-) [>0 and <=1]", ErrStat2, ErrMsg2, UnEc)
+   if (Failed()) return
+
       ! DT_UJac - Time between calls to get Jacobians (s)
    CALL ReadVar( UnIn, InputFile, p%DT_UJac, "DT_UJac", "Time between calls to get Jacobians (s)", ErrStat2, ErrMsg2, UnEc)
    if (Failed()) return
