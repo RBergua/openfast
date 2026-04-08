@@ -887,7 +887,7 @@ SUBROUTINE SD_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg )
             ! Construct the direction cosine matrix given the output angles
             CALL SmllRotTrans( 'UR_bar input angles', m%U_full_NS(DOFList(4)), m%U_full_NS(DOFList(5)), m%U_full_NS(DOFList(6)), DCM, '', ErrStat2, ErrMsg2); if(Failed()) return
             y%Y2mesh%Orientation     (:,:,iSDNode)   = DCM
-            y%Y2mesh%TranslationDisp (:,iSDNode)     = m%U_full_NS     (DOFList(1:3)) !Y2: Guyan+CB (but no SIM) displacements
+            y%Y2mesh%TranslationDisp (:,iSDNode)     = m%U_full        (DOFList(1:3)) !Y2: Guyan+CB (with SIM) displacements
             y%Y2mesh%TranslationVel  (:,iSDNode)     = m%U_full_dot    (DOFList(1:3))
             y%Y2mesh%TranslationAcc  (:,iSDNode)     = m%U_full_dotdot (DOFList(1:3))
             y%Y2mesh%RotationVel     (:,iSDNode)     = m%U_full_dot    (DOFList(4:6))
