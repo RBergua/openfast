@@ -869,7 +869,7 @@ SUBROUTINE SD_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg )
             ! --- Rigid body displacements for hydrodyn
             y%Y2mesh%Orientation     (:,:,iSDNode)   = Rg2b
             y%Y2mesh%TranslationDisp (:,iSDNode)     = duP(1:3)                       ! Y2: NOTE: only the rigid-body displacements for floating
-            ! --- Full elastic displacements for others (moordyn)
+            ! --- Elastic displacements without SIM for others (Moordyn)
             y%Y3mesh%Orientation     (:,:,iSDNode)   = EulerConstructZYX(m%U_full_NS(DOFList(4:6)))
             y%Y3mesh%TranslationDisp (:,iSDNode)     = m%U_full_NS     (DOFList(1:3)) ! Y3: Guyan+CB (but no SIM) displacements
             ! --- Elastic velocities and accelerations 
@@ -880,22 +880,32 @@ SUBROUTINE SD_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg )
             end associate
          enddo
       else
-         ! --- Fixed bottom - Y3 and Y2 meshes are identical in this case
+         ! --- Fixed bottom
+         ! Y2: Guyan+CB displacements without SIM
+         ! Y3 = Y2 for all nodes (Guyan+CB, no SIM), then overwrite reaction node(s) with SIM correction for SoilDyn
          do iSDNode = 1,p%nNodes
             associate(DOFList => p%NodesDOF(iSDNode)%List)  ! Alias to shorten notations
             ! TODO TODO which orientation to give for joints with more than 6 dofs?
             ! Construct the direction cosine matrix given the output angles
             CALL SmllRotTrans( 'UR_bar input angles', m%U_full_NS(DOFList(4)), m%U_full_NS(DOFList(5)), m%U_full_NS(DOFList(6)), DCM, '', ErrStat2, ErrMsg2); if(Failed()) return
             y%Y2mesh%Orientation     (:,:,iSDNode)   = DCM
-            y%Y2mesh%TranslationDisp (:,iSDNode)     = m%U_full        (DOFList(1:3)) !Y2: Guyan+CB (with SIM) displacements
+            y%Y2mesh%TranslationDisp (:,iSDNode)     = m%U_full_NS     (DOFList(1:3)) !Y2: Guyan+CB (but no SIM) displacements
             y%Y2mesh%TranslationVel  (:,iSDNode)     = m%U_full_dot    (DOFList(1:3))
             y%Y2mesh%TranslationAcc  (:,iSDNode)     = m%U_full_dotdot (DOFList(1:3))
             y%Y2mesh%RotationVel     (:,iSDNode)     = m%U_full_dot    (DOFList(4:6))
             y%Y2mesh%RotationAcc     (:,iSDNode)     = m%U_full_dotdot (DOFList(4:6))
+            if (any(p%Nodes_C(:,1) == iSDNode)) then
+               ! Reaction node: Y3 gets Guyan+CB+SIM displacements (for SoilDyn)
+               CALL SmllRotTrans( 'UR_bar input angles', m%U_full(DOFList(4)), m%U_full(DOFList(5)), m%U_full(DOFList(6)), DCM, '', ErrStat2, ErrMsg2); if(Failed()) return
+               y%Y3mesh%Orientation     (:,:,iSDNode)   = DCM
+               y%Y3mesh%TranslationDisp (:,iSDNode)     = m%U_full        (DOFList(1:3)) ! Y3: Guyan+CB+SIM displacements
+            else
+               ! Non-reaction node: Y3 = Y2
+               y%Y3mesh%Orientation     (:,:,iSDNode) = y%Y2mesh%Orientation     (:,:,iSDNode)
+               y%Y3mesh%TranslationDisp (:,iSDNode)   = y%Y2mesh%TranslationDisp (:,iSDNode)
+            end if
             end associate
          enddo
-         y%Y3mesh%TranslationDisp = y%Y2mesh%TranslationDisp
-         y%Y3mesh%Orientation     = y%Y2mesh%Orientation
       endif
       ! --- Y3 mesh and Y2 mesh both have elastic (Guyan+CB) velocities and accelerations
       y%Y3mesh%TranslationVel = y%Y2mesh%TranslationVel
