@@ -894,16 +894,18 @@ SUBROUTINE SD_CalcOutput( t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg )
             y%Y2mesh%TranslationAcc  (:,iSDNode)     = m%U_full_dotdot (DOFList(1:3))
             y%Y2mesh%RotationVel     (:,iSDNode)     = m%U_full_dot    (DOFList(4:6))
             y%Y2mesh%RotationAcc     (:,iSDNode)     = m%U_full_dotdot (DOFList(4:6))
-            if (any(p%Nodes_C(:,1) == iSDNode)) then
-               ! Reaction node: Y3 gets Guyan+CB+SIM displacements (for SoilDyn)
-               CALL SmllRotTrans( 'UR_bar input angles', m%U_full(DOFList(4)), m%U_full(DOFList(5)), m%U_full(DOFList(6)), DCM, '', ErrStat2, ErrMsg2); if(Failed()) return
-               y%Y3mesh%Orientation     (:,:,iSDNode)   = DCM
-               y%Y3mesh%TranslationDisp (:,iSDNode)     = m%U_full        (DOFList(1:3)) ! Y3: Guyan+CB+SIM displacements
-            else
-               ! Non-reaction node: Y3 = Y2
-               y%Y3mesh%Orientation     (:,:,iSDNode) = y%Y2mesh%Orientation     (:,:,iSDNode)
-               y%Y3mesh%TranslationDisp (:,iSDNode)   = y%Y2mesh%TranslationDisp (:,iSDNode)
-            end if
+            end associate
+         enddo
+         ! Y3 = Y2 for all nodes (Guyan+CB, no SIM)
+         y%Y3mesh%TranslationDisp = y%Y2mesh%TranslationDisp
+         y%Y3mesh%Orientation     = y%Y2mesh%Orientation
+         ! Overwrite reaction node(s) in Y3 mesh with full elastic displacements including SIM (for SoilDyn) 
+         do i = 1, p%nNodes_C
+            iSDNode = p%Nodes_C(i,1)
+            associate(DOFList => p%NodesDOF(iSDNode)%List)  ! Alias to shorten notations
+            CALL SmllRotTrans( 'UR_bar input angles', m%U_full(DOFList(4)), m%U_full(DOFList(5)), m%U_full(DOFList(6)), DCM, '', ErrStat2, ErrMsg2); if(Failed()) return
+            y%Y3mesh%Orientation     (:,:,iSDNode)   = DCM
+            y%Y3mesh%TranslationDisp (:,iSDNode)     = m%U_full        (DOFList(1:3)) ! Y3: Guyan+CB+SIM displacements
             end associate
          enddo
       endif
