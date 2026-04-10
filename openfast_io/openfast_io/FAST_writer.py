@@ -294,6 +294,8 @@ class InputWriter_OpenFAST(object):
         f.write('{:<22} {:<11} {:}'.format(self.fst_vt['Fst']['RhoInf'], 'RhoInf', '- Convergence iteration error tolerance for tight coupling generalized alpha integrator (-)\n'))
         f.write('{:<22} {:<11} {:}'.format(self.fst_vt['Fst']['ConvTol'], 'ConvTol', '- Maximum number of convergence iterations for tight coupling generalized alpha integrator (-)\n'))
         f.write('{:<22} {:<11} {:}'.format(self.fst_vt['Fst']['MaxConvIter'], 'MaxConvIter', '- Number of correction iterations (-) {0=explicit calculation, i.e., no corrections}\n'))
+        f.write('{!s:<22} {:<11} {:}'.format(self.fst_vt['Fst']['AutoRelax'], 'AutoRelax', '- Adaptive under-relaxation for the tight-coupling iterative solver (flag) [default=true]\n'))
+        f.write('{:<22} {:<11} {:}'.format(self.fst_vt['Fst']['RelaxFactor'], 'RelaxFactor', '- Constant or initial (if AutoRelax) under-relaxation factor for the tight-coupling iterative solver (-) [>0 and <=1; default=0.7 if AutoRelax=false; default=0.3 if AutoRelax=true]\n'))
         f.write('{:<22} {:<11} {:}'.format(self.fst_vt['Fst']['DT_UJac'], 'DT_UJac', '- Time between calls to get Jacobians (s)\n'))
         f.write('{:<22} {:<11} {:}'.format(self.fst_vt['Fst']['UJacSclFact'], 'UJacSclFact', '- Scaling factor used in Jacobians (-)\n'))
         f.write('---------------------- FEATURE SWITCHES AND FLAGS ------------------------------\n')
