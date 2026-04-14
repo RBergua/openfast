@@ -342,6 +342,8 @@ class InputReader_OpenFAST(object):
         self.fst_vt['Fst']['RhoInf']  = float_read(f.readline().split()[0])
         self.fst_vt['Fst']['ConvTol']  = float_read(f.readline().split()[0])
         self.fst_vt['Fst']['MaxConvIter']  = int(f.readline().split()[0])
+        self.fst_vt['Fst']['AutoRelax'] = bool_read(f.readline().split()[0])
+        self.fst_vt['Fst']['RelaxFactor'] = float_read(f.readline().split()[0])
         self.fst_vt['Fst']['DT_UJac']  = float_read(f.readline().split()[0])
         self.fst_vt['Fst']['UJacSclFact']  = float_read(f.readline().split()[0])
 

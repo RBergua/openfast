@@ -1982,6 +1982,10 @@ SUBROUTINE ValidateInputData(p, m_FAST, ErrStat, ErrMsg)
       CALL SetErrStat( ErrID_Fatal, 'MaxIter must be at least 1.', ErrStat, ErrMsg, RoutineName )
    END IF
 
+   IF ( (p%RelaxFactor <= 0.0_DbKi) .or. (p%RelaxFactor > 1.0_DbKi) ) THEN
+      CALL SetErrStat( ErrID_Fatal, 'RelaxFactor must be positive and less than or equal to 1.', ErrStat, ErrMsg, RoutineName )
+   END IF
+
       ! Check that InputFileData%OutFmt is a valid format specifier and will fit over the column headings
    CALL ChkRealFmtStr( p%OutFmt, 'OutFmt', p%FmtWidth, ErrStat2, ErrMsg2 )
       call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
@@ -2837,7 +2841,20 @@ SUBROUTINE FAST_ReadPrimaryFile( InputFile, p, m_FAST, OverrideAbortErrLev, ErrS
    CALL ReadVar( UnIn, InputFile, p%MaxConvIter, "MaxConvIter", "Maximum number of convergence iterations "//&
                      "for tight coupling generalized alpha integrator (-)", ErrStat2, ErrMsg2, UnEc)
    if (Failed()) return
-      
+
+      ! AutoRelax - Adaptive under-relaxation (flag)
+   CALL ReadVarWDefault( UnIn, InputFile, p%AutoRelax, "AutoRelax", "Adaptive under-relaxation (flag)", .true., ErrStat2, ErrMsg2, UnEc)
+   if (Failed()) return
+
+      ! RelaxFactor - Constant or initial under-relaxation factor for the iterative solver (-) [>0 and <=1]
+   if (p%AutoRelax) then
+      CALL ReadVarWDefault( UnIn, InputFile, p%RelaxFactor, "RelaxFactor", "Constant or initial under-relaxation factor for the iterative solver (-) [>0 and <=1]", 0.3_R8Ki, ErrStat2, ErrMsg2, UnEc)
+      if (Failed()) return
+   else
+      CALL ReadVarWDefault( UnIn, InputFile, p%RelaxFactor, "RelaxFactor", "Constant or initial under-relaxation factor for the iterative solver (-) [>0 and <=1]", 0.7_R8Ki, ErrStat2, ErrMsg2, UnEc)
+      if (Failed()) return
+   endif
+
       ! DT_UJac - Time between calls to get Jacobians (s)
    CALL ReadVar( UnIn, InputFile, p%DT_UJac, "DT_UJac", "Time between calls to get Jacobians (s)", ErrStat2, ErrMsg2, UnEc)
    if (Failed()) return
