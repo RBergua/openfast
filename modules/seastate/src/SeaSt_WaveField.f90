@@ -684,7 +684,7 @@ end subroutine WaveField_GetWaveKin
 
 
 ! This subroutine is intended for AeroDyn when modeling MHK turbines
-SUBROUTINE WaveField_GetWaveVelAcc_AD( WaveField, WaveField_m, StartNode, Time, pos, FV, FA, ErrStat, ErrMsg )
+SUBROUTINE WaveField_GetWaveVelAcc_AD( WaveField, WaveField_m, StartNode, Time, pos, FV, FA, ErrStat, ErrMsg, BoxExceedAllow )
    type(SeaSt_WaveFieldType),          intent(in   ) :: WaveField
    type(GridInterp_MiscVarType),       intent(inout) :: WaveField_m
    integer(IntKi),                     intent(in   ) :: StartNode
@@ -694,6 +694,7 @@ SUBROUTINE WaveField_GetWaveVelAcc_AD( WaveField, WaveField_m, StartNode, Time, 
    real(ReKi),       allocatable,      intent(inout) :: FA(:,:)
    integer(IntKi),                     intent(  out) :: ErrStat  ! Error status of the operation
    character(*),                       intent(  out) :: ErrMsg   ! Error message if errStat /= ErrID_None
+   logical,          optional,         intent(in   ) :: BoxExceedAllow
    integer(IntKi),   allocatable                     :: nodeInWater(:)
    integer(IntKi)                                    :: NumPoints, i
    real(SiKi)                                        :: FV_node(3), FA_node(3)
@@ -734,7 +735,12 @@ SUBROUTINE WaveField_GetWaveVelAcc_AD( WaveField, WaveField_m, StartNode, Time, 
       IF (getAcc) THEN
          ALLOCATE(FA_DC( 3, NumPoints ), STAT=ErrStat2); if (FailedMsg('Error allocating FA_DC')) return;
       END IF
-      CALL IfW_FlowField_GetVelAcc(WaveField%CurrField, StartNode, Time, pos, FV_DC, FA_DC, ErrStat2, ErrMsg2, PosOffset=PosOffset); if (Failed()) return;
+
+      IF (PRESENT(BoxExceedAllow)) THEN
+         CALL IfW_FlowField_GetVelAcc(WaveField%CurrField, StartNode, Time, pos, FV_DC, FA_DC, ErrStat2, ErrMsg2, BoxExceedAllow=BoxExceedAllow, PosOffset=PosOffset); if (Failed()) return
+      ELSE
+         CALL IfW_FlowField_GetVelAcc(WaveField%CurrField, StartNode, Time, pos, FV_DC, FA_DC, ErrStat2, ErrMsg2, PosOffset=PosOffset); if (Failed()) return
+      END IF
 
       ! Add contributions from IfW current field if node is in water
       DO i = 1, NumPoints

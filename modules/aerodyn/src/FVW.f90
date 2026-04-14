@@ -1489,6 +1489,10 @@ subroutine FVW_CalcOutput(t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg)
    character(*),                    intent(  out)  :: ErrMsg      !< Error message if ErrStat /= ErrID_None
    ! Local variables
    integer(IntKi)                :: nP
+   integer(IntKi)                :: iStepFVW
+   logical, save                 :: FirstNotice_FreeNearWake = .true.
+   logical, save                 :: FirstNotice_NearWake = .true.
+   logical, save                 :: FirstNotice_FullWake = .true.
    integer(IntKi)                :: ErrStat2
    character(ErrMsgLen)          :: ErrMsg2
    character(*), parameter       :: RoutineName = 'FVW_CalcOutput'
@@ -1514,23 +1518,24 @@ subroutine FVW_CalcOutput(t, u, p, x, xd, z, OtherState, y, m, ErrStat, ErrMsg)
    endif
 
    ! Write some info to screen when major milestone achieved
-   if (m%iStep == p%nNWFree .and. p%nNWFree<p%nNWMax) then
-      nP = CountCPs(p, p%nNWFree, 0)
-      call WrScr(NewLine//'[INFO] OLAF free near wake is at full extent - '//trim(num2lstr(t))//'s, '//trim(num2lstr(nP))//' points.')
-   endif
-   if (m%iStep == p%nNWMax) then
-      nP = CountCPs(p, p%nNWMax, 0)
-      if (p%nFWMax==0) then
-         call WrScr(NewLine//'[INFO] OLAF wake is at full extent - '//trim(num2lstr(t))//'s, '//trim(num2lstr(nP))//' points.')
-      else
-         call WrScr(NewLine//'[INFO] OLAF near wake is at full extent - '//trim(num2lstr(t))//'s, '//trim(num2lstr(nP))//' points.')
-      endif
-   endif
-   if (p%nFWMax>0 .and. m%iStep== p%nNWMax+p%nFWMax) then
+   iStepFVW = floor(t/p%DTfvw+1.0E-6_DbKi)
+   if (FirstNotice_FullWake .and. iStepFVW == p%nNWMax+p%nFWMax) then
       nP = CountCPs(p, p%nNWMax, p%nFWMax)
       call WrScr(NewLine//'[INFO] OLAF wake is at full extent - '//trim(num2lstr(t))//'s, '//trim(num2lstr(nP))//' points.')
-   endif
-   
+      FirstNotice_FullWake     = .false.
+      FirstNotice_NearWake     = .false.
+      FirstNotice_FreeNearWake = .false.
+   elseif (FirstNotice_NearWake .and. iStepFVW == p%nNWMax) then  ! implies p%nFWMax > 0
+      nP = CountCPs(p, p%nNWMax,  0_IntKi)
+      call WrScr(NewLine//'[INFO] OLAF near wake is at full extent - '//trim(num2lstr(t))//'s, '//trim(num2lstr(nP))//' points.')
+      FirstNotice_NearWake     = .false.
+      FirstNotice_FreeNearWake = .false.
+   elseif (FirstNotice_FreeNearWake .and. iStepFVW == p%nNWFree) then ! implies p%nNWFree<p%nNWMax
+      nP = CountCPs(p, p%nNWFree, 0_IntKi)
+      call WrScr(NewLine//'[INFO] OLAF free near wake is at full extent - '//trim(num2lstr(t))//'s, '//trim(num2lstr(nP))//' points.')
+      FirstNotice_FreeNearWake = .false.
+   end if
+
    ! --- Export to VTK
    if (m%VTKstep==-1) then 
        ! Has never been called, special handling for init

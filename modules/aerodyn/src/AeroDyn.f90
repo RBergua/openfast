@@ -1976,18 +1976,27 @@ subroutine AD_CalcWind(t, u, FLowField, p, m, o, Inflow, ErrStat, ErrMsg)
    ! OLAF points
    if (allocated(o%WakeLocationPoints) .and. allocated(Inflow%InflowWakeVel)) then
       ! If rotor is MHK, add water depth to z coordinate
-      if (p%FVW%MHK > 0) then
+      if (p%FVW%MHK /= MHK_None) then
          PosOffset = [0.0_ReKi, 0.0_ReKi, p%FVW%WtrDpth]
       else
          PosOffset = 0.0_ReKi
       end if
 
-      call IfW_FlowField_GetVelAcc(FlowField, StartNode, t, &
-                                   o%WakeLocationPoints, &
-                                   Inflow%InflowWakeVel, &
-                                   NoAcc, ErrStat2, ErrMsg2, &
-                                   BoxExceedAllow=.true., PosOffset=PosOffset)
-      if(Failed()) return
+      if (p%FVW%MHK /= MHK_None .and. p%CompSeaSt) then ! MHK turbines with waves
+         call WaveField_GetWaveVelAcc_AD(p%WaveField, m%WaveField_m, &
+                                         StartNode, t, &
+                                         o%WakeLocationPoints, &
+                                         Inflow%InflowWakeVel, &
+                                         NoAcc, ErrStat2, ErrMsg2)
+         if(Failed()) return
+      else
+         call IfW_FlowField_GetVelAcc(FlowField, StartNode, t, &
+                                      o%WakeLocationPoints, &
+                                      Inflow%InflowWakeVel, &
+                                      NoAcc, ErrStat2, ErrMsg2, &
+                                      BoxExceedAllow=.true., PosOffset=PosOffset)
+         if(Failed()) return
+      end if
       StartNode = StartNode + size(o%WakeLocationPoints)
    end if
 
@@ -2034,7 +2043,7 @@ subroutine AD_CalcWind_Rotor(t, u, FlowField, p, p_AD, m, RotInflow, StartNode, 
          call WaveField_GetWaveVelAcc_AD(p_AD%WaveField, m%WaveField_m, StartNode, t, &
             real(u%HubMotion%TranslationDisp + u%HubMotion%Position, ReKi), &
             RotInflow%InflowOnHub, NoAcc, ErrStat2, ErrMsg2)
-         if(Failed()) return 
+         if(Failed()) return
       else
          RotInflow%InflowOnHub = 0.0_ReKi
       end if
@@ -2085,7 +2094,7 @@ subroutine AD_CalcWind_Rotor(t, u, FlowField, p, p_AD, m, RotInflow, StartNode, 
          call IfW_FlowField_GetVelAcc(FlowField, StartNode, t, &
             real(u%HubMotion%TranslationDisp + u%HubMotion%Position, ReKi), &
             RotInflow%InflowOnHub, NoAcc, ErrStat2, ErrMsg2, PosOffset=PosOffset)
-         if(Failed()) return 
+         if(Failed()) return
       else
          RotInflow%InflowOnHub = 0.0_ReKi
       end if
@@ -2469,7 +2478,7 @@ subroutine RotCavtCrit(u, p, m, errStat, errMsg)
                SigmaCavitCrit = ( p%rotors(iR)%Patm + ( p%rotors(iR)%Gravity * ( abs( u%rotors(iR)%BladeMotion(j)%Position(3,i) + u%rotors(iR)%BladeMotion(j)%TranslationDisp(3,i) ) + p%rotors(iR)%MSL2SWL ) * p%rotors(iR)%airDens ) - p%rotors(iR)%Pvap ) / ( 0.5_ReKi * p%rotors(iR)%airDens * Vreltemp**2 )  ! Critical value of Sigma, cavitation occurs if local cavitation number is greater than this
                                                                         
                if ( ( SigmaCavitCrit < SigmaCavit ) .and. ( .not. ( m%rotors(iR)%CavitWarnSet(i,j) ) ) ) then     
-                  call WrScr( NewLine//'Cavitation occurred at blade '//trim(num2lstr(j))//' and node '//trim(num2lstr(i))//'.' )
+                  call WrScr( NewLine//'Cavitation occurred at rotor '//trim(num2lstr(iR))//', blade '//trim(num2lstr(j))//', and node '//trim(num2lstr(i))//'.' )
                   m%rotors(iR)%CavitWarnSet(i,j) = .true.
                end if 
                            
@@ -3208,7 +3217,7 @@ end subroutine SetDisturbedInflow
 !! Loop on blade nodes and computed a weighted sector average inflow at each node
 subroutine SetSectAvgInflow(t, p, p_AD, u, RotInflow, m, errStat, errMsg)
    real(DbKi),                   intent(in   )  :: t                      !< Current simulation time in seconds
-   type(RotParameterType),       intent(in   )  :: p                      !< AD parameters
+   type(RotParameterType),       intent(in   )  :: p                      !< Rotor parameters
    type(AD_ParameterType),       intent(in   )  :: p_AD                   !< AD parameters
    type(RotInputType),           intent(in   )  :: u                      !< AD Inputs at Time
    type(RotInflowType),          intent(in   )  :: RotInflow              !< Rotor inflow at Time
@@ -3227,6 +3236,7 @@ subroutine SetSectAvgInflow(t, p, p_AD, u, RotInflow, m, errStat, errMsg)
    real(ReKi)              :: e_t(3)      !< Polar unit vector perpendicular to rHA_perp ("e_theta")
    real(ReKi)              :: psi         !< Azimuthal offset in the current sector, runs from -psi_bwd to psi_fwd
    real(ReKi)              :: dpsi        !< Azimuthal increment
+   real(ReKi)              :: PosOffset(3)!< IfW position offset for MHK turbines
    real(ReKi), allocatable :: SectPos(:,:)!< Points used to define a given sector (for a given blade node A)
    real(ReKi), allocatable :: SectVel(:,:)!< Inflow velocity at a given sector (Undisturbed and then disturbed)
    real(ReKi), allocatable :: SectAcc(:,:)!< Inflow velocity at a given sector (Undisturbed and then disturbed)
@@ -3293,7 +3303,21 @@ subroutine SetSectAvgInflow(t, p, p_AD, u, RotInflow, m, errStat, errMsg)
 
          ! --- Inflow on sector points
          ! Undisturbed
-         call IfW_FlowField_GetVelAcc(p_AD%FlowField, 1, t, SectPos, SectVel, SectAcc, errStat=errStat2, errMsg=errMsg2); if(Failed()) return
+         if (p%MHK /= MHK_None .and. p_AD%CompSeaSt) then ! MHK turbines with waves
+            call WaveField_GetWaveVelAcc_AD(p_AD%WaveField, m%WaveField_m, 1_IntKi, t, &
+                                            SectPos, SectVel, SectAcc, ErrStat2, ErrMsg2)
+            if(Failed()) return
+         else
+            if (p%MHK /= MHK_None) then
+               PosOffset = [0.0_ReKi, 0.0_ReKi, p%WtrDpth]
+            else
+               PosOffset = 0.0_ReKi
+            end if
+            call IfW_FlowField_GetVelAcc(p_AD%FlowField, 1_IntKi, t, &
+                                         SectPos, SectVel, SectAcc, errStat=errStat2, errMsg=errMsg2, &
+                                         PosOffset=PosOffset); if(Failed()) return
+         end if
+
          ! --- Option 1 Disturbed inflow Before averaging - SectVel is modified in place
          !if (p%TwrPotent /= TwrPotent_none .or. p%TwrShadow /= TwrShadow_none) then
          !   call TwrInflArray(p, u, RotInflow, m, SectPos, SectVel, errStat2, errMsg2); if(Failed()) return

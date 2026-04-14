@@ -718,7 +718,7 @@ SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SE
       if (Failed()) return
 
       ! Loop through rotors and add module for each one
-      do iRot = 1, p_FAST%NRotors
+      do iRot = p_FAST%NRotors, 1, -1
          CALL MV_AddModule(m_Glue%ModData, Module_AD, 'AD', iRot, dt_module, p_FAST%DT, &
                            Init%OutData_AD%rotors(iRot)%Vars, p_FAST%Linearize, ErrStat2, ErrMsg2, iRotor=iRot)
          if (Failed()) return
