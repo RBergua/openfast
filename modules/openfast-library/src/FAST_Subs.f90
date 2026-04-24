@@ -897,6 +897,7 @@ SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SE
       Init%InData_SlD%InputFile = p_FAST%SoilFile
       Init%InData_SlD%RootName = p_FAST%OutFileRoot
       Init%InData_SlD%SlDNonLinearForcePortionOnly = .true. ! SoilDyn will only return the Non-Linear portion of the reaction force
+	  Init%InData_SD%SlDNonLinear = Init%InData_SlD%SlDNonLinearForcePortionOnly
       Init%InData_SlD%WtrDpth = p_FAST%WtrDpth
 
       ! Initialize SoilDyn
