@@ -1323,6 +1323,8 @@ DO I = 1, p%nNodes_C
 enddo
 ! Trigger: determine if floating/fixed  based on BCs and SSI file
 p%Floating  = isFloating(Init,p)
+! Flag from glue code: if SoilDyn is returning nonlinear loads
+p%SlDNonLinear = InitInput%SlDNonLinear
 
 !------- INTERFACE JOINTS: T/F for Locked (to the TP)/Free DOF @each Interface Joint (only Locked-to-TP implemented thus far (=rigid TP)) ---------
 ! Joints with reaction forces, joint number and locked/free dof
