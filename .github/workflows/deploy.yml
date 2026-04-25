@@ -144,6 +144,16 @@ jobs:
         with:
           submodules: true
           fetch-depth: 0
+    
+      - name: Clean build directory
+        shell: cmd
+        run: |
+          if exist build (
+            rmdir /s /q build
+          )
+          if exist vs-build (
+            rmdir /s /q vs-build
+          )
 
       - name: Test devenv actually works
         shell: cmd
