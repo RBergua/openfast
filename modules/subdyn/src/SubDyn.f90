@@ -478,7 +478,10 @@ SUBROUTINE SD_Init( InitInput, u, p, x, xd, z, OtherState, y, m, Interval, InitO
    
    ! Initialize the outputs & Store mapping between nodes and elements  
    CALL SDOUT_Init( Init, y, p, m, InitOut, InitInput%WtrDpth, ErrStat2, ErrMsg2 ); if(Failed()) return
-   
+
+   ! Flag from glue code: if SoilDyn is returning nonlinear loads
+   p%SlDNonLinear = InitInput%SlDNonLinear
+
    ! Determine if we need to perform output file handling
    IF ( p%OutSwtch == 1 .OR. p%OutSwtch == 3 ) THEN  
        CALL SDOUT_OpenOutput( SD_ProgDesc, Init%RootName, p, InitOut, ErrStat2, ErrMsg2 ); if(Failed()) return
@@ -1323,8 +1326,6 @@ DO I = 1, p%nNodes_C
 enddo
 ! Trigger: determine if floating/fixed  based on BCs and SSI file
 p%Floating  = isFloating(Init,p)
-! Flag from glue code: if SoilDyn is returning nonlinear loads
-p%SlDNonLinear = InitInput%SlDNonLinear
 
 !------- INTERFACE JOINTS: T/F for Locked (to the TP)/Free DOF @each Interface Joint (only Locked-to-TP implemented thus far (=rigid TP)) ---------
 ! Joints with reaction forces, joint number and locked/free dof
