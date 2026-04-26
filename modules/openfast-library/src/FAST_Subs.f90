@@ -907,6 +907,9 @@ SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SE
                     SlD%y, SlD%m, dt_module, Init%OutData_SlD, ErrStat2, ErrMsg2)
       if (Failed()) return
 
+      ! Pass nonlinear flag to SubDyn: true only when REDWIN DLL is active (CalcOption=3)
+      Init%InData_SD%SlDNonLinear = SlD%p%UseREDWINinterface ! REDWIN DLL returning nonlinear soil reaction forces      
+
       ! Add module to list of modules, return on error
       CALL MV_AddModule(m_Glue%ModData, Module_SlD, 'SlD', 1, dt_module, p_FAST%DT, &
                         Init%OutData_SlD%Vars, p_FAST%Linearize, ErrStat2, ErrMsg2)
