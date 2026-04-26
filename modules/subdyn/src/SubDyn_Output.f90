@@ -476,6 +476,9 @@ SUBROUTINE SDOut_MapOutputs(u,p,x, y, m, AllOuts, ErrStat, ErrMsg )
       ENDDO
       ! Store into AllOuts
       AllOuts( ReactSS(1:nDOFL_TP) ) = matmul(p%TIreact,ReactNs)
+      ! When SoilDyn nonlinear loads are active (e.g., SoilDyn CalcOption = 3), SubDyn reaction loads are incomplete (only the linear part is included)
+      ! The total reaction at each base reaction joint is available in the SoilDyn output sensors (e.g., "Sld1Fxg Sld1Fyg Sld1Fzg Sld1Mxg Sld1Myg Sld1Mzg")
+      IF (p%SlDNonLinear) AllOuts( ReactSS(1:nDOFL_TP) ) = NaN
    ENDIF
    if (allocated(ReactNs)) deallocate(ReactNs)
 contains
