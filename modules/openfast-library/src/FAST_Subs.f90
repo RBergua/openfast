@@ -893,10 +893,9 @@ SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SE
          return
       end if
 
-      ! Initialization input   
+      ! Initialization input
       Init%InData_SlD%InputFile = p_FAST%SoilFile
       Init%InData_SlD%RootName = p_FAST%OutFileRoot
-      Init%InData_SlD%SlDNonLinearForcePortionOnly = .true. ! SoilDyn will only return the Non-Linear portion of the reaction force
       Init%InData_SlD%WtrDpth = p_FAST%WtrDpth
 
       ! Initialize SoilDyn
@@ -908,13 +907,13 @@ SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SE
       if (Failed()) return
 
       ! Pass nonlinear flag to SubDyn: true only when REDWIN DLL is active (CalcOption=3)
-      Init%InData_SD%SlDNonLinear = SlD%p%UseREDWINinterface ! REDWIN DLL returning nonlinear soil reaction forces      
+      Init%InData_SD%SlDNonLinear = SlD%p%UseREDWINinterface ! REDWIN DLL returning nonlinear soil reaction forces
 
       ! Add module to list of modules, return on error
       CALL MV_AddModule(m_Glue%ModData, Module_SlD, 'SlD', 1, dt_module, p_FAST%DT, &
                         Init%OutData_SlD%Vars, p_FAST%Linearize, ErrStat2, ErrMsg2)
       if (Failed()) return
-      
+
    end select
 
    !----------------------------------------------------------------------------
