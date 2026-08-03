@@ -2,7 +2,7 @@
 Free vortex wake input file for OC7 Phase III WP 3.2 model. One wind turbine with a time step of 0.0015015 s.
 --------------------------- GENERAL OPTIONS ---------------------------------------------------
 default IntMethod          - Integration method {1: RK4, 5: Forward Euler 1st order, default: 5} (switch). Currently, only options 1 and 5 are implemented. 
-default DTfvw              - Time interval for wake propagation. {default: dtaero} (s) Time interval at which the module will update the wake. Must be a multiple of the dt used in AeroDyn.
+0.001 DTfvw              - Time interval for wake propagation. {default: dtaero} (s) Time interval at which the module will update the wake. Must be a multiple of the dt used in AeroDyn.
 default FreeWakeStart      - Time when wake is free. (-) value = always free. {default: 0.0} (s)
 default FullCircStart      - Time at which full circulation is reached. {default: 0.0} (s)
 --------------------------- CIRCULATION SPECIFICATIONS ----------------------------------------
@@ -40,11 +40,7 @@ default PartPerSegment     - Number of particles per segment {default: 1} [only 
 0       nVTKBlades         Number of blades for which VTK files are exported {0: No VTK per blade, n: VTK for blade 1 to n} (-) 
 1       VTKCoord           Coordinate system used for VTK export. {1: Global, 2: Hub, default: 1} 
 0       VTK_fps            Frame rate for VTK output (frames per second) {"all" for all glue code timesteps (1/DTAero in a AeroDyn input file), default for all OLAF timesteps} [used only if WrVTK=1]. It has to be a multiple of 1/DTfvw. 
-4       nGridOut           Number of grid outputs (the result is written down in the vtk_fvw folder using the name used in GridName below. The name also includes a number that corresponds to the time step specified below as DTOut).
+0       nGridOut           Number of grid outputs (the result is written down in the vtk_fvw folder using the name used in GridName below. The name also includes a number that corresponds to the time step specified below as DTOut).
 GridName    GridType (1 = velocity, 2 = velocity and vorticity) TStart TEnd           DTOut (all = AeroDyn time step, default: OLAF time step)     XStart    XEnd   nX    YStart   YEnd    nY    ZStart   ZEnd   nZ
 (-)           (-)                                                (s)    (s)            (s)                                                          (m)      (m)    (-)    (m)     (m)     (-)    (m)     (m)    (-)
-"1D_left"      1                                                1     1          default                                                     0.3897   0.3897     1  -1.1625  -0.465     6      1       1       1
-"1D_middle"    1                                                1     1          default                                                     0.3897   0.3897     1  -0.3488   0.3488    7      1       1       1
-"1D_right"     1                                                1     1          default                                                     0.3897   0.3897     1    0.465   1.1625    6      1       1       1
-"1D"           1                                                1     1          default                                                     0.3897   0.3897     1 "Ypoints.dat"  -     -      1       1       1
 ------------------------------------------------------------------------------------------------
