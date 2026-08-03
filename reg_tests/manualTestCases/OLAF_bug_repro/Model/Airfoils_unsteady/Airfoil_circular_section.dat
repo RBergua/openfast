@@ -1,0 +1,74 @@
+! ------------ AirfoilInfo v1.01.x Input File ---------------------------------- 
+! Circular section for OC7 Phase III WP 3.2. Assumed: Cd = 1.2 (residual influence in the results).  
+! ------------------------------------------------------------------------------ 
+"DEFAULT" InterpOrd ! Interpolation order to use for quasi-steady table lookup {1=linear; 3=cubic spline; "default"} [default=1] 
+default   RelThickness  - ! The non-dimensional thickness of the airfoil (thickness/chord) [only used if UAMod=7] [default=0.2] (-) 
+1         NonDimArea ! The non-dimensional area of the airfoil (area/chord^2) (set to 1.0 if unsure or unneeded) 
+0         NumCoords ! The number of coordinates in the airfoil shape file. Set to zero if coordinates not included. 
+"unused"  BL_file ! The file name including the boundary layer characteristics of the profile. Ignored if the aeroacoustic module is not called. 
+1         NumTabs ! Number of airfoil tables in this file. Each table must have lines for Re and Ctrl. 
+! ------------------------------------------------------------------------------ 
+! data for table 1 
+! ------------------------------------------------------------------------------ 
+0.015     Re ! Reynolds number in millions 
+0         UserProp ! User property (control) setting 
+False     InclUAdata ! Is unsteady aerodynamics data included in this table? If TRUE, then include 30 UA coefficients below this line 
+!........................................
+! Table of aerodynamics coefficients 
+54 NumAlf ! Number of data lines in the following table 
+! Alpha Cl Cd Cm Roger: Not used in this case. 
+! (deg) (-) (-) (-) 
+-180	0	1.2	0
+-170	0	1.2	0
+-160	0	1.2	0
+-150	0	1.2	0
+-140	0	1.2	0
+-130	0	1.2	0
+-120	0	1.2	0
+-110	0	1.2	0
+-100	0	1.2	0
+-90	0	1.2	0
+-80	0	1.2	0
+-70	0	1.2	0
+-60	0	1.2	0
+-50	0	1.2	0
+-40	0	1.2	0
+-30	0	1.2	0
+-20	0	1.2	0
+-10	0	1.2	0
+-5	0	1.2	0
+-4	0	1.2	0
+-3	0	1.2	0
+-2	0	1.2	0
+-1	0	1.2	0
+0	0	1.2	0
+1	0	1.2	0
+2	0	1.2	0
+3	0	1.2	0
+4	0	1.2	0
+5	0	1.2	0
+6	0	1.2	0
+7	0	1.2	0
+8	0	1.2	0
+9	0	1.2	0
+10	0	1.2	0
+11	0	1.2	0
+12	0	1.2	0
+15	0	1.2	0
+20	0	1.2	0
+30	0	1.2	0
+40	0	1.2	0
+50	0	1.2	0
+60	0	1.2	0
+70	0	1.2	0
+80	0	1.2	0
+90	0	1.2	0
+100	0	1.2	0
+110	0	1.2	0
+120	0	1.2	0
+130	0	1.2	0
+140	0	1.2	0
+150	0	1.2	0
+160	0	1.2	0
+170	0	1.2	0
+180	0	1.2	0
