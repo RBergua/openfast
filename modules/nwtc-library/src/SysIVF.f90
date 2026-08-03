@@ -55,7 +55,7 @@ MODULE SysSubs
       MODULE PROCEDURE NWTC_gammaR8
    END INTERFACE
 
-   INTEGER, PARAMETER            :: ConRecL     = 120                               ! The record length for console output.
+   INTEGER, PARAMETER            :: ConRecL     = 300                               ! The record length for console output. Must be >= MaxWrScrLen (below), otherwise WRITE statements to the console unit that wrap a line up to MaxWrScrLen characters overflow the record and silently fail (IOSTAT=66) under Intel Fortran, since WriteScr does not check the IOSTAT of its WRITE.
    INTEGER, PUBLIC               :: CU          = 7                                 ! The I/O unit for the console (Can be changed with SetConsoleUnit subroutine)
    INTEGER, PARAMETER            :: MaxWrScrLen = 256                                ! The maximum number of characters allowed to be written to a line in WrScr
    LOGICAL, PARAMETER            :: KBInputOK   = .TRUE.                            ! A flag to tell the program that keyboard input is allowed in the environment.
@@ -354,7 +354,6 @@ SUBROUTINE WriteScr ( Str, Frm )
    ELSE
       WRITE ( CU, Frm, IOSTAT=ErrStat ) TRIM(Str)
    END IF
-   print*, 'TEMP DIAG WriteScr: CU=', CU, ' IOSTAT=', ErrStat, ' LenStr=', LEN_TRIM(Str), ' Str=[', TRIM(Str), ']'
 
 END SUBROUTINE WriteScr ! ( Str )
 !=======================================================================
