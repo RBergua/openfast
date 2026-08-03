@@ -1,0 +1,21 @@
+------- AERODYN BLADE DEFINITION INPUT FILE -------------------------------------
+OC7 Phase III WP 3.2. Table 3.1, using blade span instead of position on blade axis.
+======  Blade Properties =================================================================
+         15   NumBlNds           - Number of blade nodes used in the analysis (-).
+  BlSpn        BlCrvAC        BlSwpAC        BlCrvAng       BlTwist        BlChord          BlAFID  
+   (m)           (m)            (m)            (deg)         (deg)           (m)              (-)
+  0.000	          0	             0	             0	         19.94	        0.050	           1     # Circular section
+  0.020	          0	             0	             0	         19.94	        0.050	           1     # Circular section
+  0.044	          0	             0	             0	         19.94	        0.130	           2     # SD7062 airfoil (3D rotational augmentation not necessary according to C. Schulz)
+  0.069	          0	             0	             0	         17.02	        0.126	           2     #        |
+  0.094	          0	             0	             0	         14.10	        0.116	           2     #        |
+  0.119	          0	             0	             0	         12.11	        0.101	           2     #        |
+  0.144	          0	             0	             0	         10.13	        0.089	           2     #        |
+  0.169	          0	             0	             0	          8.88	        0.080	           2     #        |
+  0.194	          0	             0	             0	          7.63	        0.072	           2     #        |
+  0.219	          0	             0	             0	          6.99	        0.066	           2     #        |
+  0.244	          0	             0	             0	          6.35	        0.061	           2     #        |
+  0.294	          0	             0	             0	          5.48	        0.052	           2     #        |
+  0.344	          0	             0	             0	          5.02	        0.046	           2     #        |
+  0.394	          0	             0	             0	          4.46	        0.042	           2     #        v
+  0.419	          0	             0	             0	          4.00	        0.040	           2     # SD7062 airfoil
