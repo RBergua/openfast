@@ -264,6 +264,12 @@ SUBROUTINE ProgExit ( StatCode )
 
    INTEGER, INTENT(IN)          :: StatCode                                      ! The status code to pass to the OS.
 
+   ! TEMP bisection fix attempt: CALL EXIT bypasses the normal Fortran runtime
+   ! shutdown sequence (which flushes/closes open I/O units on STOP), so any
+   ! buffered console/redirected output not yet written to disk can be lost.
+   ! Force an explicit flush of the console unit before the hard process exit.
+   CALL FLUSH ( CU )
+
    CALL EXIT ( StatCode )
    
    ! IF ( StatCode == 0 ) THEN
