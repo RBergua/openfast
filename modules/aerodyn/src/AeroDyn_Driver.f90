@@ -80,7 +80,6 @@ contains
 !................................   
    subroutine CheckError()
       if (dat%ErrStat /= ErrID_None) then
-         call WrScr('')
          call WrScr(TRIM(dat%errMsg))
          if (dat%errStat >= AbortErrLev) then
             call Dvr_End()

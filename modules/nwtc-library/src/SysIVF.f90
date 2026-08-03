@@ -354,6 +354,7 @@ SUBROUTINE WriteScr ( Str, Frm )
    ELSE
       WRITE ( CU, Frm, IOSTAT=ErrStat ) TRIM(Str)
    END IF
+   print*, 'TEMP DIAG WriteScr: CU=', CU, ' IOSTAT=', ErrStat, ' LenStr=', LEN_TRIM(Str), ' Str=[', TRIM(Str), ']'
 
 END SUBROUTINE WriteScr ! ( Str )
 !=======================================================================
