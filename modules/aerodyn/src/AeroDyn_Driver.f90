@@ -79,9 +79,8 @@ program AeroDyn_Driver
 contains
 !................................   
    subroutine CheckError()
-      integer(IntKi) :: TEMP_DIAG_dummy
       if (dat%ErrStat /= ErrID_None) then
-         TEMP_DIAG_dummy = LEN_TRIM(dat%errMsg)
+         call WrScr('')
          call WrScr(TRIM(dat%errMsg))
          if (dat%errStat >= AbortErrLev) then
             call Dvr_End()
