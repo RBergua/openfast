@@ -80,6 +80,7 @@ contains
 !................................   
    subroutine CheckError()
       if (dat%ErrStat /= ErrID_None) then
+         print*, 'TEMP DIAG: dat%ErrStat=', dat%ErrStat, ' LEN_TRIM(dat%errMsg)=', LEN_TRIM(dat%errMsg), ' errMsg=[', TRIM(dat%errMsg), ']'
          call WrScr(TRIM(dat%errMsg))
          if (dat%errStat >= AbortErrLev) then
             call Dvr_End()
