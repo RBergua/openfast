@@ -1,0 +1,50 @@
+--------------------------- FREE WAKE INPUT FILE ----------------------------------------------
+Free vortex wake input file for OC7 Phase III WP 3.2 model. One wind turbine with a time step of 0.0015015 s.
+--------------------------- GENERAL OPTIONS ---------------------------------------------------
+default IntMethod          - Integration method {1: RK4, 5: Forward Euler 1st order, default: 5} (switch). Currently, only options 1 and 5 are implemented. 
+default DTfvw              - Time interval for wake propagation. {default: dtaero} (s) Time interval at which the module will update the wake. Must be a multiple of the dt used in AeroDyn.
+default FreeWakeStart      - Time when wake is free. (-) value = always free. {default: 0.0} (s)
+default FullCircStart      - Time at which full circulation is reached. {default: 0.0} (s)
+--------------------------- CIRCULATION SPECIFICATIONS ----------------------------------------
+default CircSolvMethod     - Circulation solving method {1: Cl-Based, 2: No-Flow Through, 3: Prescribed, default: 1 }(switch)
+default CircSolvConvCrit   - Convergence criteria {default: 0.001} [only if CircSolvMethod=1] (-)
+default CircSolvRelaxation - Relaxation factor {default: 0.1} [only if CircSolvMethod=1] (-)
+default CircSolvMaxIter    - Maximum number of iterations for circulation solving {default: 30} (-)
+"NA"    PrescribedCircFile - File containing prescribed circulation [only if CircSolvMethod=3] (quoted string).
+===============================================================================================
+--------------------------- WAKE OPTIONS ------------------------------------------------------
+------------------- WAKE EXTENT AND DISCRETIZATION --------------------------------------------
+3200    nNWPanel           - Number of near-wake panels [integer] (-). The project requests the flow field to reach up to 10D.
+2500    nNWPanelsFree      - Number of free near-wake panels (-) {default: nNWPanels}. No free panels would be frozen-wake.
+0       nFWPanels          - Number of far-wake panels (-) {default: 0}
+0       nFWPanelsFree      - Number of free far-wake panels (-) {default: nFWPanels}
+default FWShedVorticity    - Include shed vorticity in the far wake {default: False}
+------------------- WAKE REGULARIZATIONS AND DIFFUSION -----------------------------------------
+default DiffusionMethod    - Diffusion method to account for viscous effects {0: None, 1: Core Spreading, default: 0}. R. Bergua: Diffusion is not implemented!         
+3       RegDeterMethod     - Method to determine the regularization parameters {0:  Manual (uses the inputs provided in the next lines of this section), 1: Optimized, 2: Chord, 3: Span, default: 0 }          
+default RegFunction        - Viscous diffusion function {0: None, 1: Rankine, 2: LambOseen, 3: Vatistas, 4: Denominator, default: 3} (switch)
+default WakeRegMethod      - Wake regularization method {1: Constant, 2: Stretching, 3: Age, default: 3} (switch)
+1.5     WakeRegFactor      - Wake regularization factor (m or -). Reducing this value will reduce the initial core radius. The bigger the core radius is, the smoother the wake will be. Between 0.25 and 3 when using RegDeterMethod = 3. 
+1.5     WingRegFactor      - Wing regularization factor (m or -). Between 0.25 and 3 when using RegDeterMethod = 3.
+1000    CoreSpreadEddyVisc - Eddy viscosity in core spreading methods (for DiffusionMethod = 1 or WakeRegMethod = 3), typical values 1-1000. default = 100. Higher CoreSpreadEddyVisc = the vortex cores fatten up faster as they travel downstream, so the wake blurs out and stays smooth.
+------------------- WAKE TREATMENT OPTIONS ---------------------------------------------------
+False   TwrShadowOnWake    Include tower flow disturbance effects on wake convection {default:false} [only if TwrPotent or TwrShadow in AeroDyn]. If the tower influence is activated in AeroDyn, the loads are always accounting for it. This option here is only for the wake.
+1       ShearModel         Shear Model {0: No treatment, 1: Mirrored vorticity (accounts for the ground effect), default: 0}. For wind tunnel tests, if the turbine is fairly close to the ground, then there must be a contribution from the ground and it's better to use ShearModel = 1.  
+------------------- SPEEDUP OPTIONS -----------------------------------------------------------
+2       VelocityMethod     - Method to determine the velocity {1:Segment N^2, 2:Particle tree, 3:Particle N^2, 4:Segment tree, default: 2}
+default TreeBranchFactor   - Branch radius fraction above which a multipole calculation is used {default: 1.5} [only if VelocityMethod=2,4]
+default PartPerSegment     - Number of particles per segment {default: 1} [only if VelocityMethod=2,3]
+===============================================================================================
+--------------------------- OUTPUT OPTIONS (wake visualizations) ---------------------------------------------------
+2       WrVTk              Outputs Visualization Toolkit (VTK) (independent of .fst option) {0: NoVTK, 1: Write VTK in the folder vtk_fvw at each time step defined in VTK_fps, 2: outputs at time steps defined by VTK_fps, but ensures that a file is written at the beginning and the end of the simulation (typically used with VTK_fps=0)} (flag)
+0       nVTKBlades         Number of blades for which VTK files are exported {0: No VTK per blade, n: VTK for blade 1 to n} (-) 
+1       VTKCoord           Coordinate system used for VTK export. {1: Global, 2: Hub, default: 1} 
+0       VTK_fps            Frame rate for VTK output (frames per second) {"all" for all glue code timesteps (1/DTAero in a AeroDyn input file), default for all OLAF timesteps} [used only if WrVTK=1]. It has to be a multiple of 1/DTfvw. 
+4       nGridOut           Number of grid outputs (the result is written down in the vtk_fvw folder using the name used in GridName below. The name also includes a number that corresponds to the time step specified below as DTOut).
+GridName    GridType (1 = velocity, 2 = velocity and vorticity) TStart TEnd           DTOut (all = AeroDyn time step, default: OLAF time step)     XStart    XEnd   nX    YStart   YEnd    nY    ZStart   ZEnd   nZ
+(-)           (-)                                                (s)    (s)            (s)                                                          (m)      (m)    (-)    (m)     (m)     (-)    (m)     (m)    (-)
+"1D_left"      1                                                1     1          default                                                     0.3897   0.3897     1  -1.1625  -0.465     6      1       1       1
+"1D_middle"    1                                                1     1          default                                                     0.3897   0.3897     1  -0.3488   0.3488    7      1       1       1
+"1D_right"     1                                                1     1          default                                                     0.3897   0.3897     1    0.465   1.1625    6      1       1       1
+"1D"           1                                                1     1          default                                                     0.3897   0.3897     1 "Ypoints.dat"  -     -      1       1       1
+------------------------------------------------------------------------------------------------

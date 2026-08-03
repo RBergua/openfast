@@ -173,6 +173,9 @@ jobs:
       - name: Test version output
         run: .github/scripts/test_windows_executables.bat
 
+      - name: Test AeroDyn printing messages on console
+        run: .github/scripts/test_console_prints.bat
+
       - name: Build MATLAB Mex File
         uses: matlab-actions/run-command@v2
         with:
