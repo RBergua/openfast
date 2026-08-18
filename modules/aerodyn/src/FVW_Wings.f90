@@ -468,6 +468,11 @@ contains
 
       end do ! convergence loop
       if (OLAF_PROFILING) call toc()
+      ! R. Bergua DEBUG: instrumentation to diagnose anomalous RtAeroFxi drop at absolute step ~16003
+      if (m%iStep>=15990 .and. m%iStep<=16020) then
+         print '(A,I0,A,I0,A,ES14.6,A,ES14.6)', '[RBDEBUG-CIRC] n=', m%iStep, &
+            ' iIter=', iIter, ' MeanGamma=', MeanGamma, ' maxDGamma=', maxval(abs(DGamma))
+      endif
       if (iIter==p%CircSolvMaxIter) then
          if (DEV_VERSION) then
             print'(A,I0,A,I0,A)','Circulation solve, call ',iLabel,', done after ........................ nIter: ', iIter, ' <<< Max reached'

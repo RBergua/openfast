@@ -589,6 +589,12 @@ subroutine FVW_UpdateStates( t, n, u, utimes, p, x, xd, z, OtherState, AFInfo, m
    integer(IntKi) :: nP, nFWEff, nNWEff, iW
    logical :: bReevaluation
    logical :: bOverCycling
+   ! R. Bergua DEBUG: locals for instrumentation to diagnose anomalous RtAeroFxi drop at absolute step ~16003
+   integer(IntKi) :: iW_dbg
+   real(ReKi) :: gLL_min, gLL_max, gLL_sum
+   real(ReKi) :: gNW_min, gNW_max, gNW_sum
+   real(ReKi) :: rNW_min, rNW_max
+   real(ReKi) :: epsNW_min, epsNW_max
    if (OLAF_PROFILING) call tic('FVW_UpdateStates')
    ErrStat = ErrID_None
    ErrMsg  = ""
@@ -751,6 +757,32 @@ subroutine FVW_UpdateStates( t, n, u, utimes, p, x, xd, z, OtherState, AFInfo, m
 
    ! --- Fake handling of ground effect (ensure vorticies above ground)
    call FakeGroundEffect(p, x, m, ErrStat, ErrMsg)
+
+   ! R. Bergua DEBUG: instrumentation to diagnose anomalous RtAeroFxi drop at absolute step ~16003
+   ! (occurs regardless of DT, panel count, VelocityMethod, UA_Mod, WakeRegMethod, CircSolvMethod settings)
+   if (n>=15990 .and. n<=16020) then
+      gLL_min=huge(1.0_ReKi); gLL_max=-huge(1.0_ReKi); gLL_sum=0.0_ReKi
+      gNW_min=huge(1.0_ReKi); gNW_max=-huge(1.0_ReKi); gNW_sum=0.0_ReKi
+      rNW_min=huge(1.0_ReKi); rNW_max=-huge(1.0_ReKi)
+      epsNW_min=huge(1.0_ReKi); epsNW_max=-huge(1.0_ReKi)
+      do iW_dbg=1,p%nWings
+         gLL_min = min(gLL_min, minval(z%W(iW_dbg)%Gamma_LL))
+         gLL_max = max(gLL_max, maxval(z%W(iW_dbg)%Gamma_LL))
+         gLL_sum = gLL_sum + sum(z%W(iW_dbg)%Gamma_LL)
+         gNW_min = min(gNW_min, minval(x%W(iW_dbg)%Gamma_NW(:,p%iNWStart+1:m%nNW)))
+         gNW_max = max(gNW_max, maxval(x%W(iW_dbg)%Gamma_NW(:,p%iNWStart+1:m%nNW)))
+         gNW_sum = gNW_sum + sum(x%W(iW_dbg)%Gamma_NW(:,p%iNWStart+1:m%nNW))
+         rNW_min = min(rNW_min, minval(x%W(iW_dbg)%r_NW(3,:,p%iNWStart+1:m%nNW+1)))
+         rNW_max = max(rNW_max, maxval(x%W(iW_dbg)%r_NW(3,:,p%iNWStart+1:m%nNW+1)))
+         epsNW_min = min(epsNW_min, minval(x%W(iW_dbg)%Eps_NW(1,:,p%iNWStart+1:m%nNW)))
+         epsNW_max = max(epsNW_max, maxval(x%W(iW_dbg)%Eps_NW(1,:,p%iNWStart+1:m%nNW)))
+      enddo
+      print '(A,I0,A,F12.6,A,I0,A,I0,A,6(ES14.6,1X),A,2(ES14.6,1X))', &
+         '[RBDEBUG] n=', n, ' t=', t, ' nNW=', m%nNW, ' nFW=', m%nFW, &
+         ' GLL(min,max,sum)/GNW(min,max,sum)=', gLL_min, gLL_max, gLL_sum, gNW_min, gNW_max, gNW_sum, &
+         ' rNWz(min,max)=', rNW_min, rNW_max
+      print '(A,I0,A,2(ES14.6,1X))', '[RBDEBUG] n=', n, ' EpsNW(min,max)=', epsNW_min, epsNW_max
+   endif
 
    ! set the wind points required for t+p%DTaero timestep
    CALL SetRequestedWindPoints(m%r_wind, x, p, m)
