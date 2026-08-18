@@ -339,6 +339,12 @@ contains
       ! Error handling
       integer(IntKi)           :: ErrStat2
       character(ErrMsgLen)     :: ErrMsg2
+      ! R. Bergua DEBUG: locals for fine-grained per-iteration instrumentation (step ~16000 anomaly)
+      logical                  :: bDbg
+      integer(IntKi)           :: kCP_maxres
+      real(ReKi)               :: maxDGamma_dbg
+      real(DbKi), save         :: GammaLastIter_Dbl_sum = 0.0_DbKi  !< shadow double-precision accumulator (persists across calls)
+      real(DbKi)               :: DGamma_Dbl_max
 
 
       ! Initialize ErrStat
@@ -414,6 +420,9 @@ contains
          enddo
       endif
 
+      ! R. Bergua DEBUG: enable fine-grained per-iteration prints only in the window around step ~16000
+      bDbg = (m%iStep>=15998 .and. m%iStep<=16006)
+
       ! --- Convergence loop until near wake gives induction coherent with circulation
       if (OLAF_PROFILING) call tic('Convergence loop')
       bConverged=.false.
@@ -465,6 +474,19 @@ contains
           iIter=iIter+1
           MeanGamma  = sum(abs(GammaLastIter))/(nCP_tot)
           bConverged = maxval(abs(DGamma))/(MeanGamma)<p%CircSolvConvCrit
+
+          ! R. Bergua DEBUG: per-iteration fine-grained trace - which CP has the largest residual,
+          ! plus a double-precision shadow sum of GammaLastIter to test single-precision accumulation hypothesis
+          if (bDbg) then
+             kCP_maxres = maxloc(abs(DGamma),1)
+             maxDGamma_dbg = abs(DGamma(kCP_maxres))
+             GammaLastIter_Dbl_sum = sum(real(GammaLastIter,DbKi))
+             print '(A,I0,A,I0,A,I0,A,ES14.6,A,ES14.6,A,ES14.6,A,ES20.12)', &
+                '[RBDEBUG-ITER] n=', m%iStep, ' iIter=', iIter, ' kCP_maxres=', kCP_maxres, &
+                ' DGamma_max=', maxDGamma_dbg, ' Gamma_LL(kCP_maxres)=', Gamma_LL(kCP_maxres), &
+                ' GammaLastIter(kCP_maxres)=', GammaLastIter(kCP_maxres), &
+                ' GammaLastIter_DblSum=', GammaLastIter_Dbl_sum
+          endif
 
       end do ! convergence loop
       if (OLAF_PROFILING) call toc()
