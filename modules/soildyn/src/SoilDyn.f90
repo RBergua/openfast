@@ -122,10 +122,14 @@ subroutine SlD_Init(InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitOut
       return
    end if
 
-   call SlD_InitMeshes(InputFileData, u, y, p, m, ErrStat2, ErrMsg2); if (Failed()) return; 
+   ! --- DEBUG ---
+   WRITE(*,'(A)') 'DBG: before SlD_InitMeshes'; FLUSH(6)
+   call SlD_InitMeshes(InputFileData, u, y, p, m, ErrStat2, ErrMsg2); if (Failed()) return;
+   WRITE(*,'(A)') 'DBG: after SlD_InitMeshes'; FLUSH(6)
 
    ! Set miscvars: including dll_data arrays and checking for input files.
-   call SlD_InitStatesMisc(InputFileData, m, xd, ErrStat2, ErrMsg2); if (Failed()) return; 
+   call SlD_InitStatesMisc(InputFileData, m, xd, ErrStat2, ErrMsg2); if (Failed()) return;
+   WRITE(*,'(A)') 'DBG: after SlD_InitStatesMisc'; FLUSH(6)
 
    ! Setup and initialize the Calc Options
    select case (p%CalcOption)
@@ -136,6 +140,7 @@ subroutine SlD_Init(InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitOut
    case (Calc_REDWIN)
       call SlD_REDWINsetup(InputFileData, p, m, xd, ErrStat, ErrMsg)
    end select
+   WRITE(*,'(A)') 'DBG: after CalcOption select'; FLUSH(6)
 
    ! set parameters for I/O data
    InitOut%Ver = SlD_Ver
@@ -144,14 +149,18 @@ subroutine SlD_Init(InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitOut
    call AllocAry(InitOut%WriteOutputUnt, p%NumOuts, 'WriteOutputUnt', errStat2, errMsg2); if (Failed()) return; 
    call AllocAry(y%WriteOutput, p%NumOuts, 'WriteOutput', ErrStat2, ErrMsg2); if (Failed()) return; 
    y%WriteOutput = 0
+   WRITE(*,'(A)') 'DBG: after WriteOutput allocs'; FLUSH(6)
 
-   call SetOutParam(InputFileData%OutList, p, ErrStat2, ErrMsg2); if (Failed()) return; 
+   call SetOutParam(InputFileData%OutList, p, ErrStat2, ErrMsg2); if (Failed()) return;
+   WRITE(*,'(A)') 'DBG: after SetOutParam'; FLUSH(6)
    do j = 1, p%NumOuts
       InitOut%WriteOutputHdr(j) = p%OutParam(j)%Name
       InitOut%WriteOutputUnt(j) = p%OutParam(j)%Units
    end do
 
    call SlD_InitVars(u, p, x, y, m, InitOut%Vars, InitInp%Linearize, ErrStat2, ErrMsg2)
+   WRITE(*,'(A)') 'DBG: after SlD_InitVars'; FLUSH(6)
+   ! --- END DEBUG ---
 
 contains
    logical function Failed()
@@ -392,7 +401,10 @@ subroutine SlD_InitVars(u, p, x, y, m, Vars, Linearize, ErrStat, ErrMsg)
    ErrMsg = ""
 
    ! Clear module variables type
+   ! --- DEBUG ---
+   WRITE(*,'(A)') 'DBG: SlD_InitVars start'; FLUSH(6)
    call NWTC_Library_DestroyModVarsType(Vars, ErrStat2, ErrMsg2); if (Failed()) return
+   WRITE(*,'(A)') 'DBG: after DestroyModVarsType'; FLUSH(6)
 
    !----------------------------------------------------------------------------
    ! Continuous State Variables
@@ -408,6 +420,7 @@ subroutine SlD_InitVars(u, p, x, y, m, Vars, Linearize, ErrStat, ErrMsg)
    call MV_AddMeshVar(Vars%u, "SoilMesh", MotionFields, &
                       DL=DatLoc(SlD_u_SoilMesh), &
                       Mesh=u%SoilMesh)
+   WRITE(*,'(A)') 'DBG: after MV_AddMeshVar u'; FLUSH(6)
 
    !----------------------------------------------------------------------------
    ! Output variables
@@ -417,6 +430,7 @@ subroutine SlD_InitVars(u, p, x, y, m, Vars, Linearize, ErrStat, ErrMsg)
    call MV_AddMeshVar(Vars%y, 'SoilMesh', LoadFields, &
                       DL=DatLoc(SlD_y_SoilMesh), &
                       Mesh=y%SoilMesh)
+   WRITE(*,'(A)') 'DBG: after MV_AddMeshVar y'; FLUSH(6)
 
    ! Write output variables
    call MV_AddVar(Vars%y, "WriteOutput", FieldScalar, &
@@ -424,12 +438,15 @@ subroutine SlD_InitVars(u, p, x, y, m, Vars, Linearize, ErrStat, ErrMsg)
                   Num=p%NumOuts, &
                   Flags=VF_WriteOut, &
                   LinNames=[(WriteOutputLinName(i),i=1,p%NumOuts)])
+   WRITE(*,'(A)') 'DBG: after MV_AddVar WriteOutput'; FLUSH(6)
 
    !----------------------------------------------------------------------------
    ! Initialization dependent on linearization
    !----------------------------------------------------------------------------
 
    call MV_InitVarsJac(Vars, m%Jac, Linearize, ErrStat2, ErrMsg2); if (Failed()) return
+   WRITE(*,'(A)') 'DBG: after MV_InitVarsJac'; FLUSH(6)
+   ! --- END DEBUG ---
 
    if (Linearize) then
       call SlD_CopyContState(x, m%x_perturb, MESH_NEWCOPY, ErrStat2, ErrMsg2); if (Failed()) return

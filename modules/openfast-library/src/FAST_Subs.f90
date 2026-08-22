@@ -910,6 +910,10 @@ SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SE
                     SlD%x(STATE_CURR), SlD%xd(STATE_CURR), &
                     SlD%z(STATE_CURR), SlD%OtherSt(STATE_CURR), &
                     SlD%y, SlD%m, dt_module, Init%OutData_SlD, ErrStat2, ErrMsg2)
+      WRITE(*,'(A)') 'DBG: SlD_Init returned'; FLUSH(6)
+      call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
+      if (ErrStat >= AbortErrLev) return
+
       if (Failed()) return
 
       ! Pass nonlinear flag to SubDyn: true only when REDWIN DLL is active (CalcOption=3)
@@ -953,11 +957,12 @@ SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SE
 
       ! If SoilDyn is enabled
       if (p_FAST%CompSoil == Module_SlD) then
-
+         WRITE(*,'(A)') 'DBG: before SoilStiffness copy'; FLUSH(6)
          ! Copy over the soil stiffness matrices
          if (allocated(SlD%p%Stiffness)) then
             Init%InData_SD%SoilStiffness = SlD%p%Stiffness
          endif
+         WRITE(*,'(A)') 'DBG: after SoilStiffness copy'; FLUSH(6)
 
          ! Make a copy of the SoilMesh to pass over
          if (SlD%Input(INPUT_CURR)%SoilMesh%Initialized) then
@@ -966,7 +971,8 @@ SUBROUTINE FAST_InitializeAll( t_initial, m_Glue, p_FAST, y_FAST, m_FAST, ED, SE
                           CtrlCode = MESH_COUSIN, &
                           IOS      = COMPONENT_OUTPUT, &
                           ErrStat  = ErrStat2, &
-                          ErrMess  = ErrMsg2) 
+                          ErrMess  = ErrMsg2)
+            WRITE(*,'(A)') 'DBG: after MeshCopy'; FLUSH(6)
          endif
       endif
 
