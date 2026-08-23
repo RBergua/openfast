@@ -223,7 +223,8 @@ contains
 
       call AllocAry(m%ForceTotal, 6, p%NumPoints, 'ForceTotal array for output', ErrStat2, ErrMsg2)
       call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-
+      ! This is a test for Alex
+      
       select case (p%CalcOption)
       case (Calc_StiffDamp)
          allocate (xd%dll_states(1), STAT=ErrStat2)
