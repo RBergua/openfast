@@ -1304,6 +1304,7 @@ contains
          end if
       else
          ! Time exceeds array bounds
+         print *, 'DEBUG: Periodic=', G3D%Periodic, ' T_GRID=', T_GRID, ' NSteps=', G3D%NSteps
          call SetErrStat(ErrID_Fatal, ' Error: GF wind array was exhausted at '// &
                          TRIM(Num2LStr(TIME))//' seconds (trying to access data at '// &
                          TRIM(Num2LStr(TimeShifted))//' seconds). IT_Lo='//TRIM(Num2LStr(IT_Lo))// &
