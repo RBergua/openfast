@@ -789,7 +789,7 @@ subroutine Grid3DField_GetCell(G3D, Time, Position, CalcAccel, AllowExtrap, &
    if (ErrStat >= AbortErrLev) return
 
    !----------------------------------------------------------------------------
-   ! Extract interpolation cells from grids based on poisiont
+   ! Extract interpolation cells from grids based on position
    !----------------------------------------------------------------------------
 
    ! If position is inside grid
@@ -1289,6 +1289,11 @@ contains
       ! Adjust indices and interpolant
       if (IT_LO >= 1 .and. IT_HI <= G3D%NSteps) then
          ! Point is within grid
+      else if (IT_LO == 0 .and. T_GRID >= -GridTol) then
+         ! Within tolerance of the first time step
+         IT_LO = 1
+         IT_HI = 1
+         DT = -1.0_ReKi
       else if (IT_LO == G3D%NSteps) then
          if (G3D%Periodic) then
             ! Time wraps back to beginning
@@ -1304,10 +1309,9 @@ contains
          end if
       else
          ! Time exceeds array bounds
-         print *, 'DEBUG: Periodic=', G3D%Periodic, ' T_GRID=', T_GRID, ' NSteps=', G3D%NSteps
          call SetErrStat(ErrID_Fatal, ' Error: GF wind array was exhausted at '// &
                          TRIM(Num2LStr(TIME))//' seconds (trying to access data at '// &
-                         TRIM(Num2LStr(TimeShifted))//' seconds). IT_Lo='//TRIM(Num2LStr(IT_Lo))// &
+                         TRIM(Num2LStr(TimeShifted))//' seconds). IT_LO='//TRIM(Num2LStr(IT_Lo))// &
                          ', IT_HI='//TRIM(Num2LStr(IT_Hi)), &
                          ErrStat, ErrMsg, RoutineName)
       end if
